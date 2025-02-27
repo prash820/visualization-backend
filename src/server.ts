@@ -27,7 +27,16 @@ app.get('*', (req : any, res : any) => {
   res.sendFile(path.join(__dirname, '../../visualization-frontend/dist/index.html'));
 });
 
-app.use(cors());
+const allowedOrigins = ["https://lucky-youtiao-ce3cda.netlify.app"]; // Update with actual Netlify URL
+
+
+app.use(cors(
+  {
+    origin: allowedOrigins,
+    methods: 'GET, POST, PUT, DELETE',
+    credentials: true
+  }
+));
 app.use(bodyParser.json());
 
 connectDB();
