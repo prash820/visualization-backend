@@ -1,0 +1,214 @@
+aws:
+  analytics:
+    - Athena
+    - EMR
+    - Glue
+    - Kinesis
+    - LakeFormation
+    - MSK
+    - QuickSight
+    - Redshift
+  ar:
+    - Sumerian
+  blockchain:
+    - ManagedBlockchain
+  business:
+    - AlexaForBusiness
+    - Chime
+    - WorkMail
+    - WorkSpaces
+  compute:
+    - ApplicationAutoScaling
+    - Batch
+    - ComputeOptimizer
+    - EC2
+    - ElasticBeanstalk
+    - Lambda
+    - Lightsail
+    - Outposts
+    - ServerlessApplicationRepository
+    - ThinkboxDeadline
+    - ThinkboxDraft
+    - ThinkboxFrost
+    - ThinkboxKrakatoa
+    - ThinkboxSequoia
+    - ThinkboxStoke
+    - ThinkboxXMesh
+    - Wavelength
+  cost:
+    - CostExplorer
+    - CostManagement
+    - ReservedInstanceReporting
+  database:
+    - Aurora
+    - DatabaseMigrationService
+    - DocumentDB
+    - DynamoDB
+    - ElastiCache
+    - Keyspaces
+    - Neptune
+    - QuantumLedgerDatabase
+    - RDS
+    - Timestream
+  devtools:
+    - CloudDevelopmentKit
+    - Cloud9
+    - CodeBuild
+    - CodeCommit
+    - CodeDeploy
+    - CodePipeline
+    - CodeStar
+    - CommandLineInterface
+    - ToolsAndSDKs
+    - XRay
+  enablement:
+    - ControlTower
+    - ManagedServices
+    - Organizations
+    - ServiceCatalog
+    - SystemsManager
+  enduser:
+    - AppStream
+    - WorkDocs
+    - WorkLink
+    - WorkSpaces
+  engagement:
+    - Connect
+    - Pinpoint
+    - SimpleEmailService
+  game:
+    - GameLift
+  general:
+    - Account
+    - Client
+    - General
+    - Internet
+    - Marketplace
+    - OfficeBuilding
+    - Region
+    - SAP
+    - Tradicional
+  integration:
+    - AppSync
+    - ConsoleMobileApplication
+    - EventBridge
+    - MQ
+    - SimpleNotificationService
+    - SimpleQueueService
+    - StepFunctions
+  iot:
+    - FreeRTOS
+    - Greengrass
+    - IoT1Click
+    - IoTAnalytics
+    - IoTCore
+    - IoTDeviceDefender
+    - IoTDeviceManagement
+    - IoTEvents
+    - IoTSiteWise
+    - IoTThingsGraph
+  management:
+    - AutoScaling
+    - CloudFormation
+    - CloudTrail
+    - CloudWatch
+    - Config
+    - LicenseManager
+    - ManagedServices
+    - OpsWorks
+    - ServiceCatalog
+    - SystemsManager
+    - TrustedAdvisor
+    - WellArchitectedTool
+  media:
+    - ElasticTranscoder
+    - ElementalConductor
+    - ElementalDelta
+    - ElementalLive
+    - ElementalMediaConnect
+    - ElementalMediaConvert
+    - ElementalMediaPackage
+    - ElementalMediaStore
+    - ElementalMediaTailor
+    - ElementalServer
+  migration:
+    - ApplicationDiscoveryService
+    - CloudEndureMigration
+    - DatabaseMigrationService
+    - DataSync
+    - MigrationHub
+    - ServerMigrationService
+    - Snowball
+    - SnowballEdge
+    - Snowmobile
+    - TransferForSFTP
+  ml:
+    - Comprehend
+    - DeepLens
+    - DeepLearningContainers
+    - DeepRacer
+    - ElasticInference
+    - Forecast
+    - FraudDetector
+    - Kendra
+    - Lex
+    - MachineLearning
+    - Personalize
+    - Polly
+    - Rekognition
+    - SageMaker
+    - Textract
+    - Transcribe
+    - Translate
+  mobile:
+    - Amplify
+    - APIGateway
+    - AppSync
+    - DeviceFarm
+    - MobileHub
+  network:
+    - APIGateway
+    - AppMesh
+    - CloudFront
+    - CloudMap
+    - DirectConnect
+    - ElasticLoadBalancing
+    - GlobalAccelerator
+    - PrivateLink
+    - Route53
+    - VPC
+  quantum:
+    - Braket
+  robotics:
+    - RoboMaker
+  satellite:
+    - GroundStation
+  security:
+    - Artifact
+    - CertificateManager
+    - CloudHSM
+    - Cognito
+    - Detective
+    - DirectoryService
+    - FirewallManager
+    - GuardDuty
+    - IAM
+    - Inspector
+    - KeyManagementService
+    - Macie
+    - SecretsManager
+    - SecurityHub
+    - Shield
+    - SingleSignOn
+    - WAF
+  storage:
+    - Backup
+    - ElasticBlockStore
+    - ElasticFileSystem
+    - FSx
+    - Glacier
+    - SimpleStorageServiceS3
+    - Snowball
+    - SnowballEdge
+    - Snowmobile
+    - StorageGateway
