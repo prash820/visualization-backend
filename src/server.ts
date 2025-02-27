@@ -16,15 +16,8 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Serve Frontend (React)
-app.use(express.static(path.join(__dirname, '../../visualization-frontend/dist')));
-
 app.get('/api/health', (req : any, res : any) => {
   res.json({ message: 'API is running' });
-});
-
-
-app.get('*', (req : any, res : any) => {
-  res.sendFile(path.join(__dirname, '../../visualization-frontend/dist/index.html'));
 });
 
 const allowedOrigins = ["https://lucky-youtiao-ce3cda.netlify.app"]; // Update with actual Netlify URL
@@ -33,7 +26,7 @@ const allowedOrigins = ["https://lucky-youtiao-ce3cda.netlify.app"]; // Update w
 app.use(cors(
   {
     origin: allowedOrigins,
-    methods: 'GET, POST, PUT, DELETE',
+    methods: 'GET, POST, PUT, DELETE, OPTIONS',
     credentials: true
   }
 ));
