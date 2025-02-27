@@ -54,22 +54,25 @@ const authenticateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, 
     var _a;
     const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
     if (!token) {
+        console.log("No token provided");
         res.status(401).json({ error: "Access denied. No token provided." });
         return;
     }
     try {
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        // Handle Expired Token Case
+        console.log("Decoded Token:", decoded); // ✅ Debugging
         if (!decoded || !decoded.id) {
+            console.log("Invalid token structure");
             res.status(403).json({ error: "Invalid token." });
             return;
         }
         const user = yield User_1.default.findById(decoded.id);
+        console.log("User Found:", user); // ✅ Debugging
         if (!user) {
             res.status(404).json({ error: "User not found." });
             return;
         }
-        req.user = user; // Attach user to the request
+        req.user = user;
         next();
     }
     catch (error) {

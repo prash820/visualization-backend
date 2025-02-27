@@ -12,20 +12,21 @@ const db_1 = __importDefault(require("./db"));
 const openAI_1 = __importDefault(require("./routes/openAI"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const project_1 = __importDefault(require("./routes/project"));
-const path_1 = __importDefault(require("path"));
 const diagram_1 = __importDefault(require("./routes/diagram")); // NEW route for Diagrams
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5001;
 // Serve Frontend (React)
-app.use(express_1.default.static(path_1.default.join(__dirname, '../../visualization-frontend/dist')));
 app.get('/api/health', (req, res) => {
     res.json({ message: 'API is running' });
 });
-app.get('*', (req, res) => {
-    res.sendFile(path_1.default.join(__dirname, '../../visualization-frontend/dist/index.html'));
-});
-app.use((0, cors_1.default)());
+const allowedOrigins = ["https://lucky-youtiao-ce3cda.netlify.app"]; // Update with actual Netlify URL
+app.use((0, cors_1.default)({
+    origin: allowedOrigins,
+    methods: 'GET, POST, PUT, DELETE, OPTIONS',
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+}));
 app.use(body_parser_1.default.json());
 (0, db_1.default)();
 // Routes
