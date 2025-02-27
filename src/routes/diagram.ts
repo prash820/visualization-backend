@@ -1,6 +1,6 @@
 // src/routes/diagrams.ts
 import express from "express";
-import type { Request, Response,  } from "express";
+import  { Request, Response,  } from "express";
 import { spawn } from "child_process";
 import asyncHandler from "../utils/asyncHandler";
 

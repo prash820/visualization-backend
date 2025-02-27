@@ -1,6 +1,6 @@
 // src/routes/graphviz.ts
 import express from "express";
-import type { Request, Response,  } from "express";
+import  { Request, Response,  } from "express";
 import asyncHandler from "../utils/asyncHandler"; // or "express-async-handler"
 import { spawn } from "child_process";
 

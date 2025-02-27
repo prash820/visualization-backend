@@ -1,5 +1,6 @@
 import express from "express";
-import type { Request, Response,  } from "express";import Project from "../models/Project";
+import  { Request, Response,  } from "express";
+import Project from "../models/Project";
 import dotenv from "dotenv";
 dotenv.config();
 const router = express.Router();

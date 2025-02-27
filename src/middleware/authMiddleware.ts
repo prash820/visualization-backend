@@ -1,5 +1,5 @@
 import express from "express";
-import type { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload, TokenExpiredError } from "jsonwebtoken";
 import User from "../models/User"; // Adjust path to your User model
 import dotenv from "dotenv";

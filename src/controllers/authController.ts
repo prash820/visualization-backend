@@ -1,6 +1,6 @@
 // src/controllers/authController.ts
 import express from "express";
-import type { Request, Response } from "express";
+import { Request, Response, Router } from "express"; 
 import User from "../models/User";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
