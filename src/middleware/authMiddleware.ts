@@ -1,16 +1,16 @@
-import express from "express";
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload, TokenExpiredError } from "jsonwebtoken";
-import User from "../models/User"; // Adjust path to your User model
+import User, { IUser } from "../models/User"; // ✅ Import IUser from the User model
 import dotenv from "dotenv";
 
 dotenv.config();
 
+// ✅ Fix: Ensure `AuthRequest` uses the correct User type
 interface AuthRequest extends Request {
-  user?: any; // Define user type properly if using TypeScript models
+  user?: IUser; // ✅ Correctly reference the IUser interface
 }
 
-// ✅ Instead of `jwt.JwtPayload`, define a custom type
+// ✅ Define JWT Payload Type
 interface DecodedToken {
   id: string;
   email: string;
@@ -18,40 +18,37 @@ interface DecodedToken {
   exp: number;
 }
 
-export const authenticateToken = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+// ✅ Fix TypeScript Issue: Middleware should return `void`
+export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const token = req.headers.authorization?.split(" ")[1];
 
   if (!token) {
-    console.log("No token provided");
     res.status(401).json({ error: "Access denied. No token provided." });
     return;
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as DecodedToken
-    
-    console.log("Decoded Token:", decoded); // ✅ Debugging
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as DecodedToken;
 
-    if (!decoded || !decoded.id) {
-      console.log("Invalid token structure");
+    if (!decoded?.id) {
       res.status(403).json({ error: "Invalid token." });
       return;
     }
 
-    const user = await User.findById(decoded.id);
-    console.log("User Found:", user); // ✅ Debugging
+    // ✅ Fix: Retrieve the full `IUser` object
+    User.findById(decoded.id).then((user) => {
+      if (!user) {
+        res.status(404).json({ error: "User not found." });
+        return;
+      }
 
-    if (!user) {
-      res.status(404).json({ error: "User not found." });
-      return;
-    }
+      req.user = user; // ✅ Now req.user is correctly typed as `IUser`
+      next();
+    }).catch((err) => {
+      console.error("Database error:", err);
+      res.status(500).json({ error: "Database error. Please try again later." });
+    });
 
-    req.user = user;
-    next();
   } catch (error) {
     console.error("Token verification failed:", error);
 

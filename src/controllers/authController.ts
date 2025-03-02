@@ -24,32 +24,29 @@ export const registerUser = async (req: Request, res: Response) => {
 
 // Login User
 export const loginUser = async (req: Request, res: Response) => {
-    const { email, password } = req.body;
-    
-    try {
-      // Check if user exists
-      const user = await User.findOne({ email });
-      if (!user) {
-        return res.status(401).json({ error: "Invalid email or password." });
-      }
+  const { email, password } = req.body;
   
-      // Compare passwords
-      const isMatch = await user.comparePassword(password);
-      if (!isMatch) {
-        return res.status(401).json({ error: "Invalid email or password." });
-      }
-  
-      // Generate JWT token
-      const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET!, {
-        expiresIn: "1h", // Token expiry time
-      });
-  
-      res.status(200).json({ token, message: "Login successful!" });
-    } catch (error) {
-      console.error("Error during login:", error);
-      res.status(500).json({ error: "Server error. Please try again later." });
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or password." }); // ✅ Ensure JSON response
     }
-  };
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid email or password." }); // ✅ Ensure JSON response
+    }
+
+    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET!, {
+      expiresIn: "1h",
+    });
+
+    res.status(200).json({ token, message: "Login successful!" }); // ✅ Always return JSON
+  } catch (error) {
+    console.error("Error during login:", error);
+    res.status(500).json({ error: "Server error. Please try again." }); // ✅ Ensure JSON response
+  }
+};
 
 // Validate Token
 export const validateToken = async (req: Request, res: Response) => {
