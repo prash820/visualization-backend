@@ -3,9 +3,36 @@ import express from "express";
 import { Request, Response,  } from "express";
 import { OpenAI } from "openai";
 import dotenv from "dotenv";
+import { group } from "console";
 dotenv.config();
 const router = express.Router();
 export default router;
+
+interface DiagramNode {
+  id: string;
+  label: string;
+  group?: string;
+  subgroup?: string;
+}
+
+interface DiagramEdge {
+  source: string;
+  target: string;
+  label?: string;
+}
+
+interface DiagramGroup {
+  id: string;
+  label: string;
+  parentGroup?: string;
+}
+
+interface ArchitectureResponse {
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+  groups: DiagramGroup[];
+}
+
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
@@ -30,39 +57,37 @@ export const generateVisualization = async (req: Request, res: Response) => {
               Role means the type of node, like start/end, process, decision, input output, etc
               Do not include any extra text.          
       `,
-    architecture: `You are an AI assistant specialized in generating architecture diagrams based on user prompts with over 10 years of experience.
+    architecture: `Generate a cloud architecture diagram based on the following user request:
 
-      Return only valid JSON in the following format:
-
-      json
-      Copy
-      Edit
-      {
-        "nodes": [
+          🔹 **User Query:** "<User's input>"  
+          🔹 **Diagram Type:** "architecture"  
+          
+          ### **💡 Expected Output Format**
+          1️⃣ **Group related services together** (e.g., AWS Services, AI Services).  
+          2️⃣ **Ensure child services are housed inside parent groups** (e.g., EC2 inside VPC, Lambda inside Compute).  
+          3️⃣ **Use intuitive positioning** (Avoid overlaps, maintain clear relationships).  
+          4️⃣ **Define proper relationships** between services (e.g., API Gateway routes requests to Lambda, S3 stores output data).  
+          
+          ### **📌 JSON Format**
+          json
           {
-            "provider": "aws",
-            "service": "service_name",          // Service name (e.g., VPC, EC2, S3)
-            "label": "Readable Label",          // Human-readable label (e.g., Virtual Private Cloud)
-            "group": "Main Group",              // High-level cluster (e.g., AWS, Azure)
-            "subgroup": "Sub Group",            // Sub-cluster under the main group (e.g., Networking, Compute)
-            "parent": "Parent Node Label",      // Optional: If this node is contained within another (e.g., VPC contains EC2)
-            "position": { "x": 0, "y": 0 }      // Optional: Node position
-          }
-        ],
-        "edges": [
-          {
-            "sourceLabel": "Readable Label",    // Matches the label field in nodes
-            "targetLabel": "Readable Label",    // Matches the label field in nodes
-            "label": "Optional Edge Label"      // Optional: Label for the edge
-          }
-        ]
-      }
-      Rules:
-      Ensure "provider" is always "aws" and that "service" is one of AWS's official products.
-      Use "group" for high-level clusters (e.g., AWS) and "subgroup" for service categories (e.g., Networking, Compute).
-      Utilize the "parent" field to represent hierarchical relationships (e.g., VPC → Subnet → EC2).
-      Maintain connections across clusters, sub-clusters, and parent-child nodes using accurate edges.
-      Do not include any extra text, commentary, or explanations — only the JSON output.  `,
+            "groups": [
+              { "id": "aws-services", "label": "AWS Services" },
+              { "id": "lambda-functions", "label": "Lambda Functions", "parentGroup": "aws-services" }
+            ],
+            "nodes": [
+              { "id": "api-gateway", "label": "API Gateway", "group": "aws-services" },
+              { "id": "lambda-1", "label": "Function A", "group": "lambda-functions" },
+              { "id": "lambda-2", "label": "Function B", "group": "lambda-functions" },
+              { "id": "s3", "label": "S3 Storage", "group": "aws-services" },
+              { "id": "dynamodb", "label": "DynamoDB", "group": "aws-services" }
+            ],
+            "edges": [
+              { "source": "api-gateway", "target": "lambda-1" },
+              { "source": "lambda-1", "target": "s3" },
+              { "source": "lambda-1", "target": "dynamodb" }
+            ]
+          }`,
     sequence: `
           You are an AI assistant specialized in generating sequence diagrams based on user prompts.
         Return only valid JSON with two arrays: "nodes" and "edges".
@@ -88,7 +113,7 @@ export const generateVisualization = async (req: Request, res: Response) => {
   };
   // Choose a system prompt based on diagramType
   try {
-    console.log("user prompt ", prompt);
+    console.log("User Prompt:", prompt);
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
@@ -99,17 +124,116 @@ export const generateVisualization = async (req: Request, res: Response) => {
     });
 
     const fullResponse = response.choices[0]?.message?.content || "";
-    const jsonMatch = fullResponse.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      return res.status(400).json({ error: "Invalid JSON response from AI" });
+    console.log("AI Response ", fullResponse);
+    switch (diagramType)  {
+      case "architecture" : {
+        const parsedData = parseArchitectureResponse(fullResponse);
+        return res.json(parsedData);
+      }
+      default : {
+        const parseData = parseGenericResponse(fullResponse);
+        return res.json(parseData);
+      }
     }
 
-    console.log("AI Response:", jsonMatch[0]);
-    const diagramJson = JSON.parse(jsonMatch[0]);
-    return res.json({ nodes: diagramJson.nodes, edges: diagramJson.edges });
   } catch (error) {
     console.error("Error generating visualization:", error);
     return res.status(500).json({ error: "Failed to generate diagram." });
+  }
+};
+
+export const generateIaC = async (req: Request, res: Response) => {
+  const { nodes, edges, format } = req.body; // ✅ Ensure these values exist
+
+  if (!nodes?.length || !edges?.length || !format) {
+    console.error("❌ Missing parameters:", { nodes, edges, format });
+    return res.status(400).json({ error: "Missing required parameters." });
+  }
+
+  console.log(`[AI] Generating ${format.toUpperCase()} code for architecture diagram`);
+
+  const systemPrompt = `
+    You are an expert in Infrastructure as Code (IaC).
+    Given an architecture diagram with AWS services, generate valid ${format.toUpperCase()} code.
+    
+    ## Instructions:
+    - Use official ${format.toUpperCase()} modules and syntax.
+    - Ensure all services are correctly configured.
+    - Handle dependencies (e.g., Lambda needs an IAM role).
+    - Optimize for best practices.
+
+    ## Example Input:
+    Nodes: ${JSON.stringify(nodes, null, 2)}
+    Edges: ${JSON.stringify(edges, null, 2)}
+
+    ## Expected Output:
+    - Valid ${format.toUpperCase()} code
+    - No explanations, only the code output
+  `;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: "Generate the IaC code for this architecture." },
+      ],
+      max_tokens: 1000,
+    });
+
+    // ✅ Safely Extract the AI Response
+    const fullResponse = response.choices[0]?.message?.content || "";
+    console.log("✅ AI IaC Response:", fullResponse);
+    
+    res.json({ code: fullResponse });
+  } catch (error) {
+    console.error("❌ Error generating IaC:", error);
+    return res.status(500).json({ error: "Failed to generate IaC." });
+  }
+};
+
+const parseArchitectureResponse = (response: string): ArchitectureResponse => {
+  try {
+    console.log("[AI RAW RESPONSE]:", response);
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Invalid JSON format received from AI.");
+    }
+
+    const parsedData: ArchitectureResponse = JSON.parse(jsonMatch[0]);
+
+    if (!parsedData.nodes || !parsedData.edges || !parsedData.groups) {
+      throw new Error("Missing required keys (nodes, edges, groups) in AI response.");
+    }
+
+    // ✅ Ensure every node has a valid group
+    parsedData.nodes.forEach((node: DiagramNode) => {
+      if (!node.group) {
+        throw new Error(`Node "${node.label}" is missing a group!`);
+      }
+    });
+
+    return parsedData;
+  } catch (error) {
+    console.error("Error parsing AI response:", error);
+    throw new Error("Invalid architecture response format");
+  }
+};
+
+const parseGenericResponse = (response: string) => {
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Invalid JSON format");
+
+    const diagramJson = JSON.parse(jsonMatch[0]);
+    
+    if (!diagramJson.nodes || !diagramJson.edges) {
+      throw new Error("Missing nodes or edges in response");
+    }
+
+    return diagramJson;
+  } catch (error) {
+    console.error("Error parsing AI response:", error);
+    throw new Error("Invalid generic diagram response format");
   }
 };
