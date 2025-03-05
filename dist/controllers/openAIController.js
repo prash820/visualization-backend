@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateVisualization = void 0;
+exports.generateIaC = exports.generateVisualization = void 0;
 // src/controllers/openAIController.ts
 const express_1 = __importDefault(require("express"));
 const openai_1 = require("openai");
@@ -26,106 +26,96 @@ const openai = new openai_1.OpenAI({
 const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { prompt, diagramType } = req.body;
-    console.log(`[AI] Generating diagram for prompt: ${prompt} with diagramType: ${diagramType}`);
-    // Choose a system prompt based on diagramType
-    let systemPrompt = "";
-    switch (diagramType) {
-        case "flowchart":
-            systemPrompt = `
-You are an AI assistant specialized in generating flowcharts based on user prompts.
-Return only valid JSON with two arrays: "nodes" and "edges".
-Each node should have an "id", "label", "role", and a default position.
-Each edge should connect nodes using "sourceLabel", "targetLabel" and edge label that says what is happening between steps.
-Role means the type of node, like start/end, process, decision, input output, etc
-Do not include any extra text.
-      `;
-            break;
-        case "architecture":
-            systemPrompt = `You are an AI assistant specialized in generating architecture diagrams based on user prompts with over 10 years of experience.
-
-      Return only valid JSON in the following format:
-
-      json
-      Copy
-      Edit
-      {
-        "nodes": [
-          {
-            "provider": "aws",
-            "service": "service_name",          // Service name (e.g., VPC, EC2, S3)
-            "label": "Readable Label",          // Human-readable label (e.g., Virtual Private Cloud)
-            "group": "Main Group",              // High-level cluster (e.g., AWS, Azure)
-            "subgroup": "Sub Group",            // Sub-cluster under the main group (e.g., Networking, Compute)
-            "parent": "Parent Node Label",      // Optional: If this node is contained within another (e.g., VPC contains EC2)
-            "position": { "x": 0, "y": 0 }      // Optional: Node position
-          }
-        ],
-        "edges": [
-          {
-            "sourceLabel": "Readable Label",    // Matches the label field in nodes
-            "targetLabel": "Readable Label",    // Matches the label field in nodes
-            "label": "Optional Edge Label"      // Optional: Label for the edge
-          }
-        ]
-      }
-      Rules:
-      Ensure "provider" is always "aws" and that "service" is one of AWS's official products.
-      Use "group" for high-level clusters (e.g., AWS) and "subgroup" for service categories (e.g., Networking, Compute).
-      Utilize the "parent" field to represent hierarchical relationships (e.g., VPC → Subnet → EC2).
-      Maintain connections across clusters, sub-clusters, and parent-child nodes using accurate edges.
-      Do not include any extra text, commentary, or explanations — only the JSON output.  `;
-            break;
-        case "sequence":
-            systemPrompt = `
-You are an AI assistant specialized in generating sequence diagrams based on user prompts.
-Return only valid JSON with two arrays: "nodes" and "edges".
-Nodes represent actors or steps, and edges represent the flow of interactions.
-Format example:
-{
-  "nodes": [{ "label": "Actor or Step" }],
-  "edges": [{ "sourceLabel": "Label", "targetLabel": "Label", "label": "Message" }]
-}
-Do not include any extra text.
-      `;
-            break;
-        case "uml":
-            systemPrompt = `
-You are an AI assistant specialized in generating UML class diagrams based on user prompts.
-Return only valid JSON with two arrays: "nodes" and "edges".
-Each node represents a class (with a "label"), and edges represent relationships between classes.
-Format example:
-{
-  "nodes": [{ "label": "ClassName" }],
-  "edges": [{ "sourceLabel": "ClassName", "targetLabel": "ClassName", "label": "Relationship" }]
-}
-Do not include any extra text.
-      `;
-            break;
-        default:
-            systemPrompt = `
-You are an AI assistant specialized in generating diagrams based on user prompts.
-Return only valid JSON with two arrays: "nodes" and "edges". Do not include any extra text.
-      `;
+    if (!prompt || !diagramType) {
+        return res.status(400).json({ error: "Missing required parameters." });
     }
+    console.log(`[AI] Generating diagram for prompt: ${prompt} with diagramType: ${diagramType}`);
+    const systemPrompt = {
+        flowchart: `
+                  You are an AI assistant specialized in generating flowcharts based on user prompts.
+              Return only valid JSON with two arrays: "nodes" and "edges".
+              Each node should have an "id", "label", "role", and a default position.
+              Each edge should connect nodes using "sourceLabel", "targetLabel" and edge label that says what is happening between steps.
+              Role means the type of node, like start/end, process, decision, input output, etc
+              Do not include any extra text.          
+      `,
+        architecture: `Generate a cloud architecture diagram based on the following user request:
+
+          🔹 **User Query:** "<User's input>"  
+          🔹 **Diagram Type:** "architecture"  
+          
+          ### **💡 Expected Output Format**
+          1️⃣ **Group related services together** (e.g., AWS Services, AI Services).  
+          2️⃣ **Ensure child services are housed inside parent groups** (e.g., EC2 inside VPC, Lambda inside Compute).  
+          3️⃣ **Use intuitive positioning** (Avoid overlaps, maintain clear relationships).  
+          4️⃣ **Define proper relationships** between services (e.g., API Gateway routes requests to Lambda, S3 stores output data).  
+          
+          ### **📌 JSON Format**
+          json
+          {
+            "groups": [
+              { "id": "aws-services", "label": "AWS Services" },
+              { "id": "lambda-functions", "label": "Lambda Functions", "parentGroup": "aws-services" }
+            ],
+            "nodes": [
+              { "id": "api-gateway", "label": "API Gateway", "group": "aws-services" },
+              { "id": "lambda-1", "label": "Function A", "group": "lambda-functions" },
+              { "id": "lambda-2", "label": "Function B", "group": "lambda-functions" },
+              { "id": "s3", "label": "S3 Storage", "group": "aws-services" },
+              { "id": "dynamodb", "label": "DynamoDB", "group": "aws-services" }
+            ],
+            "edges": [
+              { "source": "api-gateway", "target": "lambda-1" },
+              { "source": "lambda-1", "target": "s3" },
+              { "source": "lambda-1", "target": "dynamodb" }
+            ]
+          }`,
+        sequence: `
+          You are an AI assistant specialized in generating sequence diagrams based on user prompts.
+        Return only valid JSON with two arrays: "nodes" and "edges".
+        Nodes represent actors or steps, and edges represent the flow of interactions.
+        Format example:
+        {
+          "nodes": [{ "label": "Actor or Step" }],
+          "edges": [{ "sourceLabel": "Label", "targetLabel": "Label", "label": "Message" }]
+        }
+        Do not include any extra text.
+      `,
+        uml: `
+                You are an AI assistant specialized in generating UML class diagrams based on user prompts.
+                Return only valid JSON with two arrays: "nodes" and "edges".
+                Each node represents a class (with a "label"), and edges represent relationships between classes.
+                Format example:
+                {
+                  "nodes": [{ "label": "ClassName" }],
+                  "edges": [{ "sourceLabel": "ClassName", "targetLabel": "ClassName", "label": "Relationship" }]
+                }
+                Do not include any extra text.
+                      `
+    };
+    // Choose a system prompt based on diagramType
     try {
-        console.log("System Prompt " + systemPrompt);
+        console.log("User Prompt:", prompt);
         const response = yield openai.chat.completions.create({
             model: "gpt-3.5-turbo",
             messages: [
-                { role: "system", content: systemPrompt },
+                { role: "system", content: systemPrompt[diagramType] },
                 { role: "user", content: prompt },
             ],
             max_tokens: 700,
         });
         const fullResponse = ((_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) || "";
-        // Remove markdown formatting (backticks) and extract JSON.
-        const jsonMatch = fullResponse.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            return res.status(400).json({ error: "Invalid JSON response from AI" });
+        console.log("AI Response ", fullResponse);
+        switch (diagramType) {
+            case "architecture": {
+                const parsedData = parseArchitectureResponse(fullResponse);
+                return res.json(parsedData);
+            }
+            default: {
+                const parseData = parseGenericResponse(fullResponse);
+                return res.json(parseData);
+            }
         }
-        console.log("AI Response:", jsonMatch[0]);
-        const diagramJson = JSON.parse(jsonMatch[0]);
-        return res.json({ nodes: diagramJson.nodes, edges: diagramJson.edges });
     }
     catch (error) {
         console.error("Error generating visualization:", error);
@@ -133,3 +123,89 @@ Return only valid JSON with two arrays: "nodes" and "edges". Do not include any 
     }
 });
 exports.generateVisualization = generateVisualization;
+const generateIaC = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { nodes, edges, format } = req.body; // ✅ Ensure these values exist
+    if (!(nodes === null || nodes === void 0 ? void 0 : nodes.length) || !(edges === null || edges === void 0 ? void 0 : edges.length) || !format) {
+        console.error("❌ Missing parameters:", { nodes, edges, format });
+        return res.status(400).json({ error: "Missing required parameters." });
+    }
+    console.log(`[AI] Generating ${format.toUpperCase()} code for architecture diagram`);
+    const systemPrompt = `
+    You are an expert in Infrastructure as Code (IaC).
+    Given an architecture diagram with AWS services, generate valid ${format.toUpperCase()} code.
+    
+    ## Instructions:
+    - Use official ${format.toUpperCase()} modules and syntax.
+    - Ensure all services are correctly configured.
+    - Handle dependencies (e.g., Lambda needs an IAM role).
+    - Optimize for best practices.
+
+    ## Example Input:
+    Nodes: ${JSON.stringify(nodes, null, 2)}
+    Edges: ${JSON.stringify(edges, null, 2)}
+
+    ## Expected Output:
+    - Valid ${format.toUpperCase()} code
+    - No explanations, only the code output
+  `;
+    try {
+        const response = yield openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: "Generate the IaC code for this architecture." },
+            ],
+            max_tokens: 1000,
+        });
+        // ✅ Safely Extract the AI Response
+        const fullResponse = ((_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) || "";
+        console.log("✅ AI IaC Response:", fullResponse);
+        res.json({ code: fullResponse });
+    }
+    catch (error) {
+        console.error("❌ Error generating IaC:", error);
+        return res.status(500).json({ error: "Failed to generate IaC." });
+    }
+});
+exports.generateIaC = generateIaC;
+const parseArchitectureResponse = (response) => {
+    try {
+        console.log("[AI RAW RESPONSE]:", response);
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            throw new Error("Invalid JSON format received from AI.");
+        }
+        const parsedData = JSON.parse(jsonMatch[0]);
+        if (!parsedData.nodes || !parsedData.edges || !parsedData.groups) {
+            throw new Error("Missing required keys (nodes, edges, groups) in AI response.");
+        }
+        // ✅ Ensure every node has a valid group
+        parsedData.nodes.forEach((node) => {
+            if (!node.group) {
+                throw new Error(`Node "${node.label}" is missing a group!`);
+            }
+        });
+        return parsedData;
+    }
+    catch (error) {
+        console.error("Error parsing AI response:", error);
+        throw new Error("Invalid architecture response format");
+    }
+};
+const parseGenericResponse = (response) => {
+    try {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (!jsonMatch)
+            throw new Error("Invalid JSON format");
+        const diagramJson = JSON.parse(jsonMatch[0]);
+        if (!diagramJson.nodes || !diagramJson.edges) {
+            throw new Error("Missing nodes or edges in response");
+        }
+        return diagramJson;
+    }
+    catch (error) {
+        console.error("Error parsing AI response:", error);
+        throw new Error("Invalid generic diagram response format");
+    }
+};

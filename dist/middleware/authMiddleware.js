@@ -32,48 +32,41 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticateToken = void 0;
 const jsonwebtoken_1 = __importStar(require("jsonwebtoken"));
-const User_1 = __importDefault(require("../models/User")); // Adjust path to your User model
+const User_1 = __importDefault(require("../models/User")); // ✅ Import IUser from the User model
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const authenticateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+// ✅ Fix TypeScript Issue: Middleware should return `void`
+const authenticateToken = (req, res, next) => {
     var _a;
     const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
     if (!token) {
-        console.log("No token provided");
         res.status(401).json({ error: "Access denied. No token provided." });
         return;
     }
     try {
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        console.log("Decoded Token:", decoded); // ✅ Debugging
-        if (!decoded || !decoded.id) {
-            console.log("Invalid token structure");
+        if (!(decoded === null || decoded === void 0 ? void 0 : decoded.id)) {
             res.status(403).json({ error: "Invalid token." });
             return;
         }
-        const user = yield User_1.default.findById(decoded.id);
-        console.log("User Found:", user); // ✅ Debugging
-        if (!user) {
-            res.status(404).json({ error: "User not found." });
-            return;
-        }
-        req.user = user;
-        next();
+        // ✅ Fix: Retrieve the full `IUser` object
+        User_1.default.findById(decoded.id).then((user) => {
+            if (!user) {
+                res.status(404).json({ error: "User not found." });
+                return;
+            }
+            req.user = user; // ✅ Now req.user is correctly typed as `IUser`
+            next();
+        }).catch((err) => {
+            console.error("Database error:", err);
+            res.status(500).json({ error: "Database error. Please try again later." });
+        });
     }
     catch (error) {
         console.error("Token verification failed:", error);
@@ -84,5 +77,5 @@ const authenticateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             res.status(403).json({ error: "Invalid token." });
         }
     }
-});
+};
 exports.authenticateToken = authenticateToken;

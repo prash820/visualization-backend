@@ -37,25 +37,22 @@ exports.registerUser = registerUser;
 const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
     try {
-        // Check if user exists
         const user = yield User_1.default.findOne({ email });
         if (!user) {
-            return res.status(401).json({ error: "Invalid email or password." });
+            return res.status(401).json({ error: "Invalid email or password." }); // ✅ Ensure JSON response
         }
-        // Compare passwords
         const isMatch = yield user.comparePassword(password);
         if (!isMatch) {
-            return res.status(401).json({ error: "Invalid email or password." });
+            return res.status(401).json({ error: "Invalid email or password." }); // ✅ Ensure JSON response
         }
-        // Generate JWT token
         const token = jsonwebtoken_1.default.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, {
-            expiresIn: "1h", // Token expiry time
+            expiresIn: "1h",
         });
-        res.status(200).json({ token, message: "Login successful!" });
+        res.status(200).json({ token, message: "Login successful!" }); // ✅ Always return JSON
     }
     catch (error) {
         console.error("Error during login:", error);
-        res.status(500).json({ error: "Server error. Please try again later." });
+        res.status(500).json({ error: "Server error. Please try again." }); // ✅ Ensure JSON response
     }
 });
 exports.loginUser = loginUser;
