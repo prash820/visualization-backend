@@ -8,6 +8,7 @@ dotenv.config();
 const router = express.Router();
 export default router;
 
+
 // Register User
 export const registerUser = async (req: Request, res: Response) => {
   const { email, password } = req.body;
