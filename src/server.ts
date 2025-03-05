@@ -15,6 +15,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+const allowedOrigins = [
+  "https://lucky-youtiao-ce3cda.netlify.app",
+  "http://localhost:3000",  // Optional for local development
+];
+
 // 🔹 Security Middleware
 app.use(helmet()); // Security headers
 app.use(bodyParser.json());
@@ -24,10 +29,20 @@ const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use(limiter);
 
 // 🔹 CORS Configuration
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  })
+);
 
 // 🔹 Connect to Database
 connectDB();
