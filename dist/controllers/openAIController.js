@@ -39,37 +39,42 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
               Role means the type of node, like start/end, process, decision, input output, etc
               Do not include any extra text.          
       `,
-        architecture: `Generate a cloud architecture diagram based on the following user request:
+        architecture: `You are an AI assistant specialized in generating **cloud architecture diagrams** based on user prompts.
 
-          🔹 **User Query:** "<User's input>"  
-          🔹 **Diagram Type:** "architecture"  
-          
-          ### **💡 Expected Output Format**
-          1️⃣ **Group related services together** (e.g., AWS Services, AI Services).  
-          2️⃣ **Ensure child services are housed inside parent groups** (e.g., EC2 inside VPC, Lambda inside Compute).  
-          3️⃣ **Use intuitive positioning** (Avoid overlaps, maintain clear relationships).  
-          4️⃣ **Define proper relationships** between services (e.g., API Gateway routes requests to Lambda, S3 stores output data).  
-          
-          ### **📌 JSON Format**
-          json
-          {
-            "groups": [
-              { "id": "aws-services", "label": "AWS Services" },
-              { "id": "lambda-functions", "label": "Lambda Functions", "parentGroup": "aws-services" }
-            ],
-            "nodes": [
-              { "id": "api-gateway", "label": "API Gateway", "group": "aws-services" },
-              { "id": "lambda-1", "label": "Function A", "group": "lambda-functions" },
-              { "id": "lambda-2", "label": "Function B", "group": "lambda-functions" },
-              { "id": "s3", "label": "S3 Storage", "group": "aws-services" },
-              { "id": "dynamodb", "label": "DynamoDB", "group": "aws-services" }
-            ],
-            "edges": [
-              { "source": "api-gateway", "target": "lambda-1" },
-              { "source": "lambda-1", "target": "s3" },
-              { "source": "lambda-1", "target": "dynamodb" }
-            ]
-          }`,
+### **🔹 User Query:** "<User's Input>"
+### **🔹 Diagram Type:** "architecture"
+
+## **🌟 Rules for Generating JSON Output**
+1️⃣ **Group services under their respective cloud providers** (AWS, Azure, OCI).  
+2️⃣ **If a cloud provider has a VPC, the services inside that VPC should be grouped inside it.**  
+3️⃣ **Keep cloud providers as separate top-level groups**, even if services communicate between providers.  
+4️⃣ **Ensure correct edge connections** between services, even across different providers.  
+5️⃣ **Use proper hierarchical nesting** to reflect real-world cloud architectures.  
+
+📌 Return ONLY a valid JSON output. NO explanations or extra text.
+
+{
+  "groups": [
+    { "id": "aws-services", "label": "AWS Services" },
+    { "id": "aws-vpc-1", "label": "AWS VPC 1", "parentGroup": "aws-services" },
+    { "id": "public-subnet", "label": "Public Subnet", "parentGroup": "aws-vpc-1" },
+    { "id": "private-subnet", "label": "Private Subnet", "parentGroup": "aws-vpc-1" }
+  ],
+  "nodes": [
+    { "id": "internet-gateway", "label": "Internet Gateway", "service": "aws-internet-gateway", "group": "public-subnet" },
+    { "id": "load-balancer", "label": "Load Balancer", "service": "aws-elb", "group": "public-subnet" },
+    { "id": "app-server", "label": "Application Server", "service": "ec2-instance", "group": "private-subnet" },
+    { "id": "database-server", "label": "Database Server", "service": "rds", "group": "private-subnet" },
+    { "id": "s3-bucket", "label": "S3 Bucket", "service": "s3", "group": "aws-services" }
+  ],
+  "edges": [
+    { "source": "internet-gateway", "target": "load-balancer" },
+    { "source": "load-balancer", "target": "app-server" },
+    { "source": "app-server", "target": "database-server" },
+    { "source": "app-server", "target": "s3-bucket" }
+  ]
+}
+`,
         sequence: `
           You are an AI assistant specialized in generating sequence diagrams based on user prompts.
         Return only valid JSON with two arrays: "nodes" and "edges".
@@ -105,7 +110,6 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
             max_tokens: 700,
         });
         const fullResponse = ((_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) || "";
-        console.log("AI Response ", fullResponse);
         switch (diagramType) {
             case "architecture": {
                 const parsedData = parseArchitectureResponse(fullResponse);
@@ -186,6 +190,7 @@ const parseArchitectureResponse = (response) => {
                 throw new Error(`Node "${node.label}" is missing a group!`);
             }
         });
+        console.log("Parsed data : ", parsedData);
         return parsedData;
     }
     catch (error) {
