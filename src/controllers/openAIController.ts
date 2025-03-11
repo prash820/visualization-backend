@@ -87,11 +87,12 @@ export const generateVisualization = async (req: Request, res: Response) => {
     { "id": "oci-object-storage", "label": "OCI Object Storage", "service": "object-storage", "group": "oci-services" }
   ],
   "edges": [
-    { "source": "api-gateway", "target": "lambda-1" },
-    { "source": "lambda-1", "target": "s3" },
-    { "source": "lambda-1", "target": "rds" },
-    { "source": "azure-app-service", "target": "oci-object-storage" }
-  ]
+  { "source": "api-gateway", "target": "lambda-1", "label": "Invokes" },
+  { "source": "lambda-1", "target": "s3", "label": "Stores Data" },
+  { "source": "lambda-1", "target": "rds", "label": "Queries" },
+  { "source": "azure-app-service", "target": "oci-object-storage", "label": "Writes To" }
+]
+
 }
 `,
     sequence: `
