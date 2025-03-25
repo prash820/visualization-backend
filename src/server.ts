@@ -10,6 +10,8 @@ import openAIRoutes from "./routes/openAI";
 import authRoutes from "./routes/auth";
 import projectRoutes from "./routes/project";
 import iaCRoutes from "./routes/iacRoutes"; // ✅ New IaC Route
+import deployRoutes from "./routes/deployRoutes";
+
 
 dotenv.config();
 const app = express();
@@ -46,6 +48,8 @@ app.use("/api/generate", openAIRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/iac", iaCRoutes); // ✅ New Route for IaC
+app.use("/api/deploy", deployRoutes);
+
 
 // 🔹 Global Error Handler
 app.use(errorHandler);

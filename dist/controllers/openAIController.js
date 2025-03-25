@@ -51,28 +51,30 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
 4️⃣ **Ensure correct edge connections** between services, even across different providers.  
 5️⃣ **Use proper hierarchical nesting** to reflect real-world cloud architectures.  
 
-📌 Return ONLY a valid JSON output. NO explanations or extra text.
+### **📌 Expected JSON Format** No Other text should be part of the response or no additional follow up questions
 
 {
   "groups": [
     { "id": "aws-services", "label": "AWS Services" },
     { "id": "aws-vpc-1", "label": "AWS VPC 1", "parentGroup": "aws-services" },
-    { "id": "public-subnet", "label": "Public Subnet", "parentGroup": "aws-vpc-1" },
-    { "id": "private-subnet", "label": "Private Subnet", "parentGroup": "aws-vpc-1" }
+    { "id": "azure-services", "label": "Azure Services" },
+    { "id": "oci-services", "label": "OCI Services" }
   ],
   "nodes": [
-    { "id": "internet-gateway", "label": "Internet Gateway", "service": "aws-internet-gateway", "group": "public-subnet" },
-    { "id": "load-balancer", "label": "Load Balancer", "service": "aws-elb", "group": "public-subnet" },
-    { "id": "app-server", "label": "Application Server", "service": "ec2-instance", "group": "private-subnet" },
-    { "id": "database-server", "label": "Database Server", "service": "rds", "group": "private-subnet" },
-    { "id": "s3-bucket", "label": "S3 Bucket", "service": "s3", "group": "aws-services" }
+    { "id": "api-gateway", "label": "API Gateway", "service": "api-gateway", "group": "aws-services" },
+    { "id": "lambda-1", "label": "Lambda Function", "service": "lambda", "group": "aws-vpc-1" },
+    { "id": "s3", "label": "S3 Storage", "service": "s3", "group": "aws-services" },
+    { "id": "rds", "label": "RDS Database", "service": "rds", "group": "aws-services" },
+    { "id": "azure-app-service", "label": "Azure Web App", "service": "app-service", "group": "azure-services" },
+    { "id": "oci-object-storage", "label": "OCI Object Storage", "service": "object-storage", "group": "oci-services" }
   ],
   "edges": [
-    { "source": "internet-gateway", "target": "load-balancer" },
-    { "source": "load-balancer", "target": "app-server" },
-    { "source": "app-server", "target": "database-server" },
-    { "source": "app-server", "target": "s3-bucket" }
-  ]
+  { "source": "api-gateway", "target": "lambda-1", "label": "Invokes" },
+  { "source": "lambda-1", "target": "s3", "label": "Stores Data" },
+  { "source": "lambda-1", "target": "rds", "label": "Queries" },
+  { "source": "azure-app-service", "target": "oci-object-storage", "label": "Writes To" }
+]
+
 }
 `,
         sequence: `
