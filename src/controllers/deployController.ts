@@ -5,7 +5,7 @@ import path from "path";
 
 const saveIaCToFile = (projectId: string, iacCode: string): string => {
     console.log("Saving IAC to file");
-  const workspaceDir = path.join(__dirname, "../../workspaces", projectId);
+  const workspaceDir = path.join(__dirname, "../../terraform-runner/workspaces", projectId);
   if (!fs.existsSync(workspaceDir)) {
     fs.mkdirSync(workspaceDir, { recursive: true });
   }

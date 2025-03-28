@@ -122,7 +122,7 @@ export const generateVisualization = async (req: Request, res: Response) => {
   try {
     console.log("User Prompt:", prompt);
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4-0125-preview",
       messages: [
         { role: "system", content: systemPrompt[diagramType as DiagramType] },
         { role: "user", content: prompt },
@@ -159,27 +159,53 @@ export const generateIaC = async (req: Request, res: Response) => {
   console.log(`[AI] Generating ${format.toUpperCase()} code for architecture diagram`);
 
   const systemPrompt = `
-    You are an expert in Infrastructure as Code (IaC).
-    Given an architecture diagram with AWS services, generate valid ${format.toUpperCase()} code.
-    
-    ## Instructions:
-    - Use official ${format.toUpperCase()} modules and syntax.
-    - Ensure all services are correctly configured.
-    - Handle dependencies (e.g., Lambda needs an IAM role).
-    - Optimize for best practices.
+   You are an expert in Infrastructure as Code (IaC) with deep knowledge of Terraform, AWS provider constraints, and the latest supported AWS resource configurations.
 
-    ## Example Input:
-    Nodes: ${JSON.stringify(nodes, null, 2)}
-    Edges: ${JSON.stringify(edges, null, 2)}
+Your task is to generate only valid and production-ready ${format.toUpperCase()} code based on the given architecture diagram.
 
-    ## Expected Output:
-    - Valid ${format.toUpperCase()} code
-    - No explanations, only the code output
-  `;
+STRICT INSTRUCTIONS:
+Output must be only raw ${format.toUpperCase()} code — no explanations, no markdown, no comments, no formatting hints.
+
+Do not include backticks or wrap the code in code blocks.
+
+Do not include phrases like "Here is the code", etc.
+
+The output must be directly usable in a main.tf file without any manual editing.
+
+HARD RULES TO FOLLOW:
+Use region = "us-west-2" in the provider block.
+
+Avoid deprecated fields:
+
+Do not use acl inside aws_s3_bucket — use a separate aws_s3_bucket_acl resource instead.
+
+Do not use name in aws_db_instance — use identifier instead.
+
+Do not use outdated Lambda runtimes like nodejs14.x — use supported ones such as nodejs18.x or newer.
+
+Do not use invalid resource types like aws_api_gateway_v2_integration — the correct one is aws_apigatewayv2_integration.
+
+S3 Bucket Naming Requirement: Always ensure the bucket name is globally unique by appending a suffix (e.g., project ID, random string, or timestamp) like "my-bucket-{project_id}".
+
+Ensure:
+
+All required attributes are present and valid.
+
+All resource references are interpolated using Terraform syntax (resource.type.name.attribute).
+
+Generated code is 100% syntactically and semantically valid for AWS provider v5.92+.
+
+Output passes terraform validate and terraform apply in a clean environment.
+
+Input:
+Nodes: ${JSON.stringify(nodes, null, 2)} Edges: ${JSON.stringify(edges, null, 2)}
+
+Expected Output:
+Only raw ${format.toUpperCase()} code implementing the infrastructure described. `;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-0125-preview",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: "Generate the IaC code for this architecture." },
@@ -189,9 +215,11 @@ export const generateIaC = async (req: Request, res: Response) => {
 
     // ✅ Safely Extract the AI Response
     const fullResponse = response.choices[0]?.message?.content || "";
+    const stripped = fullResponse.replace(/```[a-z]*|```/g, "").trim();
+
     console.log("✅ AI IaC Response:", fullResponse);
     
-    res.json({ code: fullResponse });
+    res.json({ code: stripped });
   } catch (error) {
     console.error("❌ Error generating IaC:", error);
     return res.status(500).json({ error: "Failed to generate IaC." });
