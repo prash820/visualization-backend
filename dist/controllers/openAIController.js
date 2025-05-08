@@ -1,19 +1,9 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateIaC = exports.generateVisualization = void 0;
-// src/controllers/openAIController.ts
 const express_1 = __importDefault(require("express"));
 const openai_1 = require("openai");
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -25,9 +15,9 @@ const openai = new openai_1.OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "",
 });
 const anthropic = new sdk_1.default({
-    apiKey: process.env.ANTHROPIC_SECRET_KEY, // defaults to process.env["ANTHROPIC_API_KEY"]
+    apiKey: process.env.ANTHROPIC_SECRET_KEY,
 });
-const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const generateVisualization = async (req, res) => {
     var _a, _b;
     const { prompt, diagramType } = req.body;
     console.log("🔹 Prompt:", req.body);
@@ -106,10 +96,9 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
                 Do not include any extra text.
                       `
     };
-    // Choose a system prompt based on diagramType
     try {
         console.log("User Prompt:", prompt);
-        const response = yield openai.chat.completions.create({
+        const response = await openai.chat.completions.create({
             model: "gpt-4-0125-preview",
             messages: [
                 { role: "system", content: systemPrompt[diagramType] },
@@ -134,87 +123,40 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
         console.error("Error generating visualization:", error);
         return res.status(500).json({ error: "Failed to generate diagram." });
     }
-});
+};
 exports.generateVisualization = generateVisualization;
-const generateIaC = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { nodes, edges, format } = req.body; // ✅ Ensure these values exist
-    if (!(nodes === null || nodes === void 0 ? void 0 : nodes.length) || !(edges === null || edges === void 0 ? void 0 : edges.length) || !format) {
-        console.error("❌ Missing parameters:", { nodes, edges, format });
-        return res.status(400).json({ error: "Missing required parameters." });
+const generateIaC = async (req, res) => {
+    const { prompt } = req.body;
+    if (!prompt) {
+        res.status(400).json({ error: "Prompt is required" });
+        return;
     }
-    console.log(`[AI] Generating ${format.toUpperCase()} code for architecture diagram`);
-    const systemPrompt = `You are an expert in Infrastructure as Code (IaC) with deep knowledge of Terraform, AWS provider constraints (v5.92+) and production-grade resource configurations.
-
-Your task is to generate only valid and production-ready ${format.toUpperCase()} code based on the given architecture diagram.
-
-STRICT INSTRUCTIONS:
-- Output must be only raw ${format.toUpperCase()} code — no explanations, markdown, comments, or formatting hints.
-- Do not include backticks or wrap the code in code blocks.
-- Do not include phrases like "Here is the code", etc.
-- The output must be directly usable in a main.tf file without any manual editing.
-
-HARD RULES TO FOLLOW:
-
-GENERAL REQUIREMENTS:
-- Use region = "us-west-2" in the provider block.
-- Use only Terraform v1.5.7+ compatible syntax and AWS provider v5.92+ compliant resources.
-- All resource references must use proper Terraform interpolation (e.g., {resource.type.name.attribute}).
-
-DO NOT USE:
-- acl or aws_s3_bucket_acl on S3 buckets with object_ownership = "BucketOwnerEnforced" (this will fail).
-- name in aws_db_instance — use identifier instead.
-- Hardcoded AMI IDs — use data "aws_ami" to fetch the latest Amazon Linux 2 image.
-- aws_api_gateway_v2_integration — the correct type is aws_apigatewayv2_integration.
-- nodejs14.x or older runtimes — use nodejs18.x or newer.
-- Overlapping subnet CIDRs — ensure all subnet CIDRs are unique.
-
-MANDATORY INCLUSIONS:
-- For aws_db_instance, always set skip_final_snapshot = true unless final_snapshot_identifier is provided.
-- For aws_s3_bucket, set object_ownership = "BucketOwnerEnforced" and omit ACLs entirely.
-- For EC2, use data "aws_ami" to dynamically fetch images.
-- Use random_id from the random provider if uniqueness is needed — and include the required_providers block.
-- All required attributes must be included and valid for every resource.
-
-S3 BUCKET NAMING RULE:
-- Bucket names must be globally unique. Use a suffix like my-bucket-{random_id.suffix.hex}.
-
-VALIDATION:
-- The code must pass terraform validate and terraform apply without errors.
-- The code must be 100% usable as-is in main.tf — no manual intervention required.
-
-Input:
-Nodes: ${JSON.stringify(nodes, null, 2)}
-Edges: ${JSON.stringify(edges, null, 2)}
-
-Expected Output:
-Only raw ${format.toUpperCase()} code implementing the infrastructure described.
-`;
     try {
-        const response = yield anthropic.messages.create({
-            model: "claude-3-7-sonnet-20250219",
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview",
             messages: [
-                { role: "user", content: systemPrompt },
+                {
+                    role: "system",
+                    content: "You are an AI assistant specialized in generating Infrastructure as Code (IaC) using Terraform."
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
             ],
-            max_tokens: 11700,
-            temperature: 0.5,
+            temperature: 0.7,
         });
-        // ✅ Safely Extract the AI Response
-        const fullResponse = ((_a = response.content) === null || _a === void 0 ? void 0 : _a[0]) &&
-            'type' in response.content[0] &&
-            response.content[0].type === 'text' &&
-            'text' in response.content[0]
-            ? response.content[0].text
-            : '';
-        const stripped = fullResponse.replace(/```[a-z]*|```/g, "").trim();
-        console.log("✅ AI IaC Response:", fullResponse);
-        res.json({ code: stripped });
+        const response = completion.choices[0].message.content;
+        if (!response) {
+            throw new Error('No response from OpenAI');
+        }
+        res.json({ code: response });
     }
     catch (error) {
-        console.error("❌ Error generating IaC:", error);
-        return res.status(500).json({ error: "Failed to generate IaC." });
+        console.error('Error generating IaC:', error);
+        res.status(500).json({ error: 'Failed to generate Infrastructure as Code' });
     }
-});
+};
 exports.generateIaC = generateIaC;
 const parseArchitectureResponse = (response) => {
     try {
@@ -227,7 +169,6 @@ const parseArchitectureResponse = (response) => {
         if (!parsedData.nodes || !parsedData.edges || !parsedData.groups) {
             throw new Error("Missing required keys (nodes, edges, groups) in AI response.");
         }
-        // ✅ Ensure every node has a valid group
         parsedData.nodes.forEach((node) => {
             if (!node.group) {
                 throw new Error(`Node "${node.label}" is missing a group!`);
@@ -257,3 +198,4 @@ const parseGenericResponse = (response) => {
         throw new Error("Invalid generic diagram response format");
     }
 };
+//# sourceMappingURL=openAIController.js.map

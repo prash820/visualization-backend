@@ -157,91 +157,39 @@ export const generateVisualization = async (req: Request, res: Response) => {
   }
 };
 
-export const generateIaC = async (req: Request, res: Response) => {
-  const { nodes, edges, format } = req.body; // ✅ Ensure these values exist
+export const generateIaC = async (req: Request, res: Response): Promise<void> => {
+  const { prompt } = req.body;
 
-  if (!nodes?.length || !edges?.length || !format) {
-    console.error("❌ Missing parameters:", { nodes, edges, format });
-    return res.status(400).json({ error: "Missing required parameters." });
+  if (!prompt) {
+    res.status(400).json({ error: "Prompt is required" });
+    return;
   }
 
-  console.log(`[AI] Generating ${format.toUpperCase()} code for architecture diagram`);
-
-  const systemPrompt = 
-`You are an expert in Infrastructure as Code (IaC) with deep knowledge of Terraform, AWS provider constraints (v5.92+) and production-grade resource configurations.
-
-Your task is to generate only valid and production-ready ${format.toUpperCase()} code based on the given architecture diagram.
-
-STRICT INSTRUCTIONS:
-- Output must be only raw ${format.toUpperCase()} code — no explanations, markdown, comments, or formatting hints.
-- Do not include backticks or wrap the code in code blocks.
-- Do not include phrases like "Here is the code", etc.
-- The output must be directly usable in a main.tf file without any manual editing.
-
-HARD RULES TO FOLLOW:
-
-GENERAL REQUIREMENTS:
-- Use region = "us-west-2" in the provider block.
-- Use only Terraform v1.5.7+ compatible syntax and AWS provider v5.92+ compliant resources.
-- All resource references must use proper Terraform interpolation (e.g., {resource.type.name.attribute}).
-
-DO NOT USE:
-- acl or aws_s3_bucket_acl on S3 buckets with object_ownership = "BucketOwnerEnforced" (this will fail).
-- name in aws_db_instance — use identifier instead.
-- Hardcoded AMI IDs — use data "aws_ami" to fetch the latest Amazon Linux 2 image.
-- aws_api_gateway_v2_integration — the correct type is aws_apigatewayv2_integration.
-- nodejs14.x or older runtimes — use nodejs18.x or newer.
-- Overlapping subnet CIDRs — ensure all subnet CIDRs are unique.
-
-MANDATORY INCLUSIONS:
-- For aws_db_instance, always set skip_final_snapshot = true unless final_snapshot_identifier is provided.
-- For aws_s3_bucket, set object_ownership = "BucketOwnerEnforced" and omit ACLs entirely.
-- For EC2, use data "aws_ami" to dynamically fetch images.
-- Use random_id from the random provider if uniqueness is needed — and include the required_providers block.
-- All required attributes must be included and valid for every resource.
-
-S3 BUCKET NAMING RULE:
-- Bucket names must be globally unique. Use a suffix like my-bucket-{random_id.suffix.hex}.
-
-VALIDATION:
-- The code must pass terraform validate and terraform apply without errors.
-- The code must be 100% usable as-is in main.tf — no manual intervention required.
-
-Input:
-Nodes: ${JSON.stringify(nodes, null, 2)}
-Edges: ${JSON.stringify(edges, null, 2)}
-
-Expected Output:
-Only raw ${format.toUpperCase()} code implementing the infrastructure described.
-`;
-
   try {
-
-    const response = await anthropic.messages.create({
-      model: "claude-3-7-sonnet-20250219",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
       messages: [
-        { role: "user", content: systemPrompt },
+        {
+          role: "system",
+          content: "You are an AI assistant specialized in generating Infrastructure as Code (IaC) using Terraform."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
       ],
-      max_tokens: 11700,
-      temperature: 0.5,
+      temperature: 0.7,
     });
-    
 
-    // ✅ Safely Extract the AI Response
-    const fullResponse = response.content?.[0] && 
-    'type' in response.content[0] && 
-    response.content[0].type === 'text' &&
-    'text' in response.content[0]
-      ? response.content[0].text 
-      : '';
-    const stripped = fullResponse.replace(/```[a-z]*|```/g, "").trim();
+    const response = completion.choices[0].message.content;
+    if (!response) {
+      throw new Error('No response from OpenAI');
+    }
 
-    console.log("✅ AI IaC Response:", fullResponse);
-    
-    res.json({ code: stripped });
+    res.json({ code: response });
   } catch (error) {
-    console.error("❌ Error generating IaC:", error);
-    return res.status(500).json({ error: "Failed to generate IaC." });
+    console.error('Error generating IaC:', error);
+    res.status(500).json({ error: 'Failed to generate Infrastructure as Code' });
   }
 };
 

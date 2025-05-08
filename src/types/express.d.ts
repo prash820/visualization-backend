@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import type { IUser } from '../models/User';
-import express from 'express';
 
 declare global {
   namespace Express {
@@ -11,7 +10,6 @@ declare global {
 }
 
 export type { Request, Response, NextFunction, RequestHandler };
-export { express };
 
 export interface AuthRequest extends Request {
   user?: IUser;

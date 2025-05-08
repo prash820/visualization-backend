@@ -6,3 +6,4 @@ const errorHandler = (err, req, res, next) => {
     res.status(err.statusCode || 500).json({ error: err.message || "Server Error" });
 };
 exports.errorHandler = errorHandler;
+//# sourceMappingURL=errorHandler.js.map

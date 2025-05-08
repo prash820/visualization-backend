@@ -1,10 +1,10 @@
-import { express } from '../types/express';
+import express from 'express';
 import { 
   generateDocumentation, 
   generateHighLevelDocumentation, 
   generateLowLevelDocumentation 
 } from '../controllers/documentationController';
-import type { Request, Response } from '../types/express';
+import type { Request, Response } from '../types/express.d';
 
 const router = express.Router();
 

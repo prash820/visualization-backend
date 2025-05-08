@@ -60,3 +60,4 @@ const UmlDiagramSchema = new mongoose_1.Schema({
     timestamps: true,
 });
 exports.UmlDiagram = mongoose_1.default.model('UmlDiagram', UmlDiagramSchema);
+//# sourceMappingURL=umlDiagram.js.map

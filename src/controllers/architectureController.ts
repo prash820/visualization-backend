@@ -22,12 +22,13 @@ interface DiagramEdge {
   [key: string]: any;
 }
 
-export const generateArchitectureDiagram = async (req: Request, res: Response) => {
+export const generateArchitectureDiagram = async (req: Request, res: Response): Promise<void> => {
   const { prompt } = req.body;
   console.log("[Architecture Controller] Generating diagram for prompt:", prompt);
 
   if (!prompt) {
-    return res.status(400).json({ error: "Prompt is required" });
+    res.status(400).json({ error: "Prompt is required" });
+    return;
   }
 
   try {

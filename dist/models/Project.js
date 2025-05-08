@@ -34,21 +34,20 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
-// Define the Project schema
 const ProjectSchema = new mongoose_1.Schema({
-    userId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "User", required: true }, // Reference user
-    name: { type: String, required: true }, // Project name is required
-    description: { type: String, default: "" }, // Optional description
-    lastPrompt: { type: String, default: "" }, // Default empty prompt
-    lastCode: { type: String, default: "" }, // Default empty code
+    userId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "User", required: true },
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    lastPrompt: { type: String, default: "" },
+    lastCode: { type: String, default: "" },
     framework: {
         type: String,
         default: "Mermaid",
-        enum: ["Mermaid", "Graphviz"], // Restrict to valid frameworks
+        enum: ["Mermaid", "Graphviz"],
     },
-    diagramType: { type: String, default: "" }, // Default empty diagram type
-    createdAt: { type: Date, default: Date.now }, // Auto-assign creation date
+    diagramType: { type: String, default: "" },
+    createdAt: { type: Date, default: Date.now },
 });
-// Add an index for userId to optimize user-specific queries
 ProjectSchema.index({ userId: 1, createdAt: -1 });
 exports.default = mongoose_1.default.model("Project", ProjectSchema);
+//# sourceMappingURL=Project.js.map

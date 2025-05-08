@@ -24,28 +24,32 @@ export const registerUser = async (req: Request, res: Response) => {
 };
 
 // Login User
-export const loginUser = async (req: Request, res: Response) => {
+export const loginUser = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
-  
+
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ error: "Invalid email or password." }); // ✅ Ensure JSON response
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
     }
 
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ error: "Invalid email or password." }); // ✅ Ensure JSON response
+    const isValidPassword = await user.comparePassword(password);
+    if (!isValidPassword) {
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
     }
 
-    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET!, {
-      expiresIn: "1h",
-    });
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET!,
+      { expiresIn: "24h" }
+    );
 
-    res.status(200).json({ token, message: "Login successful!" }); // ✅ Always return JSON
+    res.json({ token, user: { id: user._id, email: user.email } });
   } catch (error) {
-    console.error("Error during login:", error);
-    res.status(500).json({ error: "Server error. Please try again." }); // ✅ Ensure JSON response
+    console.error("Login error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 

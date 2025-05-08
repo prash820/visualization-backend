@@ -14,7 +14,7 @@ const errorHandler_1 = require("./middleware/errorHandler");
 const openAI_1 = __importDefault(require("./routes/openAI"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const project_1 = __importDefault(require("./routes/project"));
-const iacRoutes_1 = __importDefault(require("./routes/iacRoutes")); // ✅ New IaC Route
+const iacRoutes_1 = __importDefault(require("./routes/iacRoutes"));
 const deployRoutes_1 = __importDefault(require("./routes/deployRoutes"));
 const uml_1 = __importDefault(require("./routes/uml"));
 const documentation_1 = __importDefault(require("./routes/documentation"));
@@ -23,31 +23,26 @@ const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5001;
 const allowedOrigins = [
     "https://lucky-youtiao-ce3cda.netlify.app",
-    "http://localhost:3000", // Optional for local development
+    "http://localhost:3000",
 ];
-// 🔹 Security Middleware
-app.use((0, helmet_1.default)()); // Security headers
+app.use((0, helmet_1.default)());
 app.use(body_parser_1.default.json());
-// 🔹 Rate Limiting
 const limiter = (0, express_rate_limit_1.default)({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use(limiter);
-// 🔹 CORS Configuration
 app.use((0, cors_1.default)({
     origin: "*",
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "X-Client-Version"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 }));
-// 🔹 Connect to Database
 (0, db_1.default)();
-// 🔹 API Routes
 app.use("/api/generate", openAI_1.default);
 app.use("/api/auth", auth_1.default);
 app.use("/api/projects", project_1.default);
-app.use("/api/iac", iacRoutes_1.default); // ✅ New Route for IaC
+app.use("/api/iac", iacRoutes_1.default);
 app.use("/api/deploy", deployRoutes_1.default);
 app.use("/api/uml", uml_1.default);
 app.use("/api/documentation", documentation_1.default);
-// 🔹 Global Error Handler
 app.use(errorHandler_1.errorHandler);
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+//# sourceMappingURL=server.js.map
