@@ -11,6 +11,8 @@ import authRoutes from "./routes/auth";
 import projectRoutes from "./routes/project";
 import iaCRoutes from "./routes/iacRoutes"; // ✅ New IaC Route
 import deployRoutes from "./routes/deployRoutes";
+import umlRoutes from "./routes/uml";
+import documentationRoutes from "./routes/documentation";
 
 
 dotenv.config();
@@ -35,7 +37,7 @@ app.use(
   cors({
     origin: "*",
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Client-Version"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   })
 );
@@ -49,6 +51,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/iac", iaCRoutes); // ✅ New Route for IaC
 app.use("/api/deploy", deployRoutes);
+app.use("/api/uml", umlRoutes);
+app.use("/api/documentation", documentationRoutes);
 
 
 // 🔹 Global Error Handler

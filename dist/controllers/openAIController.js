@@ -17,16 +17,22 @@ exports.generateIaC = exports.generateVisualization = void 0;
 const express_1 = __importDefault(require("express"));
 const openai_1 = require("openai");
 const dotenv_1 = __importDefault(require("dotenv"));
+const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 dotenv_1.default.config();
 const router = express_1.default.Router();
 exports.default = router;
 const openai = new openai_1.OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "",
 });
+const anthropic = new sdk_1.default({
+    apiKey: process.env.ANTHROPIC_SECRET_KEY, // defaults to process.env["ANTHROPIC_API_KEY"]
+});
 const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { prompt, diagramType } = req.body;
+    console.log("🔹 Prompt:", req.body);
     if (!prompt || !diagramType) {
+        console.log("🔹 Missing required parameters.");
         return res.status(400).json({ error: "Missing required parameters." });
     }
     console.log(`[AI] Generating diagram for prompt: ${prompt} with diagramType: ${diagramType}`);
@@ -109,7 +115,8 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
                 { role: "system", content: systemPrompt[diagramType] },
                 { role: "user", content: prompt },
             ],
-            max_tokens: 700,
+            max_tokens: 4096,
+            temperature: 0.5,
         });
         const fullResponse = ((_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) || "";
         switch (diagramType) {
@@ -130,68 +137,75 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
 });
 exports.generateVisualization = generateVisualization;
 const generateIaC = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a;
     const { nodes, edges, format } = req.body; // ✅ Ensure these values exist
     if (!(nodes === null || nodes === void 0 ? void 0 : nodes.length) || !(edges === null || edges === void 0 ? void 0 : edges.length) || !format) {
         console.error("❌ Missing parameters:", { nodes, edges, format });
         return res.status(400).json({ error: "Missing required parameters." });
     }
     console.log(`[AI] Generating ${format.toUpperCase()} code for architecture diagram`);
-    const systemPrompt = `
-   You are an expert in Infrastructure as Code (IaC) with deep knowledge of Terraform, AWS provider constraints, and the latest supported AWS resource configurations.
+    const systemPrompt = `You are an expert in Infrastructure as Code (IaC) with deep knowledge of Terraform, AWS provider constraints (v5.92+) and production-grade resource configurations.
 
 Your task is to generate only valid and production-ready ${format.toUpperCase()} code based on the given architecture diagram.
 
 STRICT INSTRUCTIONS:
-Output must be only raw ${format.toUpperCase()} code — no explanations, no markdown, no comments, no formatting hints.
-
-Do not include backticks or wrap the code in code blocks.
-
-Do not include phrases like "Here is the code", etc.
-
-The output must be directly usable in a main.tf file without any manual editing.
+- Output must be only raw ${format.toUpperCase()} code — no explanations, markdown, comments, or formatting hints.
+- Do not include backticks or wrap the code in code blocks.
+- Do not include phrases like "Here is the code", etc.
+- The output must be directly usable in a main.tf file without any manual editing.
 
 HARD RULES TO FOLLOW:
-Use region = "us-west-2" in the provider block.
 
-Avoid deprecated fields:
+GENERAL REQUIREMENTS:
+- Use region = "us-west-2" in the provider block.
+- Use only Terraform v1.5.7+ compatible syntax and AWS provider v5.92+ compliant resources.
+- All resource references must use proper Terraform interpolation (e.g., {resource.type.name.attribute}).
 
-Do not use acl inside aws_s3_bucket — use a separate aws_s3_bucket_acl resource instead.
+DO NOT USE:
+- acl or aws_s3_bucket_acl on S3 buckets with object_ownership = "BucketOwnerEnforced" (this will fail).
+- name in aws_db_instance — use identifier instead.
+- Hardcoded AMI IDs — use data "aws_ami" to fetch the latest Amazon Linux 2 image.
+- aws_api_gateway_v2_integration — the correct type is aws_apigatewayv2_integration.
+- nodejs14.x or older runtimes — use nodejs18.x or newer.
+- Overlapping subnet CIDRs — ensure all subnet CIDRs are unique.
 
-Do not use name in aws_db_instance — use identifier instead.
+MANDATORY INCLUSIONS:
+- For aws_db_instance, always set skip_final_snapshot = true unless final_snapshot_identifier is provided.
+- For aws_s3_bucket, set object_ownership = "BucketOwnerEnforced" and omit ACLs entirely.
+- For EC2, use data "aws_ami" to dynamically fetch images.
+- Use random_id from the random provider if uniqueness is needed — and include the required_providers block.
+- All required attributes must be included and valid for every resource.
 
-Do not use outdated Lambda runtimes like nodejs14.x — use supported ones such as nodejs18.x or newer.
+S3 BUCKET NAMING RULE:
+- Bucket names must be globally unique. Use a suffix like my-bucket-{random_id.suffix.hex}.
 
-Do not use invalid resource types like aws_api_gateway_v2_integration — the correct one is aws_apigatewayv2_integration.
-
-S3 Bucket Naming Requirement: Always ensure the bucket name is globally unique by appending a suffix (e.g., project ID, random string, or timestamp) like "my-bucket-{project_id}".
-
-Ensure:
-
-All required attributes are present and valid.
-
-All resource references are interpolated using Terraform syntax (resource.type.name.attribute).
-
-Generated code is 100% syntactically and semantically valid for AWS provider v5.92+.
-
-Output passes terraform validate and terraform apply in a clean environment.
+VALIDATION:
+- The code must pass terraform validate and terraform apply without errors.
+- The code must be 100% usable as-is in main.tf — no manual intervention required.
 
 Input:
-Nodes: ${JSON.stringify(nodes, null, 2)} Edges: ${JSON.stringify(edges, null, 2)}
+Nodes: ${JSON.stringify(nodes, null, 2)}
+Edges: ${JSON.stringify(edges, null, 2)}
 
 Expected Output:
-Only raw ${format.toUpperCase()} code implementing the infrastructure described. `;
+Only raw ${format.toUpperCase()} code implementing the infrastructure described.
+`;
     try {
-        const response = yield openai.chat.completions.create({
-            model: "gpt-4-0125-preview",
+        const response = yield anthropic.messages.create({
+            model: "claude-3-7-sonnet-20250219",
             messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: "Generate the IaC code for this architecture." },
+                { role: "user", content: systemPrompt },
             ],
-            max_tokens: 1000,
+            max_tokens: 11700,
+            temperature: 0.5,
         });
         // ✅ Safely Extract the AI Response
-        const fullResponse = ((_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) || "";
+        const fullResponse = ((_a = response.content) === null || _a === void 0 ? void 0 : _a[0]) &&
+            'type' in response.content[0] &&
+            response.content[0].type === 'text' &&
+            'text' in response.content[0]
+            ? response.content[0].text
+            : '';
         const stripped = fullResponse.replace(/```[a-z]*|```/g, "").trim();
         console.log("✅ AI IaC Response:", fullResponse);
         res.json({ code: stripped });
