@@ -41,4 +41,3 @@ const extractVisualizationCode = (responseText, framework) => {
     return null;
 };
 exports.extractVisualizationCode = extractVisualizationCode;
-//# sourceMappingURL=validation.js.map

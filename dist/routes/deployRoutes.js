@@ -7,6 +7,6 @@ const express_1 = __importDefault(require("express"));
 const deployController_1 = require("../controllers/deployController");
 const asyncHandler_1 = __importDefault(require("../utils/asyncHandler"));
 const router = express_1.default.Router();
+// 🔹 POST /api/deploy
 router.post("/", (0, asyncHandler_1.default)(deployController_1.deployInfrastructure));
 exports.default = router;
-//# sourceMappingURL=deployRoutes.js.map

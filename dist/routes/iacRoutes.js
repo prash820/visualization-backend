@@ -7,6 +7,6 @@ const express_1 = __importDefault(require("express"));
 const openAIController_1 = require("../controllers/openAIController");
 const asyncHandler_1 = __importDefault(require("../utils/asyncHandler"));
 const router = express_1.default.Router();
+// 🔹 Generate Infrastructure as Code (Terraform, AWS CDK, CloudFormation)
 router.post("/", (0, asyncHandler_1.default)(openAIController_1.generateIaC));
 exports.default = router;
-//# sourceMappingURL=iacRoutes.js.map

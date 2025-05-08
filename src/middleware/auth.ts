@@ -1,10 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { AuthRequest } from '../types/express';
+import { IUser } from '../models/User';
 
 dotenv.config();
 
-export const authenticateToken = (req: Request, res: Response, next: NextFunction): void => {
+interface JwtPayload {
+  id: string;
+  email: string;
+  iat?: number;
+  exp?: number;
+}
+
+export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -14,8 +23,13 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as JwtPayload;
+    // Create a minimal user object with the required fields
+    const user: Partial<IUser> = {
+      _id: decoded.id,
+      email: decoded.email
+    };
+    req.user = user as IUser;
     next();
   } catch (error) {
     res.status(403).json({ error: 'Invalid token.' });

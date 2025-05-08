@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -10,7 +19,8 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const router = express_1.default.Router();
 exports.default = router;
-const createProject = async (req, res) => {
+// Create a project
+const createProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         if (!req.user) {
             res.status(401).json({ error: "Unauthorized" });
@@ -24,7 +34,7 @@ const createProject = async (req, res) => {
             userId: req.user._id,
         });
         console.log("Project", JSON.stringify(project));
-        const savedProject = await project.save();
+        const savedProject = yield project.save();
         res.status(201).json({ project: savedProject });
         console.log("Project successfully created ", project.name);
     }
@@ -32,15 +42,16 @@ const createProject = async (req, res) => {
         console.error("Error creating project:", error);
         res.status(500).json({ error: "Internal server error" });
     }
-};
+});
 exports.createProject = createProject;
-const getProjects = async (req, res) => {
+// Get all projects for a user
+const getProjects = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         if (!req.user) {
             res.status(401).json({ error: "Unauthorized" });
             return;
         }
-        const projects = await Project_1.default.find({ userId: req.user._id });
+        const projects = yield Project_1.default.find({ userId: req.user._id });
         res.status(200).json({ projects });
         console.log("Projects retrieved size ", projects.length);
     }
@@ -48,9 +59,10 @@ const getProjects = async (req, res) => {
         console.error("Error fetching projects:", error);
         res.status(500).json({ error: "Failed to fetch projects." });
     }
-};
+});
 exports.getProjects = getProjects;
-const updateProject = async (req, res) => {
+// Update a project
+const updateProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
         const { name, description, prompt, framework, diagramType } = req.body;
@@ -58,7 +70,7 @@ const updateProject = async (req, res) => {
             res.status(401).json({ error: "Unauthorized" });
             return;
         }
-        const updatedProject = await Project_1.default.findOneAndUpdate({ _id: id, userId: req.user._id }, { name, description, prompt, framework, diagramType }, { new: true });
+        const updatedProject = yield Project_1.default.findOneAndUpdate({ _id: id, userId: req.user._id }, { name, description, prompt, framework, diagramType }, { new: true });
         if (!updatedProject) {
             res.status(404).json({ error: "Project not found or not authorized" });
             return;
@@ -69,16 +81,17 @@ const updateProject = async (req, res) => {
         console.error("Error updating project:", error);
         res.status(500).json({ error: "Failed to update project." });
     }
-};
+});
 exports.updateProject = updateProject;
-const deleteProject = async (req, res) => {
+// Delete a project
+const deleteProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
         if (!req.user) {
             res.status(401).json({ error: "Unauthorized" });
             return;
         }
-        const deletedProject = await Project_1.default.findOneAndDelete({
+        const deletedProject = yield Project_1.default.findOneAndDelete({
             _id: id,
             userId: req.user._id,
         });
@@ -92,9 +105,9 @@ const deleteProject = async (req, res) => {
         console.error("Error deleting project:", error);
         res.status(500).json({ error: "Failed to delete project." });
     }
-};
+});
 exports.deleteProject = deleteProject;
-const saveProjectState = async (req, res) => {
+const saveProjectState = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
         const { lastPrompt, lastCode } = req.body;
@@ -102,7 +115,7 @@ const saveProjectState = async (req, res) => {
             res.status(401).json({ error: "Unauthorized" });
             return;
         }
-        const updatedProject = await Project_1.default.findOneAndUpdate({ _id: id, userId: req.user._id }, { lastPrompt, lastCode }, { new: true });
+        const updatedProject = yield Project_1.default.findOneAndUpdate({ _id: id, userId: req.user._id }, { lastPrompt, lastCode }, { new: true });
         if (!updatedProject) {
             res.status(404).json({ error: "Project not found or not authorized" });
             return;
@@ -113,12 +126,12 @@ const saveProjectState = async (req, res) => {
         console.error("Error saving project state:", error);
         res.status(500).json({ error: "Failed to save project state." });
     }
-};
+});
 exports.saveProjectState = saveProjectState;
-const getProjectById = async (req, res) => {
+const getProjectById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const project = await Project_1.default.findById(id);
+        const project = yield Project_1.default.findById(id);
         console.log("Id", id);
         if (!project) {
             res.status(404).json({ error: "Project not found" });
@@ -130,6 +143,5 @@ const getProjectById = async (req, res) => {
         console.error("Error fetching project:", error);
         res.status(500).json({ error: "Failed to fetch project" });
     }
-};
+});
 exports.getProjectById = getProjectById;
-//# sourceMappingURL=projectController.js.map

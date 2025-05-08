@@ -7,6 +7,6 @@ const express_1 = __importDefault(require("express"));
 const openAIController_1 = require("../controllers/openAIController");
 const asyncHandler_1 = __importDefault(require("../utils/asyncHandler"));
 const router = express_1.default.Router();
+// Generate visualization endpoint
 router.post("/", (0, asyncHandler_1.default)(openAIController_1.generateVisualization));
 exports.default = router;
-//# sourceMappingURL=openAI.js.map

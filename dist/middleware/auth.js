@@ -16,7 +16,12 @@ const authenticateToken = (req, res, next) => {
     }
     try {
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET || 'secret');
-        req.user = decoded;
+        // Create a minimal user object with the required fields
+        const user = {
+            _id: decoded.id,
+            email: decoded.email
+        };
+        req.user = user;
         next();
     }
     catch (error) {
@@ -24,4 +29,3 @@ const authenticateToken = (req, res, next) => {
     }
 };
 exports.authenticateToken = authenticateToken;
-//# sourceMappingURL=auth.js.map

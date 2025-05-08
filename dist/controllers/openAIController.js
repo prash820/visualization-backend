@@ -1,9 +1,19 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateIaC = exports.generateVisualization = void 0;
+// src/controllers/openAIController.ts
 const express_1 = __importDefault(require("express"));
 const openai_1 = require("openai");
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -15,9 +25,9 @@ const openai = new openai_1.OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "",
 });
 const anthropic = new sdk_1.default({
-    apiKey: process.env.ANTHROPIC_SECRET_KEY,
+    apiKey: process.env.ANTHROPIC_SECRET_KEY, // defaults to process.env["ANTHROPIC_API_KEY"]
 });
-const generateVisualization = async (req, res) => {
+const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { prompt, diagramType } = req.body;
     console.log("🔹 Prompt:", req.body);
@@ -96,9 +106,10 @@ const generateVisualization = async (req, res) => {
                 Do not include any extra text.
                       `
     };
+    // Choose a system prompt based on diagramType
     try {
         console.log("User Prompt:", prompt);
-        const response = await openai.chat.completions.create({
+        const response = yield openai.chat.completions.create({
             model: "gpt-4-0125-preview",
             messages: [
                 { role: "system", content: systemPrompt[diagramType] },
@@ -123,16 +134,16 @@ const generateVisualization = async (req, res) => {
         console.error("Error generating visualization:", error);
         return res.status(500).json({ error: "Failed to generate diagram." });
     }
-};
+});
 exports.generateVisualization = generateVisualization;
-const generateIaC = async (req, res) => {
+const generateIaC = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { prompt } = req.body;
     if (!prompt) {
         res.status(400).json({ error: "Prompt is required" });
         return;
     }
     try {
-        const completion = await openai.chat.completions.create({
+        const completion = yield openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
                 {
@@ -156,7 +167,7 @@ const generateIaC = async (req, res) => {
         console.error('Error generating IaC:', error);
         res.status(500).json({ error: 'Failed to generate Infrastructure as Code' });
     }
-};
+});
 exports.generateIaC = generateIaC;
 const parseArchitectureResponse = (response) => {
     try {
@@ -169,6 +180,7 @@ const parseArchitectureResponse = (response) => {
         if (!parsedData.nodes || !parsedData.edges || !parsedData.groups) {
             throw new Error("Missing required keys (nodes, edges, groups) in AI response.");
         }
+        // ✅ Ensure every node has a valid group
         parsedData.nodes.forEach((node) => {
             if (!node.group) {
                 throw new Error(`Node "${node.label}" is missing a group!`);
@@ -198,4 +210,3 @@ const parseGenericResponse = (response) => {
         throw new Error("Invalid generic diagram response format");
     }
 };
-//# sourceMappingURL=openAIController.js.map

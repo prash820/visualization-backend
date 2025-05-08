@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -9,9 +18,9 @@ const openai_1 = __importDefault(require("openai"));
 const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY,
 });
-const generateUmlFromPrompt = async (prompt) => {
+const generateUmlFromPrompt = (prompt) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const completion = await openai.chat.completions.create({
+        const completion = yield openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
                 {
@@ -53,11 +62,13 @@ const generateUmlFromPrompt = async (prompt) => {
             throw new Error('No response from OpenAI');
         }
         console.log("[UML Generator] Received OpenAI response:", response);
+        // Parse the response to extract different diagram types
         const diagrams = {
             sequence: "",
             entity: "",
             component: ""
         };
+        // Extract diagrams based on Mermaid syntax markers
         const sections = response.split("```mermaid");
         console.log("[UML Generator] Split content into sections:", sections.length);
         sections.forEach((section) => {
@@ -85,7 +96,7 @@ const generateUmlFromPrompt = async (prompt) => {
         console.error('[UML Generator] Error generating UML diagrams:', error);
         throw error;
     }
-};
+});
 exports.generateUmlFromPrompt = generateUmlFromPrompt;
 function parseUMLResponse(response) {
     const diagrams = {
@@ -107,4 +118,3 @@ function parseUMLResponse(response) {
     });
     return diagrams;
 }
-//# sourceMappingURL=umlGenerator.js.map
