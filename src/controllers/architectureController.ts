@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { OpenAI } from "openai";
 import dotenv from "dotenv";
 dotenv.config();

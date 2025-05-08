@@ -13,10 +13,11 @@ import iaCRoutes from "./routes/iacRoutes"; // ✅ New IaC Route
 import deployRoutes from "./routes/deployRoutes";
 import umlRoutes from "./routes/uml";
 import documentationRoutes from "./routes/documentation";
+import type { Express } from 'express';
 
 
 dotenv.config();
-const app = express();
+const app: Express = express();
 const PORT = process.env.PORT || 5001;
 
 const allowedOrigins = [
