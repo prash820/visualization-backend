@@ -1,1 +1,1 @@
-echo "web: npm install && npm run build && node dist/server.js" > visualization-backend/Procfile
+web: npm install && npm run build && node dist/server.js
