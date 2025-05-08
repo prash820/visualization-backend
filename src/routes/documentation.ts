@@ -1,4 +1,4 @@
-import express from 'express';
+import { express } from '../types/express';
 import { 
   generateDocumentation, 
   generateHighLevelDocumentation, 
