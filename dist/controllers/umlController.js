@@ -16,7 +16,6 @@ exports.deleteUmlDiagram = exports.updateUmlDiagram = exports.getUmlDiagram = ex
 const umlDiagram_1 = require("../models/umlDiagram");
 const openai_1 = require("openai");
 const dotenv_1 = __importDefault(require("dotenv"));
-const mermaidUtils_1 = require("../utils/mermaidUtils");
 dotenv_1.default.config();
 const openai = new openai_1.OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "",
@@ -178,38 +177,30 @@ const generateUmlDiagrams = (req, res) => __awaiter(void 0, void 0, void 0, func
         console.log("[UML Controller] Received OpenAI response:", response);
         // Parse the response to extract different diagram types
         const diagrams = {
-            sequence: { mermaid: "", svg: "" },
-            entity: { mermaid: "", svg: "" },
-            component: { mermaid: "", svg: "" },
+            sequence: "",
+            entity: "",
+            component: "",
         };
         // Extract diagrams based on Mermaid syntax markers
         const sections = response.split("```mermaid");
         console.log("[UML Controller] Split content into sections:", sections.length);
-        // Process each diagram and generate SVGs
-        for (const section of sections) {
-            let mermaidCode = "";
+        sections.forEach((section) => {
             if (section.includes("sequenceDiagram")) {
-                mermaidCode = section.split("```")[0].trim();
-                diagrams.sequence.mermaid = mermaidCode;
-                diagrams.sequence.svg = yield (0, mermaidUtils_1.generateSvgFromMermaid)(mermaidCode);
+                diagrams.sequence = section.split("```")[0].trim();
             }
             else if (section.includes("erDiagram")) {
-                mermaidCode = section.split("```")[0].trim();
-                diagrams.entity.mermaid = mermaidCode;
-                diagrams.entity.svg = yield (0, mermaidUtils_1.generateSvgFromMermaid)(mermaidCode);
+                diagrams.entity = section.split("```")[0].trim();
             }
             else if (section.includes("architecture-beta")) {
-                mermaidCode = section.split("```")[0].trim();
-                diagrams.component.mermaid = mermaidCode;
-                diagrams.component.svg = yield (0, mermaidUtils_1.generateSvgFromMermaid)(mermaidCode);
+                diagrams.component = section.split("```")[0].trim();
             }
-        }
-        console.log("[UML Controller] Generated diagrams with SVGs:", {
+        });
+        console.log("[UML Controller] Extracted diagrams:", {
             types: Object.keys(diagrams),
             lengths: {
-                sequence: diagrams.sequence.mermaid.length,
-                entity: diagrams.entity.mermaid.length,
-                component: diagrams.component.mermaid.length,
+                sequence: diagrams.sequence.length,
+                entity: diagrams.entity.length,
+                component: diagrams.component.length,
             }
         });
         res.json({ diagrams });

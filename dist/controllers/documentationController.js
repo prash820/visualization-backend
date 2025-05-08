@@ -130,32 +130,27 @@ Important:
 }
 function generateLowLevelDesign(prompt, umlDiagrams) {
     return __awaiter(this, void 0, void 0, function* () {
-        const systemPrompt = `You are an expert enterprise software engineer. Generate a comprehensive, objective, and context-rich low-level design document for the following application. 
-  
-  The audience is technical stakeholders and engineers who will use this document for implementation, code reviews, and future maintenance. 
-  
-  Avoid subjectivity and personal opinions; focus on facts, standards, and best practices.
+        const systemPrompt = `You are an expert enterprise software engineer. Generate a comprehensive, objective, and context-rich low-level design document for the following application.
 
-Respond ONLY with a valid JSON array. Each element must have a 'title' (string) and 'content' (markdown string). 
+The audience is technical stakeholders and engineers who will use this document for implementation, code reviews, and future maintenance.
 
-Required sections (in this order):
-1. API Specifications
-2. Database Schema
-3. Component Details
-4. Integration Points
-5. Error Handling
-6. Testing Strategy
-7. Performance Optimization
-8. Monitoring & Logging
+Avoid subjectivity and personal opinions; focus on facts, standards, and best practices.
 
-Important:
-- Use clear, concise, and technical language
-- Do NOT include or mention any diagrams; these will be inserted automatically
-- Avoid subjective statements and personal opinions
-- Use bullet points and tables where appropriate for clarity
-- Each section should be self-contained and comprehensive
-- Focus on enterprise-grade solutions and best practices
-- Include specific technical details and implementation guidelines`;
+Respond ONLY with a valid JSON array. Each element must have a 'title' (string) and 'content' (markdown string).
+
+Guidelines:
+- Start with a brief problem description or system context to set the stage for the design.
+- Organize the document into logical sections relevant to the application (e.g., API Specifications, Component Details, Integration Points, Error Handling, Testing Strategy, Performance Optimization, Monitoring & Logging, etc.).
+- For the database/ERD section, do NOT list the schema, tables, or entities as text or tables. Instead, provide a concise description or summary of the data model, referencing the ERD diagram that will be rendered separately.
+- Use clear, concise, and technical language.
+- Do NOT include or mention any diagrams; these will be inserted automatically.
+- Avoid subjective statements and personal opinions.
+- Use bullet points and tables where appropriate for clarity.
+- Each section should be self-contained and comprehensive.
+- Focus on enterprise-grade solutions and best practices.
+- Include specific technical details and implementation guidelines.
+- Add any other sections you deem important for a robust low-level design.
+`;
         console.log('[generateLowLevelDesign] Calling OpenAI with prompt and UML diagrams...');
         const response = yield openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
