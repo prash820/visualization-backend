@@ -33,8 +33,11 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
 
+  console.log("email", email);
+
   try {
     const user = await User.findOne({ email });
+    console.log("user", user);
     if (!user) {
       res.status(401).json({ error: "Invalid credentials" });
       return;
