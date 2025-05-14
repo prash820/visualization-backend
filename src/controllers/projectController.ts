@@ -8,6 +8,8 @@ export default router;
 // Create a project
 export const createProject = async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log("[createProject] Request body:", req.body);
+    console.log("[createProject] User:", (req as any).user);
     if (!(req as any).user) {
       res.status(401).json({ error: "Unauthorized" });
       return;
@@ -136,6 +138,8 @@ export const saveProjectState = async (req: Request, res: Response): Promise<voi
   export const getProjectById = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
+      console.log("[getProjectById] Incoming id param:", id);
+      console.log("[getProjectById] Request body:", req.body);
       const project = await Project.findById(id);
       console.log("Id", id);
       if (!project) {
