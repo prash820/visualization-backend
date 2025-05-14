@@ -33,19 +33,26 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
 
-  console.log("email", email);
-
   try {
+    console.log(`Attempting login for email: ${email}`);
+    
     const user = await User.findOne({ email });
-    console.log("user", user);
     if (!user) {
-      res.status(401).json({ error: "Invalid credentials" });
+      console.log(`No user found with email: ${email}`);
+      res.status(401).json({ 
+        error: "Invalid credentials",
+        details: "No user found with this email"
+      });
       return;
     }
 
     const isValidPassword = await user.comparePassword(password);
     if (!isValidPassword) {
-      res.status(401).json({ error: "Invalid credentials" });
+      console.log(`Invalid password for user: ${email}`);
+      res.status(401).json({ 
+        error: "Invalid credentials",
+        details: "Invalid password"
+      });
       return;
     }
 
@@ -55,10 +62,20 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       { expiresIn: "24h" }
     );
 
-    res.json({ token, user: { id: user._id, email: user.email } });
+    console.log(`Successful login for user: ${email}`);
+    res.json({ 
+      token, 
+      user: { 
+        id: user._id, 
+        email: user.email 
+      }
+    });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ 
+      error: "Internal server error",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
   }
 };
 
