@@ -13,13 +13,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateArchitectureDiagram = void 0;
-const openai_1 = require("openai");
+const openai_1 = __importDefault(require("openai"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const configuration = new openai_1.Configuration({
+const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY || "",
 });
-const openai = new openai_1.OpenAIApi(configuration);
 const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     const { prompt } = req.body;
@@ -29,7 +28,7 @@ const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void
         return;
     }
     try {
-        const completion = yield openai.createChatCompletion({
+        const completion = yield openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
                 {
@@ -77,7 +76,7 @@ const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void
             ],
             temperature: 0.7,
         });
-        const response = (_a = completion.data.choices[0].message) === null || _a === void 0 ? void 0 : _a.content;
+        const response = (_a = completion.choices[0].message) === null || _a === void 0 ? void 0 : _a.content;
         if (!response) {
             throw new Error('No response from OpenAI');
         }

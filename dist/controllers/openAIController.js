@@ -15,16 +15,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateIaC = exports.generateVisualization = void 0;
 // src/controllers/openAIController.ts
 const express_1 = __importDefault(require("express"));
-const openai_1 = require("openai");
+const openai_1 = __importDefault(require("openai"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 dotenv_1.default.config();
 const router = express_1.default.Router();
 exports.default = router;
-const configuration = new openai_1.Configuration({
+const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY || "",
 });
-const openai = new openai_1.OpenAIApi(configuration);
 const anthropic = new sdk_1.default({
     apiKey: process.env.ANTHROPIC_SECRET_KEY, // defaults to process.env["ANTHROPIC_API_KEY"]
 });
@@ -110,7 +109,7 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
     // Choose a system prompt based on diagramType
     try {
         console.log("User Prompt:", prompt);
-        const response = yield openai.createChatCompletion({
+        const response = yield openai.chat.completions.create({
             model: "gpt-4-0125-preview",
             messages: [
                 { role: "system", content: systemPrompt[diagramType] },
@@ -119,7 +118,7 @@ const generateVisualization = (req, res) => __awaiter(void 0, void 0, void 0, fu
             max_tokens: 4096,
             temperature: 0.5,
         });
-        const fullResponse = ((_b = (_a = response.data.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) || "";
+        const fullResponse = ((_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) || "";
         switch (diagramType) {
             case "architecture": {
                 const parsedData = parseArchitectureResponse(fullResponse);
@@ -145,7 +144,7 @@ const generateIaC = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         return;
     }
     try {
-        const completion = yield openai.createChatCompletion({
+        const completion = yield openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
                 {
@@ -159,7 +158,7 @@ const generateIaC = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             ],
             temperature: 0.7,
         });
-        const response = (_b = (_a = completion.data.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content;
+        const response = (_b = (_a = completion.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content;
         if (!response) {
             throw new Error('No response from OpenAI');
         }

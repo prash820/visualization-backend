@@ -1,10 +1,8 @@
-import { Configuration, OpenAIApi } from 'openai';
+import OpenAI from 'openai';
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-const openai = new OpenAIApi(configuration);
 
 export interface UMLDiagrams {
   class?: string;
@@ -15,7 +13,7 @@ export interface UMLDiagrams {
 
 export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams> => {
   try {
-    const completion = await openai.createChatCompletion({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
       messages: [
         {
@@ -59,7 +57,7 @@ export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams
       temperature: 0.7,
     });
 
-    const response = completion.data.choices[0].message?.content;
+    const response = completion.choices[0].message?.content;
     if (!response) {
       throw new Error('No response from OpenAI');
     }

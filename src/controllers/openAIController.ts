@@ -1,7 +1,7 @@
 // src/controllers/openAIController.ts
 import express from "express";
 import { Request, Response,  } from "express";
-import { Configuration, OpenAIApi } from "openai";
+import OpenAI from "openai";
 import dotenv from "dotenv";
 import Anthropic from '@anthropic-ai/sdk';
 dotenv.config();
@@ -34,11 +34,9 @@ interface ArchitectureResponse {
 }
 
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
 });
-
-const openai = new OpenAIApi(configuration);
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_SECRET_KEY, // defaults to process.env["ANTHROPIC_API_KEY"]
@@ -130,7 +128,7 @@ export const generateVisualization = async (req: Request, res: Response) => {
   // Choose a system prompt based on diagramType
   try {
     console.log("User Prompt:", prompt);
-    const response = await openai.createChatCompletion({
+    const response = await openai.chat.completions.create({
       model: "gpt-4-0125-preview",
       messages: [
         { role: "system", content: systemPrompt[diagramType as DiagramType] },
@@ -141,7 +139,7 @@ export const generateVisualization = async (req: Request, res: Response) => {
     });
 
 
-    const fullResponse = response.data.choices[0]?.message?.content || "";
+    const fullResponse = response.choices[0]?.message?.content || "";
     switch (diagramType)  {
       case "architecture" : {
         const parsedData = parseArchitectureResponse(fullResponse);
@@ -168,7 +166,7 @@ export const generateIaC = async (req: Request, res: Response): Promise<void> =>
   }
 
   try {
-    const completion = await openai.createChatCompletion({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
       messages: [
         {
@@ -183,7 +181,7 @@ export const generateIaC = async (req: Request, res: Response): Promise<void> =>
       temperature: 0.7,
     });
 
-    const response = completion.data.choices[0]?.message?.content;
+    const response = completion.choices[0]?.message?.content;
     if (!response) {
       throw new Error('No response from OpenAI');
     }

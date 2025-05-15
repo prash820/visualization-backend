@@ -1,13 +1,11 @@
 import { Request, Response } from 'express';
-import { Configuration, OpenAIApi } from "openai";
+import OpenAI from "openai";
 import dotenv from "dotenv";
 dotenv.config();
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
 });
-
-const openai = new OpenAIApi(configuration);
 
 interface DiagramNode {
   id: string;
@@ -34,7 +32,7 @@ export const generateArchitectureDiagram = async (req: Request, res: Response): 
   }
 
   try {
-    const completion = await openai.createChatCompletion({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
       messages: [
         {
@@ -83,7 +81,7 @@ export const generateArchitectureDiagram = async (req: Request, res: Response): 
       temperature: 0.7,
     });
 
-    const response = completion.data.choices[0].message?.content;
+    const response = completion.choices[0].message?.content;
     if (!response) {
       throw new Error('No response from OpenAI');
     }

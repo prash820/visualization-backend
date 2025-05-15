@@ -8,18 +8,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateUmlFromPrompt = void 0;
 exports.parseUMLResponse = parseUMLResponse;
-const openai_1 = require("openai");
-const configuration = new openai_1.Configuration({
+const openai_1 = __importDefault(require("openai"));
+const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY,
 });
-const openai = new openai_1.OpenAIApi(configuration);
 const generateUmlFromPrompt = (prompt) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const completion = yield openai.createChatCompletion({
+        const completion = yield openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
                 {
@@ -62,7 +64,7 @@ const generateUmlFromPrompt = (prompt) => __awaiter(void 0, void 0, void 0, func
             ],
             temperature: 0.7,
         });
-        const response = (_a = completion.data.choices[0].message) === null || _a === void 0 ? void 0 : _a.content;
+        const response = (_a = completion.choices[0].message) === null || _a === void 0 ? void 0 : _a.content;
         if (!response) {
             throw new Error('No response from OpenAI');
         }

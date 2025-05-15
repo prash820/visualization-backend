@@ -8,13 +8,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateDocumentation = exports.generateLowLevelDocumentation = exports.generateHighLevelDocumentation = void 0;
-const openai_1 = require("openai");
-const configuration = new openai_1.Configuration({
+const openai_1 = __importDefault(require("openai"));
+const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY || "",
 });
-const openai = new openai_1.OpenAIApi(configuration);
 // Separate endpoints for high-level and low-level documentation
 const generateHighLevelDocumentation = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -109,7 +111,7 @@ Important:
 - Each section should be self-contained and comprehensive
 - Focus on enterprise-grade solutions and best practices`;
         console.log('[generateHighLevelDesign] Calling OpenAI with prompt and UML diagrams...');
-        const response = yield openai.createChatCompletion({
+        const response = yield openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
                 { role: "system", content: systemPrompt },
@@ -118,7 +120,7 @@ Important:
             temperature: 0.5,
             max_tokens: 2000
         });
-        let content = ((_a = response.data.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) || '';
+        let content = ((_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) || '';
         console.log('[generateHighLevelDesign] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
         try {
             const jsonString = content.replace(/```json|```/g, '').trim();
@@ -155,7 +157,7 @@ Guidelines:
 - Add any other sections you deem important for a robust low-level design.
 `;
         console.log('[generateLowLevelDesign] Calling OpenAI with prompt and UML diagrams...');
-        const response = yield openai.createChatCompletion({
+        const response = yield openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
                 { role: "system", content: systemPrompt },
@@ -164,7 +166,7 @@ Guidelines:
             temperature: 0.5,
             max_tokens: 2000
         });
-        let content = ((_a = response.data.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) || '';
+        let content = ((_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) || '';
         console.log('[generateLowLevelDesign] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
         try {
             const jsonString = content.replace(/```json|```/g, '').trim();
