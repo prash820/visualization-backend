@@ -71,7 +71,7 @@ export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams
     const sections = response.split("```mermaid");
     console.log("[UML Generator] Split content into sections:", sections.length);
 
-    sections.forEach((section) => {
+    sections.forEach((section: string) => {
       if (section.includes("classDiagram")) {
         diagrams.class = section.split("```")[0].trim();
       } else if (section.includes("sequenceDiagram")) {
@@ -105,7 +105,7 @@ export function parseUMLResponse(response: string): UMLDiagrams {
   }
 
   const sections = response.split("```mermaid")
-  sections.forEach(section => {
+  sections.forEach((section: string) => {
     if (section.includes("sequenceDiagram")) {
       diagrams.sequence = section.split("```")[0].trim()
     } else if (section.includes("erDiagram")) {
