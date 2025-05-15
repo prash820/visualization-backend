@@ -4,21 +4,27 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-interface UMLDiagrams {
-  sequence: string
-  entity: string
-  component: string
+export interface UMLDiagrams {
+  class?: string;
+  sequence?: string;
+  entity?: string;
+  component?: string;
 }
 
-export const generateUmlFromPrompt = async (prompt: string) => {
+export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams> => {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
       messages: [
         {
           role: "system",
-          content: `You are a UML diagram expert. Generate three UML diagrams in Mermaid syntax for the given system description.
-          Return exactly three diagrams in this format:
+          content: `You are a UML diagram expert. Generate comprehensive UML diagrams in Mermaid syntax for the given system description.
+          Return all diagrams in this format:
+
+          \`\`\`mermaid
+          classDiagram
+          [Your class diagram here showing class relationships and attributes]
+          \`\`\`
 
           \`\`\`mermaid
           sequenceDiagram
@@ -40,7 +46,8 @@ export const generateUmlFromPrompt = async (prompt: string) => {
           2. Include all essential components and relationships
           3. Keep diagrams clean and readable
           4. Use descriptive labels for relationships
-          5. Return ONLY the diagrams with no additional text or explanations`
+          5. Return ONLY the diagrams with no additional text or explanations
+          6. Generate all diagram types that are relevant to the system description`
         },
         {
           role: "user",
@@ -58,33 +65,29 @@ export const generateUmlFromPrompt = async (prompt: string) => {
     console.log("[UML Generator] Received OpenAI response:", response);
 
     // Parse the response to extract different diagram types
-    const diagrams: { [key: string]: string } = {
-      sequence: "",
-      entity: "",
-      component: ""
-    };
+    const diagrams: UMLDiagrams = {};
     
     // Extract diagrams based on Mermaid syntax markers
     const sections = response.split("```mermaid");
     console.log("[UML Generator] Split content into sections:", sections.length);
 
     sections.forEach((section) => {
-      if (section.includes("sequenceDiagram")) {
+      if (section.includes("classDiagram")) {
+        diagrams.class = section.split("```")[0].trim();
+      } else if (section.includes("sequenceDiagram")) {
         diagrams.sequence = section.split("```")[0].trim();
       } else if (section.includes("erDiagram")) {
         diagrams.entity = section.split("```")[0].trim();
-      } else if (section.includes("architecture-beta")) {
+      } else if (section.includes("flowchart")) {
         diagrams.component = section.split("```")[0].trim();
       }
     });
 
     console.log("[UML Generator] Extracted diagrams:", {
       types: Object.keys(diagrams),
-      lengths: {
-        sequence: diagrams.sequence.length,
-        entity: diagrams.entity.length,
-        component: diagrams.component.length,
-      }
+      lengths: Object.fromEntries(
+        Object.entries(diagrams).map(([key, value]) => [key, value?.length || 0])
+      )
     });
 
     return diagrams;

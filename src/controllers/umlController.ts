@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { UmlDiagram } from '../models/umlDiagram';
-import { generateUmlFromPrompt } from '../utils/umlGenerator';
+import { generateUmlFromPrompt, UMLDiagrams } from '../utils/umlGenerator';
 import { OpenAI } from "openai";
 import dotenv from "dotenv";
 dotenv.config();
@@ -10,7 +10,7 @@ const openai = new OpenAI({
 });
 
 export const generateUmlDiagrams = async (req: Request, res: Response): Promise<void> => {
-  const { prompt } = req.body;
+  const { prompt, projectId } = req.body;
 
   if (!prompt) {
     res.status(400).json({ error: "Prompt is required" });
@@ -18,46 +18,46 @@ export const generateUmlDiagrams = async (req: Request, res: Response): Promise<
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        {
-          role: "system",
-          content: "You are an AI assistant specialized in generating UML diagrams in PlantUML format."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
+    const diagrams = await generateUmlFromPrompt(prompt);
+    
+    // Create a single document with all diagrams
+    const diagram = await UmlDiagram.create({
+      projectId,
+      diagramType: 'comprehensive', // This indicates it contains multiple diagram types
+      diagramData: diagrams,
+      diagrams: diagrams,
+      prompt: prompt,
     });
 
-    const response = completion.choices[0].message.content;
-    if (!response) {
-      throw new Error('No response from OpenAI');
-    }
-
-    res.json({ diagram: response });
+    res.json({
+      id: diagram._id,
+      projectId: diagram.projectId,
+      diagrams: diagram.diagrams,
+      prompt: diagram.prompt,
+      createdAt: diagram.createdAt,
+      updatedAt: diagram.updatedAt,
+    });
   } catch (error) {
-    console.error('Error generating UML diagram:', error);
-    res.status(500).json({ error: 'Failed to generate UML diagram' });
+    console.error('Error generating UML diagrams:', error);
+    res.status(500).json({ error: 'Failed to generate UML diagrams' });
   }
 };
 
 export const saveUmlDiagram = async (req: Request, res: Response) => {
   try {
-    const { projectId, diagramType, diagramData } = req.body;
+    const { projectId, diagrams, prompt } = req.body;
     
-    if (!projectId || !diagramType || !diagramData) {
+    if (!projectId || !diagrams) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
 
     const diagram = await UmlDiagram.create({
       projectId,
-      diagramType,
-      diagramData,
+      diagramType: 'comprehensive',
+      diagramData: diagrams,
+      diagrams: diagrams,
+      prompt: prompt,
     });
 
     res.json(diagram);

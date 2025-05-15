@@ -43,7 +43,7 @@ const UmlDiagramSchema = new mongoose_1.Schema({
     diagramType: {
         type: String,
         required: true,
-        enum: ['class', 'sequence', 'entity', 'component'],
+        enum: ['class', 'sequence', 'entity', 'component', 'comprehensive'],
     },
     diagramData: {
         type: mongoose_1.Schema.Types.Mixed,

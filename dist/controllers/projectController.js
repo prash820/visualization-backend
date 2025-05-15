@@ -22,6 +22,8 @@ exports.default = router;
 // Create a project
 const createProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log("[createProject] Request body:", req.body);
+        console.log("[createProject] User:", req.user);
         if (!req.user) {
             res.status(401).json({ error: "Unauthorized" });
             return;
@@ -131,6 +133,8 @@ exports.saveProjectState = saveProjectState;
 const getProjectById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
+        console.log("[getProjectById] Incoming id param:", id);
+        console.log("[getProjectById] Request body:", req.body);
         const project = yield Project_1.default.findById(id);
         console.log("Id", id);
         if (!project) {

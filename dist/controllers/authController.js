@@ -43,22 +43,41 @@ exports.registerUser = registerUser;
 const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
     try {
+        console.log(`Attempting login for email: ${email}`);
         const user = yield User_1.default.findOne({ email });
         if (!user) {
-            res.status(401).json({ error: "Invalid credentials" });
+            console.log(`No user found with email: ${email}`);
+            res.status(401).json({
+                error: "Invalid credentials",
+                details: "No user found with this email"
+            });
             return;
         }
         const isValidPassword = yield user.comparePassword(password);
         if (!isValidPassword) {
-            res.status(401).json({ error: "Invalid credentials" });
+            console.log(`Invalid password for user: ${email}`);
+            res.status(401).json({
+                error: "Invalid credentials",
+                details: "Invalid password"
+            });
             return;
         }
         const token = jsonwebtoken_1.default.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "24h" });
-        res.json({ token, user: { id: user._id, email: user.email } });
+        console.log(`Successful login for user: ${email}`);
+        res.json({
+            token,
+            user: {
+                id: user._id,
+                email: user.email
+            }
+        });
     }
     catch (error) {
         console.error("Login error:", error);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json({
+            error: "Internal server error",
+            details: error instanceof Error ? error.message : "Unknown error"
+        });
     }
 });
 exports.loginUser = loginUser;

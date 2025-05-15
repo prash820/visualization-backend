@@ -3,7 +3,12 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IUmlDiagram extends Document {
   projectId: string;
   diagramType: string;
-  diagramData: any;
+  diagramData: {
+    class?: string;
+    sequence?: string;
+    entity?: string;
+    component?: string;
+  };
   diagrams?: {
     class?: string;
     sequence?: string;
@@ -24,7 +29,7 @@ const UmlDiagramSchema = new Schema<IUmlDiagram>(
     diagramType: {
       type: String,
       required: true,
-      enum: ['class', 'sequence', 'entity', 'component'],
+      enum: ['class', 'sequence', 'entity', 'component', 'comprehensive'],
     },
     diagramData: {
       type: Schema.Types.Mixed,
