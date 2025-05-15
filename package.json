@@ -30,8 +30,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.12.0",
     "mongoose": "^8.9.5",
-    "openai": "^4.98.0",
-    "qs": "^6.14.0",
+    "openai": "^4.20.1",
+    "qs": "^6.11.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.7.3",
     "vite": "^6.1.1"
@@ -44,5 +44,8 @@
     "@types/helmet": "^0.0.48",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^18.x"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
