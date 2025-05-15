@@ -16,11 +16,12 @@ exports.generateArchitectureDiagram = void 0;
 const openai_1 = require("openai");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const openai = new openai_1.OpenAI({
+const configuration = new openai_1.Configuration({
     apiKey: process.env.OPENAI_API_KEY || "",
 });
+const openai = new openai_1.OpenAIApi(configuration);
 const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c;
     const { prompt } = req.body;
     console.log("[Architecture Controller] Generating diagram for prompt:", prompt);
     if (!prompt) {
@@ -28,7 +29,7 @@ const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void
         return;
     }
     try {
-        const completion = yield openai.chat.completions.create({
+        const completion = yield openai.createChatCompletion({
             model: "gpt-4-turbo-preview",
             messages: [
                 {
@@ -76,7 +77,7 @@ const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void
             ],
             temperature: 0.7,
         });
-        const response = completion.choices[0].message.content;
+        const response = (_a = completion.data.choices[0].message) === null || _a === void 0 ? void 0 : _a.content;
         if (!response) {
             throw new Error('No response from OpenAI');
         }
@@ -84,8 +85,8 @@ const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void
         try {
             const parsedData = JSON.parse(response);
             console.log("[Architecture Controller] Parsed data:", {
-                nodes: (_a = parsedData.nodes) === null || _a === void 0 ? void 0 : _a.length,
-                edges: (_b = parsedData.edges) === null || _b === void 0 ? void 0 : _b.length,
+                nodes: (_b = parsedData.nodes) === null || _b === void 0 ? void 0 : _b.length,
+                edges: (_c = parsedData.edges) === null || _c === void 0 ? void 0 : _c.length,
             });
             res.json(parsedData);
         }

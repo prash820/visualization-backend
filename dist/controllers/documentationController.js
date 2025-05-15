@@ -11,9 +11,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateDocumentation = exports.generateLowLevelDocumentation = exports.generateHighLevelDocumentation = void 0;
 const openai_1 = require("openai");
-const openai = new openai_1.OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+const configuration = new openai_1.Configuration({
+    apiKey: process.env.OPENAI_API_KEY || "",
 });
+const openai = new openai_1.OpenAIApi(configuration);
 // Separate endpoints for high-level and low-level documentation
 const generateHighLevelDocumentation = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -83,6 +84,7 @@ function generateComprehensiveDocumentation(prompt, umlDiagrams) {
 }
 function generateHighLevelDesign(prompt, umlDiagrams) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a;
         const systemPrompt = `You are an expert enterprise software architect. Generate a comprehensive, objective, and context-rich high-level design document for the following application. 
   The audience is technical stakeholders and engineers who will use this document as a reference for implementation and future maintenance. 
   Avoid subjectivity and personal opinions; focus on facts, standards, and best practices.
@@ -107,7 +109,7 @@ Important:
 - Each section should be self-contained and comprehensive
 - Focus on enterprise-grade solutions and best practices`;
         console.log('[generateHighLevelDesign] Calling OpenAI with prompt and UML diagrams...');
-        const response = yield openai.chat.completions.create({
+        const response = yield openai.createChatCompletion({
             model: "gpt-4-turbo-preview",
             messages: [
                 { role: "system", content: systemPrompt },
@@ -116,7 +118,7 @@ Important:
             temperature: 0.5,
             max_tokens: 2000
         });
-        let content = response.choices[0].message.content || '';
+        let content = ((_a = response.data.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) || '';
         console.log('[generateHighLevelDesign] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
         try {
             const jsonString = content.replace(/```json|```/g, '').trim();
@@ -130,6 +132,7 @@ Important:
 }
 function generateLowLevelDesign(prompt, umlDiagrams) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a;
         const systemPrompt = `You are an expert enterprise software engineer. Generate a comprehensive, objective, and context-rich low-level design document for the following application.
 
 The audience is technical stakeholders and engineers who will use this document for implementation, code reviews, and future maintenance.
@@ -152,7 +155,7 @@ Guidelines:
 - Add any other sections you deem important for a robust low-level design.
 `;
         console.log('[generateLowLevelDesign] Calling OpenAI with prompt and UML diagrams...');
-        const response = yield openai.chat.completions.create({
+        const response = yield openai.createChatCompletion({
             model: "gpt-4-turbo-preview",
             messages: [
                 { role: "system", content: systemPrompt },
@@ -161,7 +164,7 @@ Guidelines:
             temperature: 0.5,
             max_tokens: 2000
         });
-        let content = response.choices[0].message.content || '';
+        let content = ((_a = response.data.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) || '';
         console.log('[generateLowLevelDesign] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
         try {
             const jsonString = content.replace(/```json|```/g, '').trim();

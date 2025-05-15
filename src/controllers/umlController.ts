@@ -1,13 +1,15 @@
 import { Request, Response } from 'express';
 import { UmlDiagram } from '../models/umlDiagram';
 import { generateUmlFromPrompt, UMLDiagrams } from '../utils/umlGenerator';
-import { OpenAI } from "openai";
+import { Configuration, OpenAIApi } from "openai";
 import dotenv from "dotenv";
 dotenv.config();
 
-const openai = new OpenAI({
+const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY || "",
 });
+
+const openai = new OpenAIApi(configuration);
 
 export const generateUmlDiagrams = async (req: Request, res: Response): Promise<void> => {
   const { prompt, projectId } = req.body;

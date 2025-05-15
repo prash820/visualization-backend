@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { OpenAI } from 'openai';
+import { Configuration, OpenAIApi } from 'openai';
 import { DocumentationResponse, DocumentationSection } from '../types/documentation';
 
 interface UmlDiagramResponse {
@@ -14,9 +14,11 @@ interface UmlDiagramResponse {
   };
 }
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY || "",
 });
+
+const openai = new OpenAIApi(configuration);
 
 // Separate endpoints for high-level and low-level documentation
 export const generateHighLevelDocumentation = async (req: Request, res: Response): Promise<void> => {
@@ -121,7 +123,7 @@ Important:
 
   console.log('[generateHighLevelDesign] Calling OpenAI with prompt and UML diagrams...');
 
-  const response = await openai.chat.completions.create({
+  const response = await openai.createChatCompletion({
     model: "gpt-4-turbo-preview",
     messages: [
       { role: "system", content: systemPrompt },
@@ -131,7 +133,7 @@ Important:
     max_tokens: 2000
   });
 
-  let content = response.choices[0].message.content || '';
+  let content = response.data.choices[0].message?.content || '';
   console.log('[generateHighLevelDesign] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
 
   try {
@@ -171,7 +173,7 @@ Guidelines:
 
   console.log('[generateLowLevelDesign] Calling OpenAI with prompt and UML diagrams...');
 
-  const response = await openai.chat.completions.create({
+  const response = await openai.createChatCompletion({
     model: "gpt-4-turbo-preview",
     messages: [
       { role: "system", content: systemPrompt },
@@ -181,7 +183,7 @@ Guidelines:
     max_tokens: 2000
   });
 
-  let content = response.choices[0].message.content || '';
+  let content = response.data.choices[0].message?.content || '';
   console.log('[generateLowLevelDesign] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
 
   try {

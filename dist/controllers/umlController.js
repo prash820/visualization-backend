@@ -18,9 +18,10 @@ const umlGenerator_1 = require("../utils/umlGenerator");
 const openai_1 = require("openai");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const openai = new openai_1.OpenAI({
+const configuration = new openai_1.Configuration({
     apiKey: process.env.OPENAI_API_KEY || "",
 });
+const openai = new openai_1.OpenAIApi(configuration);
 const generateUmlDiagrams = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { prompt, projectId } = req.body;
     if (!prompt) {
