@@ -106,7 +106,7 @@ function parseUMLResponse(response) {
         component: ""
     };
     const sections = response.split("```mermaid");
-    sections.forEach(section => {
+    sections.forEach((section) => {
         if (section.includes("sequenceDiagram")) {
             diagrams.sequence = section.split("```")[0].trim();
         }
