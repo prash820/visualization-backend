@@ -14,4 +14,6 @@ router.post("/register", register);
 // Token validation endpoint
 router.get("/validate-token", validateToken);
 
+router.post("/validate", validateToken);
+
 export default router;
