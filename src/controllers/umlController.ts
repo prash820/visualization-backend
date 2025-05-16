@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { getProjectById, saveProject } from '../utils/projectFileStore';
-import { generateUmlFromPrompt, UMLDiagrams } from '../utils/umlGenerator';
+import { generateUmlFromPrompt, UMLDiagrams, parseUMLResponse } from '../utils/umlGenerator';
 import OpenAI from "openai";
 import dotenv from "dotenv";
 dotenv.config();
@@ -18,18 +18,19 @@ export const generateUmlDiagrams = async (req: Request, res: Response): Promise<
   }
 
   try {
-    const diagrams: UMLDiagrams = await generateUmlFromPrompt(prompt);
+    // Generate and parse diagrams
+    const aiResponse = await generateUmlFromPrompt(prompt);
     const project = await getProjectById(projectId);
     if (!project) {
       res.status(404).json({ error: 'Project not found' });
       return;
     }
-    project.umlDiagrams = diagrams;
+    project.umlDiagrams = aiResponse;
     await saveProject(project);
     res.json({
       id: project._id,
       projectId: project._id,
-      diagrams: project.umlDiagrams,
+      diagrams: aiResponse,
       prompt: prompt,
       updatedAt: new Date().toISOString(),
     });

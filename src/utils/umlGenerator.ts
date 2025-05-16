@@ -64,32 +64,9 @@ export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams
 
     console.log("[UML Generator] Received OpenAI response:", response);
 
-    // Parse the response to extract different diagram types
-    const diagrams: UMLDiagrams = {};
-    
-    // Extract diagrams based on Mermaid syntax markers
-    const sections = response.split("```mermaid");
-    console.log("[UML Generator] Split content into sections:", sections.length);
-
-    sections.forEach((section: string) => {
-      if (section.includes("classDiagram")) {
-        diagrams.class = section.split("```")[0].trim();
-      } else if (section.includes("sequenceDiagram")) {
-        diagrams.sequence = section.split("```")[0].trim();
-      } else if (section.includes("erDiagram")) {
-        diagrams.entity = section.split("```")[0].trim();
-      } else if (section.includes("flowchart")) {
-        diagrams.component = section.split("```")[0].trim();
-      }
-    });
-
-    console.log("[UML Generator] Extracted diagrams:", {
-      types: Object.keys(diagrams),
-      lengths: Object.fromEntries(
-        Object.entries(diagrams).map(([key, value]) => [key, value?.length || 0])
-      )
-    });
-
+    // Use the robust parser
+    const diagrams = parseUMLResponse(response);
+    console.log("[UML Generator] Parsed diagrams:", diagrams);
     return diagrams;
   } catch (error) {
     console.error('[UML Generator] Error generating UML diagrams:', error);
@@ -98,22 +75,20 @@ export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams
 };
 
 export function parseUMLResponse(response: string): UMLDiagrams {
-  const diagrams: UMLDiagrams = {
-    sequence: "",
-    entity: "",
-    component: ""
-  }
-
-  const sections = response.split("```mermaid")
-  sections.forEach((section: string) => {
-    if (section.includes("sequenceDiagram")) {
-      diagrams.sequence = section.split("```")[0].trim()
-    } else if (section.includes("erDiagram")) {
-      diagrams.entity = section.split("```")[0].trim()
-    } else if (section.includes("architecture-beta")) {
-      diagrams.component = section.split("```")[0].trim()
+  const diagrams: UMLDiagrams = {};
+  const regex = /```mermaid\s*([\s\S]*?)```/g;
+  let match;
+  while ((match = regex.exec(response)) !== null) {
+    const content = match[1].trim();
+    if (content.startsWith("classDiagram")) {
+      diagrams.class = content;
+    } else if (content.startsWith("sequenceDiagram")) {
+      diagrams.sequence = content;
+    } else if (content.startsWith("erDiagram")) {
+      diagrams.entity = content;
+    } else if (content.startsWith("flowchart")) {
+      diagrams.component = content;
     }
-  })
-
-  return diagrams
+  }
+  return diagrams;
 } 
