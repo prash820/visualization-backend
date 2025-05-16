@@ -17,6 +17,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+// Increase timeout for all routes
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Set timeout to 5 minutes (300000ms)
+  req.setTimeout(300000);
+  res.setTimeout(300000);
+  next();
+});
+
 // Simple in-memory rate limiter
 const requestCounts = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
@@ -58,7 +66,8 @@ const allowedOrigins = [
 
 // 🔹 Security Middleware
 app.use(helmet()); // Security headers
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // 🔹 CORS Configuration
 app.use(
@@ -88,4 +97,9 @@ app.use("/api/documentation", documentationRoutes);
 // 🔹 Global Error Handler
 app.use(errorHandler);
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+// Create server with increased timeout
+const server = app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  // Set server timeout to 5 minutes
+  server.timeout = 300000;
+});

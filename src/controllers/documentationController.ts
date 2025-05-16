@@ -6,6 +6,7 @@ import path from 'path';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
+  timeout: 240000, // 4 minutes timeout for OpenAI API calls
 });
 
 export const generateDocumentation = async (req: Request, res: Response): Promise<void> => {
@@ -17,11 +18,26 @@ export const generateDocumentation = async (req: Request, res: Response): Promis
       return;
     }
 
+    // Set response headers for long-running request
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    // Send initial response to keep connection alive
+    res.write(JSON.stringify({ status: 'processing', message: 'Generating documentation...' }));
+
     const designDoc = await generateDesignDocument(prompt, umlDiagrams);
-    res.json(designDoc);
+    
+    // Send the final response
+    res.write(JSON.stringify({ status: 'complete', data: designDoc }));
+    res.end();
   } catch (error) {
     console.error('Error generating design document:', error);
-    res.status(500).json({ error: 'Failed to generate design document' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to generate design document' });
+    } else {
+      res.write(JSON.stringify({ status: 'error', error: 'Failed to generate design document' }));
+      res.end();
+    }
   }
 };
 
