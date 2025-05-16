@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import bodyParser from "body-parser";
 import helmet from "helmet";
-import connectDB  from "./db";
+// import { connectDB } from "./db"; // Removed
 import { errorHandler } from "./middleware/errorHandler";
 import openAIRoutes from "./routes/openAI";
 import authRoutes from "./routes/auth";
@@ -74,7 +74,7 @@ app.use(
 app.use(simpleRateLimiter);
 
 // 🔹 Connect to Database
-connectDB();
+// connectDB(); // Removed
 
 // 🔹 API Routes
 app.use("/api/generate", openAIRoutes);

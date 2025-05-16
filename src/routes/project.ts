@@ -1,24 +1,16 @@
 // src/routes/project.ts
 import express from "express";
-
-import {
-  createProject,
-  getProjects,
-  updateProject,
-  deleteProject,
-  saveProjectState,
-  getProjectById
-} from "../controllers/projectController";
+import { getProjects, createProject, updateProject, removeProject, getProject, saveProjectState } from "../controllers/projectController";
 import { authenticateToken } from "../middleware/authMiddleware";
+import asyncHandler from "../utils/asyncHandler";
 
 const router = express.Router();
 
-router.post("/", authenticateToken, createProject);
-router.get("/", authenticateToken, getProjects);
-router.put("/:id", authenticateToken, updateProject);
-router.delete("/:id", authenticateToken, deleteProject);
-router.patch("/:id/state", authenticateToken, saveProjectState);
-router.get("/:id", authenticateToken, getProjectById);
-
+router.get("/", authenticateToken, asyncHandler(getProjects));
+router.post("/", authenticateToken, asyncHandler(createProject));
+router.get("/:id", authenticateToken, asyncHandler(getProject));
+router.put("/:id", authenticateToken, asyncHandler(updateProject));
+router.delete("/:id", authenticateToken, asyncHandler(removeProject));
+router.post("/:id/state", authenticateToken, asyncHandler(saveProjectState));
 
 export default router;

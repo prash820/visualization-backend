@@ -1,155 +1,62 @@
 import express from "express";
 import  { Request, Response,  } from "express";
-import Project from "../models/Project";
+import { getAllProjects, getProjectById, saveProject, deleteProject, Project } from "../utils/projectFileStore";
 import dotenv from "dotenv";
+import { v4 as uuidv4 } from "uuid";
 dotenv.config();
 const router = express.Router();
 export default router;
 // Create a project
-export const createProject = async (req: Request, res: Response): Promise<void> => {
-  try {
-    console.log("[createProject] Request body:", req.body);
-    console.log("[createProject] User:", (req as any).user);
-    if (!(req as any).user) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    const { name, prompt, diagramType } = req.body;
-
-    const project = new Project({
-      name,
-      prompt,
-      diagramType,
-      userId: (req as any).user._id,
-    });
-
-    console.log("Project", JSON.stringify(project));
-    const savedProject = await project.save();
-    res.status(201).json({ project: savedProject });
-    console.log("Project successfully created ", project.name);
-  } catch (error) {
-    console.error("Error creating project:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
+export const createProject = async (req: Request, res: Response) => {
+  const newProject: Project = {
+    ...req.body,
+    _id: uuidv4(),
+    createdAt: new Date().toISOString(),
+  };
+  await saveProject(newProject);
+  res.status(201).json(newProject);
 };
 
 // Get all projects for a user
-export const getProjects = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!(req as any).user) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    const projects = await Project.find({ userId: (req as any).user._id });
-    res.status(200).json({ projects });
-    console.log("Projects retrieved size ", projects.length);
-  } catch (error) {
-    console.error("Error fetching projects:", error);
-    res.status(500).json({ error: "Failed to fetch projects." });
-  }
+export const getProjects = async (req: Request, res: Response) => {
+  const projects = await getAllProjects();
+  res.json(projects);
 };
 
 // Update a project
-export const updateProject = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { name, description, prompt, framework, diagramType } = req.body;
-
-    if (!(req as any).user) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    const updatedProject = await Project.findOneAndUpdate(
-      { _id: id, userId: (req as any).user._id },
-      { name, description, prompt, framework, diagramType },
-      { new: true }
-    );
-
-    if (!updatedProject) {
-      res.status(404).json({ error: "Project not found or not authorized" });
-      return;
-    }
-
-    res.status(200).json({ project: updatedProject });
-  } catch (error) {
-    console.error("Error updating project:", error);
-    res.status(500).json({ error: "Failed to update project." });
-  }
+export const updateProject = async (req: Request, res: Response) => {
+  const project = await getProjectById(req.params.id);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+  const updated: Project = { ...project, ...req.body };
+  await saveProject(updated);
+  res.json(updated);
 };
 
 // Delete a project
-export const deleteProject = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-
-    if (!(req as any).user) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    const deletedProject = await Project.findOneAndDelete({
-      _id: id,
-      userId: (req as any).user._id,
-    });
-
-    if (!deletedProject) {
-      res.status(404).json({ error: "Project not found or not authorized" });
-      return;
-    }
-
-    res.status(200).json({ message: "Project deleted successfully." });
-  } catch (error) {
-    console.error("Error deleting project:", error);
-    res.status(500).json({ error: "Failed to delete project." });
-  }
+export const removeProject = async (req: Request, res: Response) => {
+  await deleteProject(req.params.id);
+  res.json({ message: "Project deleted" });
 };
 
-export const saveProjectState = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const { lastPrompt, lastCode } = req.body;
-  
-      if (!(req as any).user) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-      }
-  
-      const updatedProject = await Project.findOneAndUpdate(
-        { _id: id, userId: (req as any).user._id },
-        { lastPrompt, lastCode },
-        { new: true }
-      );
-  
-      if (!updatedProject) {
-        res.status(404).json({ error: "Project not found or not authorized" });
-        return;
-      }
-  
-      res.status(200).json({ project: updatedProject });
-    } catch (error) {
-      console.error("Error saving project state:", error);
-      res.status(500).json({ error: "Failed to save project state." });
-    }
-  };
+export const saveProjectState = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { lastPrompt, lastCode } = req.body;
 
-  export const getProjectById = async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      console.log("[getProjectById] Incoming id param:", id);
-      console.log("[getProjectById] Request body:", req.body);
-      const project = await Project.findById(id);
-      console.log("Id", id);
-      if (!project) {
-        res.status(404).json({ error: "Project not found" });
-        return;
-      }
-  
-      res.status(200).json(project);
-    } catch (error) {
-      console.error("Error fetching project:", error);
-      res.status(500).json({ error: "Failed to fetch project" });
-    }
-  };
+  const project = await getProjectById(id);
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  project.lastPrompt = lastPrompt;
+  project.lastCode = lastCode;
+  await saveProject(project);
+
+  res.status(200).json({ project });
+};
+
+export const getProject = async (req: Request, res: Response) => {
+  const project = await getProjectById(req.params.id);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+  res.json(project);
+};

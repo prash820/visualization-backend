@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { AuthRequest } from '../types/express';
-import { IUser } from '../models/User';
+// import { IUser } from '../models/User'; // Removed
 
 dotenv.config();
 
@@ -25,11 +25,11 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as JwtPayload;
     // Create a minimal user object with the required fields
-    const user: Partial<IUser> = {
+    const user = {
       _id: decoded.id,
       email: decoded.email
     };
-    req.user = user as IUser;
+    req.user = user;
     next();
   } catch (error) {
     res.status(403).json({ error: 'Invalid token.' });

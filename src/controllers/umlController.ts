@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { UmlDiagram } from '../models/umlDiagram';
+import { getProjectById, saveProject } from '../utils/projectFileStore';
 import { generateUmlFromPrompt, UMLDiagrams } from '../utils/umlGenerator';
 import OpenAI from "openai";
 import dotenv from "dotenv";
@@ -18,24 +18,20 @@ export const generateUmlDiagrams = async (req: Request, res: Response): Promise<
   }
 
   try {
-    const diagrams = await generateUmlFromPrompt(prompt);
-    
-    // Create a single document with all diagrams
-    const diagram = await UmlDiagram.create({
-      projectId,
-      diagramType: 'comprehensive', // This indicates it contains multiple diagram types
-      diagramData: diagrams,
-      diagrams: diagrams,
-      prompt: prompt,
-    });
-
+    const diagrams: UMLDiagrams = await generateUmlFromPrompt(prompt);
+    const project = await getProjectById(projectId);
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+    project.umlDiagrams = diagrams;
+    await saveProject(project);
     res.json({
-      id: diagram._id,
-      projectId: diagram.projectId,
-      diagrams: diagram.diagrams,
-      prompt: diagram.prompt,
-      createdAt: diagram.createdAt,
-      updatedAt: diagram.updatedAt,
+      id: project._id,
+      projectId: project._id,
+      diagrams: project.umlDiagrams,
+      prompt: prompt,
+      updatedAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Error generating UML diagrams:', error);
@@ -43,88 +39,4 @@ export const generateUmlDiagrams = async (req: Request, res: Response): Promise<
   }
 };
 
-export const saveUmlDiagram = async (req: Request, res: Response) => {
-  try {
-    const { projectId, diagrams, prompt } = req.body;
-    
-    if (!projectId || !diagrams) {
-      res.status(400).json({ error: 'Missing required fields' });
-      return;
-    }
-
-    const diagram = await UmlDiagram.create({
-      projectId,
-      diagramType: 'comprehensive',
-      diagramData: diagrams,
-      diagrams: diagrams,
-      prompt: prompt,
-    });
-
-    res.json(diagram);
-  } catch (error) {
-    console.error('Error saving UML diagram:', error);
-    res.status(500).json({ error: 'Failed to save UML diagram' });
-  }
-};
-
-export const getUmlDiagram = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const diagram = await UmlDiagram.findById(id);
-    
-    if (!diagram) {
-      res.status(404).json({ error: 'UML diagram not found' });
-      return;
-    }
-
-    res.json(diagram);
-  } catch (error) {
-    console.error('Error getting UML diagram:', error);
-    res.status(500).json({ error: 'Failed to get UML diagram' });
-  }
-};
-
-export const updateUmlDiagram = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { diagramData } = req.body;
-    
-    if (!diagramData) {
-      res.status(400).json({ error: 'Diagram data is required' });
-      return;
-    }
-
-    const diagram = await UmlDiagram.findByIdAndUpdate(
-      id,
-      { diagramData },
-      { new: true }
-    );
-
-    if (!diagram) {
-      res.status(404).json({ error: 'UML diagram not found' });
-      return;
-    }
-
-    res.json(diagram);
-  } catch (error) {
-    console.error('Error updating UML diagram:', error);
-    res.status(500).json({ error: 'Failed to update UML diagram' });
-  }
-};
-
-export const deleteUmlDiagram = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const diagram = await UmlDiagram.findByIdAndDelete(id);
-    
-    if (!diagram) {
-      res.status(404).json({ error: 'UML diagram not found' });
-      return;
-    }
-
-    res.json({ message: 'UML diagram deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting UML diagram:', error);
-    res.status(500).json({ error: 'Failed to delete UML diagram' });
-  }
-}; 
+// All other CRUD operations for UML diagrams should be handled by updating the project object using the file store. 

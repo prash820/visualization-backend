@@ -1,0 +1,8 @@
+[
+  {
+    "_id": "dummy-user-1",
+    "email": "test@example.com",
+    "passwordHash": "$2b$10$u1Qw1Qw1Qw1Qw1Qw1Qw1QeQw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Qw1Q", // placeholder, will replace with real hash
+    "createdAt": "2024-05-16T00:00:00.000Z"
+  }
+] 

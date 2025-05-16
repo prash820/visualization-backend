@@ -1,13 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload, TokenExpiredError } from "jsonwebtoken";
-import User, { IUser } from "../models/User"; // ✅ Import IUser from the User model
 import dotenv from "dotenv";
 
 dotenv.config();
 
 // ✅ Fix: Ensure `AuthRequest` uses the correct User type
 interface AuthRequest extends Request {
-  user?: IUser; // ✅ Correctly reference the IUser interface
+  user?: { _id: string; email: string };
 }
 
 // ✅ Define JWT Payload Type
@@ -35,20 +34,8 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
       return;
     }
 
-    // ✅ Fix: Retrieve the full `IUser` object
-    User.findById(decoded.id).then((user) => {
-      if (!user) {
-        res.status(404).json({ error: "User not found." });
-        return;
-      }
-
-      req.user = user; // ✅ Now req.user is correctly typed as `IUser`
-      next();
-    }).catch((err) => {
-      console.error("Database error:", err);
-      res.status(500).json({ error: "Database error. Please try again later." });
-    });
-
+    req.user = { _id: decoded.id, email: decoded.email };
+    next();
   } catch (error) {
     console.error("Token verification failed:", error);
 

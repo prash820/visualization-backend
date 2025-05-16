@@ -1,17 +1,17 @@
 // src/routes/auth.ts
 import express from "express";
-import { loginUser, registerUser, validateToken } from "../controllers/authController";
+import { register, login, validateToken } from "../controllers/authController";
 import asyncHandler from "../utils/asyncHandler";
 
 const router = express.Router();
 
 // Login endpoint
-router.post("/login", asyncHandler(loginUser));
+router.post("/login", asyncHandler(login));
 
 // Register endpoint
-router.post("/register", asyncHandler(registerUser));
+router.post("/register", register);
 
 // Token validation endpoint
-router.post("/validate", asyncHandler(validateToken));
+router.get("/validate-token", validateToken);
 
 export default router;

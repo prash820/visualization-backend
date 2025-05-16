@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticateToken = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const dotenv_1 = __importDefault(require("dotenv"));
+// import { IUser } from '../models/User'; // Removed
 dotenv_1.default.config();
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];

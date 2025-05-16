@@ -12,75 +12,38 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateToken = exports.loginUser = exports.registerUser = void 0;
+exports.validateToken = exports.login = exports.register = void 0;
 const express_1 = __importDefault(require("express"));
-const User_1 = __importDefault(require("../models/User"));
+// import User from "../models/User"; // Removed
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const userFileStore_1 = require("../utils/userFileStore");
 dotenv_1.default.config();
 const router = express_1.default.Router();
 exports.default = router;
 // Register User
-const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
     try {
-        const existingUser = yield User_1.default.findOne({ email });
-        if (existingUser) {
-            res.status(400).json({ error: "Email already in use." });
-            return;
-        }
-        const newUser = new User_1.default({ email, password });
-        yield newUser.save();
-        res.status(201).json({ message: "User registered successfully!" });
+        const user = yield (0, userFileStore_1.createUser)(email, password);
+        res.json({ message: "User registered", user: { _id: user._id, email: user.email } });
     }
-    catch (error) {
-        console.error("Registration error:", error);
-        res.status(500).json({ error: "Internal server error" });
+    catch (err) {
+        res.status(400).json({ error: err.message });
     }
 });
-exports.registerUser = registerUser;
+exports.register = register;
 // Login User
-const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
-    try {
-        console.log(`Attempting login for email: ${email}`);
-        const user = yield User_1.default.findOne({ email });
-        if (!user) {
-            console.log(`No user found with email: ${email}`);
-            res.status(401).json({
-                error: "Invalid credentials",
-                details: "No user found with this email"
-            });
-            return;
-        }
-        const isValidPassword = yield user.comparePassword(password);
-        if (!isValidPassword) {
-            console.log(`Invalid password for user: ${email}`);
-            res.status(401).json({
-                error: "Invalid credentials",
-                details: "Invalid password"
-            });
-            return;
-        }
-        const token = jsonwebtoken_1.default.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "24h" });
-        console.log(`Successful login for user: ${email}`);
-        res.json({
-            token,
-            user: {
-                id: user._id,
-                email: user.email
-            }
-        });
+    const user = yield (0, userFileStore_1.validateUser)(email, password);
+    if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
     }
-    catch (error) {
-        console.error("Login error:", error);
-        res.status(500).json({
-            error: "Internal server error",
-            details: error instanceof Error ? error.message : "Unknown error"
-        });
-    }
+    const token = jsonwebtoken_1.default.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET || "secret", { expiresIn: "7d" });
+    res.json({ token, user: { _id: user._id, email: user.email } });
 });
-exports.loginUser = loginUser;
+exports.login = login;
 // Validate Token
 const validateToken = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;

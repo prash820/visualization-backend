@@ -9,9 +9,9 @@ const authController_1 = require("../controllers/authController");
 const asyncHandler_1 = __importDefault(require("../utils/asyncHandler"));
 const router = express_1.default.Router();
 // Login endpoint
-router.post("/login", (0, asyncHandler_1.default)(authController_1.loginUser));
+router.post("/login", (0, asyncHandler_1.default)(authController_1.login));
 // Register endpoint
-router.post("/register", (0, asyncHandler_1.default)(authController_1.registerUser));
+router.post("/register", authController_1.register);
 // Token validation endpoint
-router.post("/validate", (0, asyncHandler_1.default)(authController_1.validateToken));
+router.get("/validate-token", authController_1.validateToken);
 exports.default = router;

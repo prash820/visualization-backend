@@ -38,7 +38,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticateToken = void 0;
 const jsonwebtoken_1 = __importStar(require("jsonwebtoken"));
-const User_1 = __importDefault(require("../models/User")); // ✅ Import IUser from the User model
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 // ✅ Fix TypeScript Issue: Middleware should return `void`
@@ -55,18 +54,8 @@ const authenticateToken = (req, res, next) => {
             res.status(403).json({ error: "Invalid token." });
             return;
         }
-        // ✅ Fix: Retrieve the full `IUser` object
-        User_1.default.findById(decoded.id).then((user) => {
-            if (!user) {
-                res.status(404).json({ error: "User not found." });
-                return;
-            }
-            req.user = user; // ✅ Now req.user is correctly typed as `IUser`
-            next();
-        }).catch((err) => {
-            console.error("Database error:", err);
-            res.status(500).json({ error: "Database error. Please try again later." });
-        });
+        req.user = { _id: decoded.id, email: decoded.email };
+        next();
     }
     catch (error) {
         console.error("Token verification failed:", error);
