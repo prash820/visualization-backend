@@ -8,7 +8,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const cors_1 = __importDefault(require("cors"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const helmet_1 = __importDefault(require("helmet"));
-const db_1 = __importDefault(require("./db"));
+const db_1 = require("./db");
 const errorHandler_1 = require("./middleware/errorHandler");
 const openAI_1 = __importDefault(require("./routes/openAI"));
 const auth_1 = __importDefault(require("./routes/auth"));
@@ -69,7 +69,7 @@ app.use((0, cors_1.default)({
 // 🔹 Apply rate limiter
 app.use(simpleRateLimiter);
 // 🔹 Connect to Database
-(0, db_1.default)();
+(0, db_1.connectDB)();
 // 🔹 API Routes
 app.use("/api/generate", openAI_1.default);
 app.use("/api/auth", auth_1.default);
