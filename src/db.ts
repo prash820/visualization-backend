@@ -1,22 +1,29 @@
-import mongoose from "mongoose";
+import { MongoClient, ServerApiVersion } from "mongodb";
 import dotenv from "dotenv";
-dotenv.config(); 
+dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI || "";
+const uri = process.env.MONGO_URI;
 
-const connectDB = async () => {
-  if (!MONGO_URI) {
-    console.error("MongoDB connection string is missing!");
+if (!uri) {
+  console.error("MONGODB_URI environment variable is not set!");
+  process.exit(1);
+}
+
+export const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  }
+});
+
+export async function connectDB() {
+  try {
+    await client.connect();
+    await client.db("admin").command({ ping: 1 });
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+  } catch (err) {
+    console.error("Error connecting to MongoDB:", err);
     process.exit(1);
   }
-
-  try {
-    await mongoose.connect(MONGO_URI);
-    console.log("Connected to MongoDB Atlas");
-  } catch (error) {
-    console.error("Error connecting to MongoDB Atlas:", error);
-    process.exit(1); // Exit process with failure
-  }
-};
-
-export default connectDB;
+}

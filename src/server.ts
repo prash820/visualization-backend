@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import bodyParser from "body-parser";
 import helmet from "helmet";
-import connectDB from "./db";
+import { connectDB } from "./db";
 import { errorHandler } from "./middleware/errorHandler";
 import openAIRoutes from "./routes/openAI";
 import authRoutes from "./routes/auth";
