@@ -54,6 +54,8 @@ async function generateDesignDocument(
 
 The audience is technical stakeholders and engineers who will use this document for implementation and maintenance.
 
+IMPORTANT: You MUST follow the exact template structure provided. Your response must be a valid JSON object that matches the template structure exactly, including all required fields and sections.
+
 Guidelines:
 - Use clear, concise, and technical language
 - Focus on facts and best practices
@@ -62,14 +64,15 @@ Guidelines:
 - Do NOT include or mention any diagrams; these will be inserted automatically
 - Be specific and detailed in each section
 - Include concrete examples where relevant
-- Follow the exact structure provided in the template
-- Fill in all sections with relevant information
 - Use markdown formatting for better readability
+- Ensure all sections from the template are included
+- Maintain the exact hierarchy and structure of the template
+- Do not add or remove any sections from the template
 
 Template Structure:
 ${JSON.stringify(template, null, 2)}
 
-Respond ONLY with a valid JSON object that follows this exact structure.`;
+Your response MUST be a valid JSON object that exactly matches this structure. Do not include any text before or after the JSON object.`;
 
   console.log('[generateDesignDocument] Calling OpenAI with prompt and UML diagrams...');
 
@@ -79,8 +82,9 @@ Respond ONLY with a valid JSON object that follows this exact structure.`;
       { role: "system", content: systemPrompt },
       { role: "user", content: `Application Description: ${prompt}\n\nUML Diagrams: ${JSON.stringify(umlDiagrams)}` }
     ],
-    temperature: 0.5,
-    max_tokens: 4000
+    temperature: 0.3, // Reduced temperature for more consistent output
+    max_tokens: 4000,
+    response_format: { type: "json_object" } // Force JSON response
   });
 
   let content = response.choices[0].message?.content || '';
@@ -90,21 +94,44 @@ Respond ONLY with a valid JSON object that follows this exact structure.`;
     const jsonString = content.replace(/```json|```/g, '').trim();
     const designDoc = JSON.parse(jsonString);
     
-    // Add metadata
-    designDoc.metadata = {
-      title: "System Design Document",
-      authors: ["AI Assistant"],
-      date_created: new Date().toISOString(),
-      date_updated: new Date().toISOString(),
-      reviewers: [],
-      version: "1.0",
-      status: "Draft",
-      document_scope: "Complete system design and implementation details"
-    };
+    // Validate that all required sections are present
+    const requiredSections = [
+      'metadata',
+      'executive_summary',
+      'goals',
+      'requirements',
+      'proposed_architecture',
+      'data_models',
+      'api_endpoints',
+      'security_considerations',
+      'deployment_strategy',
+      'testing_strategy',
+      'maintenance_and_support',
+      'future_enhancements'
+    ];
+
+    const missingSections = requiredSections.filter(section => !designDoc[section]);
+    if (missingSections.length > 0) {
+      throw new Error(`Missing required sections: ${missingSections.join(', ')}`);
+    }
+
+    // Add metadata if not present
+    if (!designDoc.metadata) {
+      designDoc.metadata = {
+        title: "System Design Document",
+        authors: ["AI Assistant"],
+        date_created: new Date().toISOString(),
+        date_updated: new Date().toISOString(),
+        reviewers: [],
+        version: "1.0",
+        status: "Draft",
+        document_scope: "Complete system design and implementation details"
+      };
+    }
 
     return designDoc;
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('[generateDesignDocument] Failed to parse AI JSON response:', e);
-    throw new Error('Failed to parse AI JSON response');
+    throw new Error('Failed to parse AI JSON response: ' + (e instanceof Error ? e.message : String(e)));
   }
 } 
