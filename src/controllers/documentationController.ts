@@ -29,8 +29,8 @@ async function generateDesignDocument(
   prompt: string,
   umlDiagrams: any
 ): Promise<DesignDocument> {
-  // Read the template file
-  const templatePath = path.join(__dirname, '../templates/designDocumentTemplate.json');
+  // Read the template file from the dist directory
+  const templatePath = path.join(__dirname, '../../dist/templates/designDocumentTemplate.json');
   const templateContent = await fs.readFile(templatePath, 'utf-8');
   const template = JSON.parse(templateContent);
 

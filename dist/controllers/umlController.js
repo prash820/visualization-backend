@@ -28,18 +28,19 @@ const generateUmlDiagrams = (req, res) => __awaiter(void 0, void 0, void 0, func
         return;
     }
     try {
-        const diagrams = yield (0, umlGenerator_1.generateUmlFromPrompt)(prompt);
+        // Generate and parse diagrams
+        const aiResponse = yield (0, umlGenerator_1.generateUmlFromPrompt)(prompt);
         const project = yield (0, projectFileStore_1.getProjectById)(projectId);
         if (!project) {
             res.status(404).json({ error: 'Project not found' });
             return;
         }
-        project.umlDiagrams = diagrams;
+        project.umlDiagrams = aiResponse;
         yield (0, projectFileStore_1.saveProject)(project);
         res.json({
             id: project._id,
             projectId: project._id,
-            diagrams: project.umlDiagrams,
+            diagrams: aiResponse,
             prompt: prompt,
             updatedAt: new Date().toISOString(),
         });

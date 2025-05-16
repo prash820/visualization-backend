@@ -15,15 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const documentationController_1 = require("../controllers/documentationController");
 const router = express_1.default.Router();
-// Combined documentation endpoint (for backward compatibility)
 router.post('/generate', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     yield (0, documentationController_1.generateDocumentation)(req, res);
-}));
-// Separate endpoints for high-level and low-level documentation
-router.post('/generate-high-level', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield (0, documentationController_1.generateHighLevelDocumentation)(req, res);
-}));
-router.post('/generate-low-level', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield (0, documentationController_1.generateLowLevelDocumentation)(req, res);
 }));
 exports.default = router;

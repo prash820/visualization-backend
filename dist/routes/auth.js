@@ -14,4 +14,5 @@ router.post("/login", (0, asyncHandler_1.default)(authController_1.login));
 router.post("/register", authController_1.register);
 // Token validation endpoint
 router.get("/validate-token", authController_1.validateToken);
+router.post("/validate", authController_1.validateToken);
 exports.default = router;
