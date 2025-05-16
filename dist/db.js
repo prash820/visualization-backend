@@ -12,33 +12,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.client = void 0;
-exports.connectDB = connectDB;
-const mongodb_1 = require("mongodb");
+const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const uri = process.env.MONGO_URI;
-if (!uri) {
-    console.error("MONGODB_URI environment variable is not set!");
-    process.exit(1);
-}
-exports.client = new mongodb_1.MongoClient(uri, {
-    serverApi: {
-        version: mongodb_1.ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
+const MONGO_URI = process.env.MONGO_URI || "";
+const connectDB = () => __awaiter(void 0, void 0, void 0, function* () {
+    if (!MONGO_URI) {
+        console.error("MongoDB connection string is missing!");
+        process.exit(1);
+    }
+    try {
+        yield mongoose_1.default.connect(MONGO_URI);
+        console.log("Connected to MongoDB Atlas");
+    }
+    catch (error) {
+        console.error("Error connecting to MongoDB Atlas:", error);
+        process.exit(1); // Exit process with failure
     }
 });
-function connectDB() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            yield exports.client.connect();
-            yield exports.client.db("admin").command({ ping: 1 });
-            console.log("Pinged your deployment. You successfully connected to MongoDB!");
-        }
-        catch (err) {
-            console.error("Error connecting to MongoDB:", err);
-            process.exit(1);
-        }
-    });
-}
+exports.default = connectDB;
