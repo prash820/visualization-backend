@@ -3,6 +3,15 @@ import OpenAI from 'openai';
 import { DesignDocument } from '../utils/projectFileStore';
 import fs from 'fs/promises';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  createDocumentation,
+  getDocumentationById,
+  updateDocumentation,
+  getDocumentationsByProjectId,
+  deleteDocumentation,
+  Documentation
+} from '../utils/documentationStore';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
@@ -11,136 +20,143 @@ const openai = new OpenAI({
 
 const MAX_RETRIES = 3;
 
-// Define the expected structure based on the template
-const TEMPLATE_STRUCTURE = {
-  metadata: {
-    required: ['title', 'authors', 'date_created', 'date_updated', 'reviewers', 'version', 'status', 'document_scope'],
-    type: 'object'
-  },
-  executive_summary: {
-    required: [],
-    type: 'string'
-  },
-  goals: {
-    required: ['goals_list', 'non_goals_list'],
-    type: 'object'
-  },
-  background_context: {
-    required: [],
-    type: 'string'
-  },
-  requirements: {
-    required: ['functional', 'non_functional', 'regulatory_compliance'],
-    type: 'object'
-  },
-  proposed_architecture: {
-    required: ['high_level_architecture_diagram', 'components', 'data_models', 'external_integrations'],
-    type: 'object'
-  },
-  detailed_design: {
-    required: ['sequence_diagrams', 'algorithms', 'modules_classes', 'concurrency_model', 'retry_idempotency_logic'],
-    type: 'object'
-  },
-  api_contracts: {
-    required: ['api_type', 'endpoints', 'request_response_format', 'error_handling', 'versioning_strategy'],
-    type: 'object'
-  },
-  deployment_infrastructure: {
-    required: ['environment_setup', 'iac_outline', 'ci_cd_strategy', 'feature_flags', 'secrets_configuration'],
-    type: 'object'
-  },
-  observability_plan: {
-    required: ['logging', 'metrics', 'tracing', 'dashboards', 'alerting_rules'],
-    type: 'object'
-  },
-  security_considerations: {
-    required: ['threat_model', 'encryption', 'authentication_authorization', 'secrets_handling', 'security_reviews_required'],
-    type: 'object'
-  },
-  failure_handling_resilience: {
-    required: ['failure_modes', 'fallbacks_retries', 'graceful_degradation', 'disaster_recovery'],
-    type: 'object'
-  },
-  cost_estimation: {
-    required: ['infrastructure', 'third_party_services', 'storage_bandwidth'],
-    type: 'object'
-  },
-  risks_tradeoffs: {
-    required: [],
-    type: 'array'
-  },
-  alternatives_considered: {
-    required: [],
-    type: 'array'
-  },
-  rollout_plan: {
-    required: ['strategy', 'data_migration', 'stakeholder_communication', 'feature_flags_usage'],
-    type: 'object'
-  },
-  post_launch_checklist: {
-    required: ['health_checks', 'regression_coverage', 'load_testing', 'ownership_and_runbooks'],
-    type: 'object'
-  },
-  open_questions: {
-    required: [],
-    type: 'array'
-  },
-  appendix: {
-    required: ['external_links', 'reference_docs', 'terminology'],
-    type: 'object'
+// Helper function to extract structure information from template
+function getTemplateStructure(template: any): Record<string, { type: string; required: string[] }> {
+  const structure: Record<string, { type: string; required: string[] }> = {};
+  
+  for (const [key, value] of Object.entries(template)) {
+    if (Array.isArray(value)) {
+      structure[key] = { type: 'array', required: [] };
+    } else if (typeof value === 'object' && value !== null) {
+      structure[key] = {
+        type: 'object',
+        required: Object.keys(value)
+      };
+    } else {
+      structure[key] = { type: typeof value, required: [] };
+    }
   }
-};
+  
+  return structure;
+}
 
 export const generateDocumentation = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { prompt, umlDiagrams } = req.body;
+    const { prompt, umlDiagrams, projectId } = req.body;
 
     if (!prompt) {
       res.status(400).json({ error: 'Prompt is required' });
       return;
     }
 
-    // Set response headers for long-running request
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    // Send initial response to keep connection alive
-    res.write(JSON.stringify({ status: 'processing', message: 'Generating documentation...' }));
-
-    const designDoc = await generateDesignDocument(prompt, umlDiagrams);
-    
-    // Send the final response
-    res.write(JSON.stringify({ status: 'complete', data: designDoc }));
-    res.end();
-  } catch (error) {
-    console.error('Error generating design document:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to generate design document' });
-    } else {
-      res.write(JSON.stringify({ status: 'error', error: 'Failed to generate design document' }));
-      res.end();
+    if (!projectId) {
+      res.status(400).json({ error: 'Project ID is required' });
+      return;
     }
+
+    // Create documentation record
+    const documentation = await createDocumentation(projectId, prompt, umlDiagrams);
+
+    // Start the background job
+    processDocumentationGeneration(documentation.id, prompt, umlDiagrams);
+
+    // Return the documentation ID immediately
+    res.json({
+      status: 'accepted',
+      documentationId: documentation.id,
+      message: 'Documentation generation started',
+      checkStatusUrl: `/api/documentation/status/${documentation.id}`
+    });
+  } catch (error) {
+    console.error('Error initiating documentation generation:', error);
+    res.status(500).json({ error: 'Failed to initiate documentation generation' });
   }
 };
 
-async function generateDesignDocument(
+export const getDocumentationStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const documentation = await getDocumentationById(id);
+
+    if (!documentation) {
+      res.status(404).json({ error: 'Documentation not found' });
+      return;
+    }
+
+    res.json({
+      id: documentation.id,
+      status: documentation.status,
+      progress: documentation.progress,
+      result: documentation.result,
+      error: documentation.error
+    });
+  } catch (error) {
+    console.error('Error getting documentation status:', error);
+    res.status(500).json({ error: 'Failed to get documentation status' });
+  }
+};
+
+export const getProjectDocumentations = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const documentations = await getDocumentationsByProjectId(projectId);
+    res.json(documentations);
+  } catch (error) {
+    console.error('Error getting project documentations:', error);
+    res.status(500).json({ error: 'Failed to get project documentations' });
+  }
+};
+
+export const deleteDocumentationById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const success = await deleteDocumentation(id);
+    
+    if (!success) {
+      res.status(404).json({ error: 'Documentation not found' });
+      return;
+    }
+
+    res.json({ message: 'Documentation deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting documentation:', error);
+    res.status(500).json({ error: 'Failed to delete documentation' });
+  }
+};
+
+async function processDocumentationGeneration(
+  documentationId: string,
   prompt: string,
   umlDiagrams: any,
   retryCount = 0
-): Promise<DesignDocument> {
-  // Read the template file from the dist directory
-  const templatePath = path.join(__dirname, '../../dist/templates/designDocumentTemplate.json');
-  const templateContent = await fs.readFile(templatePath, 'utf-8');
-  const template = JSON.parse(templateContent);
+): Promise<void> {
+  try {
+    // Update documentation status to processing
+    await updateDocumentation(documentationId, {
+      status: 'processing',
+      progress: 0
+    });
 
-  const systemPrompt = `You are an expert software architect. Generate a comprehensive design document for the following application.
+    // Read the template file from the dist directory
+    const templatePath = path.join(__dirname, '../../dist/templates/designDocumentTemplate.json');
+    const templateContent = await fs.readFile(templatePath, 'utf-8');
+    const template = JSON.parse(templateContent);
+    const templateStructure = getTemplateStructure(template);
+
+    // Update progress
+    await updateDocumentation(documentationId, {
+      status: 'processing',
+      progress: 20
+    });
+
+    const systemPrompt = `You are an expert software architect. Generate a comprehensive design document for the following application.
 
 The audience is technical stakeholders and engineers who will use this document for implementation and maintenance.
 
 IMPORTANT: You MUST follow the exact template structure provided. Your response must be a valid JSON object that matches the template structure exactly, including ALL required sections and their subsections.
 
 Required Sections and Their Structure:
-${Object.entries(TEMPLATE_STRUCTURE).map(([section, details]) => `
+${Object.entries(templateStructure).map(([section, details]) => `
 ${section}:
 - Type: ${details.type}
 ${details.required.length > 0 ? `- Required fields: ${details.required.join(', ')}` : ''}
@@ -180,66 +196,98 @@ ${JSON.stringify(template, null, 2)}
 
 Your response MUST be a valid JSON object that exactly matches this structure and includes ALL required sections with their specified fields. Do not include any text before or after the JSON object.`;
 
-  console.log('[generateDesignDocument] Calling OpenAI with prompt and UML diagrams...');
+    // Update progress
+    await updateDocumentation(documentationId, {
+      status: 'processing',
+      progress: 40
+    });
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4-turbo-preview",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: `Application Description: ${prompt}\n\nUML Diagrams: ${JSON.stringify(umlDiagrams)}` }
-    ],
-    temperature: 0.2, // Reduced temperature for more consistent output
-    max_tokens: 4000,
-    response_format: { type: "json_object" } // Force JSON response
-  });
+    console.log('[generateDesignDocument] Calling OpenAI with prompt and UML diagrams...');
 
-  let content = response.choices[0].message?.content || '';
-  console.log('[generateDesignDocument] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Application Description: ${prompt}\n\nUML Diagrams: ${JSON.stringify(umlDiagrams)}` }
+      ],
+      temperature: 0.2,
+      max_tokens: 4000,
+      response_format: { type: "json_object" }
+    });
 
-  try {
-    const jsonString = content.replace(/```json|```/g, '').trim();
-    const designDoc = JSON.parse(jsonString);
-    
-    // Validate that all required sections and their fields are present
-    const missingSections = Object.entries(TEMPLATE_STRUCTURE)
-      .filter(([section, details]) => {
-        if (!designDoc[section]) return true;
-        if (details.type === 'object' && details.required.length > 0) {
-          return details.required.some(field => !designDoc[section][field]);
+    // Update progress
+    await updateDocumentation(documentationId, {
+      status: 'processing',
+      progress: 80
+    });
+
+    let content = response.choices[0].message?.content || '';
+    console.log('[generateDesignDocument] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
+
+    try {
+      const jsonString = content.replace(/```json|```/g, '').trim();
+      const designDoc = JSON.parse(jsonString);
+      
+      // Validate that all required sections and their fields are present
+      const missingSections = Object.entries(templateStructure)
+        .filter(([section, details]) => {
+          if (!designDoc[section]) return true;
+          if (details.type === 'object' && details.required.length > 0) {
+            return details.required.some(field => !designDoc[section][field]);
+          }
+          return false;
+        })
+        .map(([section]) => section);
+
+      if (missingSections.length > 0) {
+        if (retryCount < MAX_RETRIES) {
+          console.log(`[generateDesignDocument] Missing sections or fields detected. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+          return processDocumentationGeneration(documentationId, prompt, umlDiagrams, retryCount + 1);
         }
-        return false;
-      })
-      .map(([section]) => section);
-
-    if (missingSections.length > 0) {
-      if (retryCount < MAX_RETRIES) {
-        console.log(`[generateDesignDocument] Missing sections or fields detected. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-        return generateDesignDocument(prompt, umlDiagrams, retryCount + 1);
+        throw new Error(`Missing required sections or fields: ${missingSections.join(', ')}`);
       }
-      throw new Error(`Missing required sections or fields: ${missingSections.join(', ')}`);
-    }
 
-    // Add metadata if not present
-    if (!designDoc.metadata) {
-      designDoc.metadata = {
-        title: "System Design Document",
-        authors: ["AI Assistant"],
-        date_created: new Date().toISOString(),
-        date_updated: new Date().toISOString(),
-        reviewers: [],
-        version: "1.0",
-        status: "Draft",
-        document_scope: "Complete system design and implementation details"
-      };
-    }
+      // Add metadata if not present
+      if (!designDoc.metadata) {
+        designDoc.metadata = {
+          title: "System Design Document",
+          authors: ["AI Assistant"],
+          date_created: new Date().toISOString(),
+          date_updated: new Date().toISOString(),
+          reviewers: [],
+          version: "1.0",
+          status: "Draft",
+          document_scope: "Complete system design and implementation details"
+        };
+      }
 
-    return designDoc;
-  } catch (e: unknown) {
-    console.error('[generateDesignDocument] Failed to parse AI JSON response:', e);
-    if (retryCount < MAX_RETRIES) {
-      console.log(`[generateDesignDocument] Error occurred. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-      return generateDesignDocument(prompt, umlDiagrams, retryCount + 1);
+      // Update documentation with success
+      await updateDocumentation(documentationId, {
+        status: 'completed',
+        progress: 100,
+        result: designDoc
+      });
+
+    } catch (e) {
+      console.error('[generateDesignDocument] Failed to parse AI JSON response:', e);
+      if (retryCount < MAX_RETRIES) {
+        console.log(`[generateDesignDocument] Error occurred. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+        return processDocumentationGeneration(documentationId, prompt, umlDiagrams, retryCount + 1);
+      }
+      
+      // Update documentation with error
+      await updateDocumentation(documentationId, {
+        status: 'failed',
+        progress: 100,
+        error: 'Failed to parse AI JSON response: ' + (e instanceof Error ? e.message : String(e))
+      });
     }
-    throw new Error('Failed to parse AI JSON response: ' + (e instanceof Error ? e.message : String(e)));
+  } catch (error) {
+    console.error('Error in documentation generation:', error);
+    await updateDocumentation(documentationId, {
+      status: 'failed',
+      progress: 100,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    });
   }
 } 

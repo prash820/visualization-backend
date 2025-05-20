@@ -1,16 +1,25 @@
 import express from 'express';
-import { generateDocumentation } from '../controllers/documentationController';
+import {
+  generateDocumentation,
+  getDocumentationStatus,
+  getProjectDocumentations,
+  deleteDocumentationById
+} from '../controllers/documentationController';
 import type { Request, Response } from '../types/express.d';
 import asyncHandler from '../utils/asyncHandler';
 
 const router = express.Router();
 
-// Synchronous endpoint
-router.post('/generate', async (req: Request, res: Response) => {
-  await generateDocumentation(req, res);
-});
+// Generate documentation endpoint
+router.post('/generate', asyncHandler(generateDocumentation));
 
-// Asynchronous endpoint for long-running requests
-router.post('/generate-async', asyncHandler(generateDocumentation));
+// Get documentation generation status
+router.get('/status/:id', asyncHandler(getDocumentationStatus));
+
+// Get all documentations for a project
+router.get('/project/:projectId', asyncHandler(getProjectDocumentations));
+
+// Delete a documentation
+router.delete('/:id', asyncHandler(deleteDocumentationById));
 
 export default router; 
