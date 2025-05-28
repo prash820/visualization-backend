@@ -59,11 +59,6 @@ const simpleRateLimiter = (req: Request, res: Response, next: NextFunction): voi
   next();
 };
 
-const allowedOrigins = [
-  "https://lucky-youtiao-ce3cda.netlify.app",
-  "http://localhost:3000",  // Optional for local development
-];
-
 // 🔹 Security Middleware
 app.use(helmet()); // Security headers
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -75,7 +70,7 @@ app.use(
     origin: "*",
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "X-Client-Version"],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   })
 );
 

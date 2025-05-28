@@ -16,8 +16,14 @@ exports.getAllProjects = getAllProjects;
 exports.getProjectById = getProjectById;
 exports.saveProject = saveProject;
 exports.deleteProject = deleteProject;
+exports.createOrUpdateProjectDocumentation = createOrUpdateProjectDocumentation;
+exports.getProjectDocumentation = getProjectDocumentation;
+exports.updateProjectDocumentation = updateProjectDocumentation;
+exports.deleteProjectDocumentation = deleteProjectDocumentation;
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
+const uuid_1 = require("uuid");
+const mermaidToSvg_1 = require("../utils/mermaidToSvg");
 const DATA_FILE = path_1.default.join(__dirname, "../../projects.json");
 function readAll() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -64,5 +70,69 @@ function deleteProject(id) {
         const projects = yield readAll();
         const filtered = projects.filter(p => p._id !== id);
         yield writeAll(filtered);
+    });
+}
+function createOrUpdateProjectDocumentation(projectId, prompt, umlDiagrams) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b;
+        const projects = yield readAll();
+        const project = projects.find(p => p._id === projectId);
+        if (!project)
+            return null;
+        const now = new Date().toISOString();
+        const newDoc = {
+            id: ((_a = project.documentation) === null || _a === void 0 ? void 0 : _a.id) || (0, uuid_1.v4)(),
+            projectId,
+            prompt,
+            umlDiagrams,
+            status: 'pending',
+            progress: 0,
+            createdAt: ((_b = project.documentation) === null || _b === void 0 ? void 0 : _b.createdAt) || now,
+            updatedAt: now
+        };
+        project.documentation = newDoc;
+        // Generate SVGs for each Mermaid diagram
+        const umlDiagramsSvg = {};
+        if (umlDiagrams && typeof umlDiagrams === 'object') {
+            for (const [key, code] of Object.entries(umlDiagrams)) {
+                if (typeof code === 'string') {
+                    try {
+                        umlDiagramsSvg[key] = yield (0, mermaidToSvg_1.mermaidToSvg)(code);
+                    }
+                    catch (e) {
+                        console.error(`Failed to render SVG for ${key}:`, e);
+                    }
+                }
+            }
+        }
+        project.umlDiagramsSvg = umlDiagramsSvg;
+        yield saveProject(project);
+        return project;
+    });
+}
+function getProjectDocumentation(projectId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const project = yield getProjectById(projectId);
+        return project && project.documentation ? project.documentation : null;
+    });
+}
+function updateProjectDocumentation(projectId, updates) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const project = yield getProjectById(projectId);
+        if (!project || !project.documentation)
+            return null;
+        project.documentation = Object.assign(Object.assign(Object.assign({}, project.documentation), updates), { updatedAt: new Date().toISOString() });
+        yield saveProject(project);
+        return project;
+    });
+}
+function deleteProjectDocumentation(projectId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const project = yield getProjectById(projectId);
+        if (!project || !project.documentation)
+            return false;
+        project.documentation = undefined;
+        yield saveProject(project);
+        return true;
     });
 }

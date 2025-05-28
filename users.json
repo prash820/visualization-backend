@@ -4,5 +4,11 @@
     "email": "test@example.com",
     "passwordHash": "$2b$10$lvTFUnzlcebZ3nSIktYdb.57/uEeDfx10CL3cH3B6sRGo7b46b.jG",
     "createdAt": "2024-05-16T00:00:00.000Z"
+  },
+  {
+    "_id": "00b64960-2c7e-4ac5-bc6c-c25ea27fe13a",
+    "email": "test@chartai.com",
+    "passwordHash": "$2b$10$GQwJaFx9T2o5pUbVZ1EOYem4A1Ryu8kBW.UxSSiLFF5iK632CJEzW",
+    "createdAt": "2025-05-20T07:43:05.937Z"
   }
-] 
+]

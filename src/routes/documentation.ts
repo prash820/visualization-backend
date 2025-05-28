@@ -2,10 +2,9 @@ import express from 'express';
 import {
   generateDocumentation,
   getDocumentationStatus,
-  getProjectDocumentations,
-  deleteDocumentationById
+  getProjectDocumentationHandler,
+  deleteProjectDocumentationHandler
 } from '../controllers/documentationController';
-import type { Request, Response } from '../types/express.d';
 import asyncHandler from '../utils/asyncHandler';
 
 const router = express.Router();
@@ -16,10 +15,10 @@ router.post('/generate', asyncHandler(generateDocumentation));
 // Get documentation generation status
 router.get('/status/:id', asyncHandler(getDocumentationStatus));
 
-// Get all documentations for a project
-router.get('/project/:projectId', asyncHandler(getProjectDocumentations));
+// Get documentation for a project
+router.get('/project/:projectId', asyncHandler(getProjectDocumentationHandler));
 
-// Delete a documentation
-router.delete('/:id', asyncHandler(deleteDocumentationById));
+// Delete a documentation (by projectId in query)
+router.delete('/', asyncHandler(deleteProjectDocumentationHandler));
 
 export default router; 

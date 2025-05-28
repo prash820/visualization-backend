@@ -1,5 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
+import { v4 as uuidv4 } from "uuid";
+import { Documentation } from './documentationStore';
+import { mermaidToSvg } from '../utils/mermaidToSvg';
 
 const DATA_FILE = path.join(__dirname, "../../projects.json");
 
@@ -145,8 +148,9 @@ export interface Project {
   diagramType: string;
   createdAt: string;
   umlDiagrams?: UMLDiagrams;
-  documentation?: DocumentationSection[];
+  documentation?: Documentation;
   designDocument?: DesignDocument;
+  umlDiagramsSvg?: Record<string, string>;
 }
 
 async function readAll(): Promise<Project[]> {
@@ -186,4 +190,78 @@ export async function deleteProject(id: string): Promise<void> {
   const projects = await readAll();
   const filtered = projects.filter(p => p._id !== id);
   await writeAll(filtered);
-} 
+}
+
+export async function createOrUpdateProjectDocumentation(
+  projectId: string,
+  prompt: string,
+  umlDiagrams: any
+): Promise<Project | null> {
+  const projects = await readAll();
+  const project = projects.find(p => p._id === projectId);
+  if (!project) return null;
+
+  const now = new Date().toISOString();
+  const newDoc: Documentation = {
+    id: project.documentation?.id || uuidv4(),
+    projectId,
+    prompt,
+    umlDiagrams,
+    status: 'pending',
+    progress: 0,
+    createdAt: project.documentation?.createdAt || now,
+    updatedAt: now
+  };
+
+  project.documentation = newDoc;
+
+  // Generate SVGs for each Mermaid diagram
+  const umlDiagramsSvg: Record<string, string> = {};
+  if (umlDiagrams && typeof umlDiagrams === 'object') {
+    for (const [key, code] of Object.entries(umlDiagrams)) {
+      if (typeof code === 'string') {
+        try {
+          umlDiagramsSvg[key] = await mermaidToSvg(code);
+        } catch (e) {
+          console.error(`Failed to render SVG for ${key}:`, e);
+        }
+      }
+    }
+  }
+
+  project.umlDiagramsSvg = umlDiagramsSvg;
+
+  await saveProject(project);
+  return project;
+}
+
+export async function getProjectDocumentation(projectId: string): Promise<Documentation | null> {
+  const project = await getProjectById(projectId);
+  return project && project.documentation ? project.documentation : null;
+}
+
+export async function updateProjectDocumentation(
+  projectId: string,
+  updates: Partial<Documentation>
+): Promise<Project | null> {
+  const project = await getProjectById(projectId);
+  if (!project || !project.documentation) return null;
+
+  project.documentation = {
+    ...project.documentation,
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+
+  await saveProject(project);
+  return project;
+}
+
+export async function deleteProjectDocumentation(projectId: string): Promise<boolean> {
+  const project = await getProjectById(projectId);
+  if (!project || !project.documentation) return false;
+
+  project.documentation = undefined;
+  await saveProject(project);
+  return true;
+}
