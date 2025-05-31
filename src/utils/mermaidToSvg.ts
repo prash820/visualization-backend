@@ -1,41 +1,67 @@
-import { execFile } from 'child_process';
 import { tmpdir } from 'os';
 import { promises as fs } from 'fs';
 import path from 'path';
+import puppeteer from 'puppeteer';
 
 export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   const tempDir = tmpdir();
   const mmdPath = path.join(tempDir, `diagram-${Date.now()}.mmd`);
   const svgPath = path.join(tempDir, `diagram-${Date.now()}.svg`);
+  
   console.log('[mermaidToSvg] Writing Mermaid code to:', mmdPath);
   await fs.writeFile(mmdPath, mermaidCode, 'utf8');
-  console.log('[mermaidToSvg] Running: mmdc -i', mmdPath, '-o', svgPath, '--quiet');
-  await new Promise((resolve, reject) => {
-    execFile(
-      'mmdc',
-      ['-i', mmdPath, '-o', svgPath, '--quiet'],
-      (error, stdout, stderr) => {
-        if (error) {
-          console.error('[mermaidToSvg] Error executing mmdc:', error, stderr);
-          reject(error);
-        } else {
-          console.log('[mermaidToSvg] mmdc executed successfully:', svgPath);
-          resolve(null);
-        }
-      }
-    );
-  });
-  // Check if SVG file exists
+
   try {
-    await fs.access(svgPath);
-    console.log('[mermaidToSvg] SVG file exists:', svgPath);
-  } catch (e) {
-    console.error('[mermaidToSvg] SVG file does not exist after mmdc:', svgPath);
-    throw e;
+    // Launch browser
+    const browser = await puppeteer.launch({
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    // Create new page
+    const page = await browser.newPage();
+
+    // Set content with mermaid diagram and mermaid.js
+    await page.setContent(`
+      <html>
+        <head>
+          <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        </head>
+        <body>
+          <div class="mermaid">
+            ${mermaidCode}
+          </div>
+          <script>
+            mermaid.initialize({
+              startOnLoad: true,
+              theme: 'default',
+              securityLevel: 'loose'
+            });
+          </script>
+        </body>
+      </html>
+    `);
+
+    // Wait for mermaid to render
+    await page.waitForSelector('.mermaid svg');
+
+    // Get SVG content
+    const svg = await page.evaluate(() => {
+      const svgElement = document.querySelector('.mermaid svg');
+      return svgElement ? svgElement.outerHTML : '';
+    });
+
+    // Close browser
+    await browser.close();
+
+    // Clean up temp files
+    await fs.unlink(mmdPath);
+    await fs.unlink(svgPath);
+
+    console.log('[mermaidToSvg] SVG generated successfully');
+    return svg;
+  } catch (error) {
+    console.error('[mermaidToSvg] Error generating SVG:', error);
+    throw error;
   }
-  const svg = await fs.readFile(svgPath, 'utf8');
-  console.log('[mermaidToSvg] SVG content length:', svg.length);
-  await fs.unlink(mmdPath);
-  await fs.unlink(svgPath);
-  return svg;
 }
