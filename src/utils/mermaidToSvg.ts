@@ -11,18 +11,6 @@ async function ensureDirectoryExists(dirPath: string) {
   }
 }
 
-async function checkChromeExecutable(): Promise<string | null> {
-  const chromePath = '/app/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome';
-  try {
-    // Ensure parent directories exist
-    await ensureDirectoryExists(path.dirname(chromePath));
-    await fs.access(chromePath);
-    return chromePath;
-  } catch (error) {
-    console.log('[mermaidToSvg] Chrome executable not found at:', chromePath);
-    return null;
-  }
-}
 
 export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   const tempDir = tmpdir();
@@ -33,7 +21,7 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   await fs.writeFile(mmdPath, mermaidCode, 'utf8');
 
   try {
-    // Launch browser with system Chrome
+    // Launch browser with Chrome from Puppeteer buildpack
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -44,7 +32,7 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
         '--disable-gpu',
         '--single-process'
       ],
-      executablePath: '/usr/bin/chromium-browser',
+      executablePath: process.env.CHROME_BIN || '/app/.apt/usr/bin/google-chrome-stable',
     });
 
     // Create new page
