@@ -21,6 +21,7 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   await fs.writeFile(mmdPath, mermaidCode, 'utf8');
 
   try {
+    
     // Launch browser with Chrome from Puppeteer buildpack
     const browser = await puppeteer.launch({
       headless: true,
