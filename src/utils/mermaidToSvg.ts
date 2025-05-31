@@ -3,9 +3,19 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import puppeteer from 'puppeteer';
 
+async function ensureDirectoryExists(dirPath: string) {
+  try {
+    await fs.access(dirPath);
+  } catch {
+    await fs.mkdir(dirPath, { recursive: true });
+  }
+}
+
 async function checkChromeExecutable(): Promise<string | null> {
   const chromePath = '/app/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome';
   try {
+    // Ensure parent directories exist
+    await ensureDirectoryExists(path.dirname(chromePath));
     await fs.access(chromePath);
     return chromePath;
   } catch (error) {
@@ -23,13 +33,10 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   await fs.writeFile(mmdPath, mermaidCode, 'utf8');
 
   try {
-    // Check if Chrome executable exists
-    const chromePath = await checkChromeExecutable();
-    
-    // Launch browser with appropriate configuration
+    // Launch browser with system Chromium
     const browser = await puppeteer.launch({
+      executablePath: '/app/.apt/usr/bin/chromium-browser',
       headless: true,
-      ...(chromePath ? { executablePath: chromePath } : {}),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
