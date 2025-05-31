@@ -3,6 +3,17 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import puppeteer from 'puppeteer';
 
+async function checkChromeExecutable(): Promise<string | null> {
+  const chromePath = '/app/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome';
+  try {
+    await fs.access(chromePath);
+    return chromePath;
+  } catch (error) {
+    console.log('[mermaidToSvg] Chrome executable not found at:', chromePath);
+    return null;
+  }
+}
+
 export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   const tempDir = tmpdir();
   const mmdPath = path.join(tempDir, `diagram-${Date.now()}.mmd`);
@@ -12,9 +23,13 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   await fs.writeFile(mmdPath, mermaidCode, 'utf8');
 
   try {
-    // Launch browser with system Chrome
+    // Check if Chrome executable exists
+    const chromePath = await checkChromeExecutable();
+    
+    // Launch browser with appropriate configuration
     const browser = await puppeteer.launch({
       headless: true,
+      ...(chromePath ? { executablePath: chromePath } : {}),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
