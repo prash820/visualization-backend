@@ -14,7 +14,7 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   try {
     // Launch browser with system Chrome
     const browser = await puppeteer.launch({
-      executablePath: '/usr/bin/google-chrome',
+      executablePath: '/app/.apt/usr/bin/chromium-browser',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
