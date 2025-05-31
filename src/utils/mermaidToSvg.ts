@@ -33,7 +33,7 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   await fs.writeFile(mmdPath, mermaidCode, 'utf8');
 
   try {
-    // Launch browser with Puppeteer's Chrome
+    // Launch browser with system Chrome
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -44,7 +44,7 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
         '--disable-gpu',
         '--single-process'
       ],
-      executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome',
+      executablePath: '/usr/bin/chromium-browser',
     });
 
     // Create new page
