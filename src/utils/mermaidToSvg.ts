@@ -1,7 +1,7 @@
 import { tmpdir } from 'os';
 import { promises as fs } from 'fs';
 import path from 'path';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 
 async function ensureDirectoryExists(dirPath: string) {
   try {
@@ -33,7 +33,7 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   await fs.writeFile(mmdPath, mermaidCode, 'utf8');
 
   try {
-    // Launch browser with Puppeteer's built-in Chrome
+    // Launch browser with Puppeteer's Chrome
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -41,8 +41,10 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--single-process'
       ],
+      executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome',
     });
 
     // Create new page
