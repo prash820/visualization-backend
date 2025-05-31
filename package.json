@@ -6,7 +6,7 @@
     "dev": "ts-node-dev src/server.ts",
     "build": "tsc && node build.js",
     "start": "node dist/server.js",
-    "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js"
+    "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js && npx puppeteer browsers install chrome"
   },
   "keywords": [],
   "author": "",
