@@ -2,7 +2,6 @@ import fs from "fs/promises";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { Documentation } from './documentationStore';
-import { mermaidToSvg } from '../utils/mermaidToSvg';
 
 const DATA_FILE = path.join(__dirname, "../../projects.json");
 
@@ -150,7 +149,6 @@ export interface Project {
   umlDiagrams?: UMLDiagrams;
   documentation?: Documentation;
   designDocument?: DesignDocument;
-  umlDiagramsSvg?: Record<string, string>;
 }
 
 async function readAll(): Promise<Project[]> {
@@ -214,22 +212,6 @@ export async function createOrUpdateProjectDocumentation(
   };
 
   project.documentation = newDoc;
-
-  // Generate SVGs for each Mermaid diagram
-  const umlDiagramsSvg: Record<string, string> = {};
-  if (umlDiagrams && typeof umlDiagrams === 'object') {
-    for (const [key, code] of Object.entries(umlDiagrams)) {
-      if (typeof code === 'string') {
-        try {
-          umlDiagramsSvg[key] = await mermaidToSvg(code);
-        } catch (e) {
-          console.error(`Failed to render SVG for ${key}:`, e);
-        }
-      }
-    }
-  }
-
-  project.umlDiagramsSvg = umlDiagramsSvg;
 
   await saveProject(project);
   return project;

@@ -23,7 +23,6 @@ exports.deleteProjectDocumentation = deleteProjectDocumentation;
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
 const uuid_1 = require("uuid");
-const mermaidToSvg_1 = require("../utils/mermaidToSvg");
 const DATA_FILE = path_1.default.join(__dirname, "../../projects.json");
 function readAll() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -91,21 +90,6 @@ function createOrUpdateProjectDocumentation(projectId, prompt, umlDiagrams) {
             updatedAt: now
         };
         project.documentation = newDoc;
-        // Generate SVGs for each Mermaid diagram
-        const umlDiagramsSvg = {};
-        if (umlDiagrams && typeof umlDiagrams === 'object') {
-            for (const [key, code] of Object.entries(umlDiagrams)) {
-                if (typeof code === 'string') {
-                    try {
-                        umlDiagramsSvg[key] = yield (0, mermaidToSvg_1.mermaidToSvg)(code);
-                    }
-                    catch (e) {
-                        console.error(`Failed to render SVG for ${key}:`, e);
-                    }
-                }
-            }
-        }
-        project.umlDiagramsSvg = umlDiagramsSvg;
         yield saveProject(project);
         return project;
     });

@@ -109,9 +109,7 @@ const getProjectDocumentationHandler = (req, res) => __awaiter(void 0, void 0, v
             return;
         }
         // Attach umlDiagramsSvg to the documentation object
-        const documentation = project.documentation
-            ? Object.assign(Object.assign({}, project.documentation), { umlDiagramsSvg: project.umlDiagramsSvg }) : null;
-        console.log('[getProjectDocumentationHandler] documentation:', documentation === null || documentation === void 0 ? void 0 : documentation.umlDiagramsSvg);
+        const documentation = project.documentation || null;
         res.json(documentation);
     }
     catch (error) {

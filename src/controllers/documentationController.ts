@@ -108,10 +108,7 @@ export const getProjectDocumentationHandler = async (req: Request, res: Response
       return;
     }
     // Attach umlDiagramsSvg to the documentation object
-    const documentation = project.documentation
-      ? { ...project.documentation, umlDiagramsSvg: project.umlDiagramsSvg }
-      : null;
-    console.log('[getProjectDocumentationHandler] documentation:', documentation?.umlDiagramsSvg);
+    const documentation = project.documentation || null;
     res.json(documentation);
   } catch (error) {
     console.error('Error getting project documentation:', error);
