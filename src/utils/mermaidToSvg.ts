@@ -33,9 +33,8 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   await fs.writeFile(mmdPath, mermaidCode, 'utf8');
 
   try {
-    // Launch browser with Puppeteer's installed Chrome
+    // Launch browser with Puppeteer's built-in Chrome
     const browser = await puppeteer.launch({
-      executablePath: '/app/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
       headless: true,
       args: [
         '--no-sandbox',
