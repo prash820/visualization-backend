@@ -32,7 +32,7 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
         '--disable-gpu',
         '--single-process'
       ],
-      executablePath: process.env.CHROME_BIN || '/app/.apt/usr/bin/google-chrome-stable',
+      executablePath: process.env.CHROME_BIN || '/app/.apt/usr/bin/chromium-browser',
     });
 
     // Create new page
