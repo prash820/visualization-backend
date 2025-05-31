@@ -14,14 +14,13 @@ export async function mermaidToSvg(mermaidCode: string): Promise<string> {
   try {
     // Launch browser with system Chrome
     const browser = await puppeteer.launch({
-      executablePath: '/app/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--headless=new'
+        '--disable-gpu'
       ],
     });
 
