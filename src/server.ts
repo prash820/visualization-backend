@@ -66,6 +66,7 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // 🔹 CORS Configuration
 app.use(
+  
   cors({
     origin: "*",
     credentials: true,
