@@ -178,12 +178,18 @@ export const generateIaC = async (req: Request, res: Response): Promise<void> =>
 Your task is to generate production-ready Terraform code for the user's project, based on their prompt and UML diagrams.
 
 **IMPORTANT INSTRUCTIONS:**
-- Return ONLY a valid JSON object, with no extra text, explanations, or Markdown outside the JSON object.
-- The JSON object must have two fields:
-  - "code": a string containing the complete Terraform code (all files concatenated, with clear file boundaries as comments, e.g., "// main.tf", "// variables.tf", etc.)
-  - "documentation": a string containing Markdown documentation for the infrastructure.
+1. Analyze the provided UML diagrams to understand the system architecture
+2. Generate Terraform code that exactly matches the components and relationships shown in the diagrams
+3. Include all necessary AWS services shown in the diagrams (e.g., API Gateway, Lambda, S3, DynamoDB, Cognito)
+4. Set up proper IAM roles and permissions for service interactions
+5. Configure security groups and network access as needed
+6. Return ONLY a valid JSON object, with no extra text, explanations, or Markdown outside the JSON object
 
-**Example output:**
+The JSON object must have two fields:
+- "code": a string containing the complete Terraform code (all files concatenated, with clear file boundaries as comments)
+- "documentation": a string containing Markdown documentation for the infrastructure
+
+**Example output format:**
 {
   "code": "// main.tf\n...\n// variables.tf\n...\n",
   "documentation": "# Infrastructure Documentation\n..."
@@ -196,7 +202,15 @@ Do not include any explanations, Markdown, or text outside the JSON object.`;
       model: "gpt-4-0125-preview",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: prompt },
+        { 
+          role: "user", 
+          content: `Generate infrastructure code for the following system:
+          
+Prompt: ${prompt}
+
+UML Diagrams:
+${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).join('\n\n')}`
+        },
       ],
       max_tokens: 4096,
       temperature: 0.5,
