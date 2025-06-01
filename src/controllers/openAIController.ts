@@ -183,19 +183,18 @@ Your task is to generate production-ready Terraform code for the user's project,
 3. Include all necessary AWS services shown in the diagrams (e.g., API Gateway, Lambda, S3, DynamoDB, Cognito)
 4. Set up proper IAM roles and permissions for service interactions
 5. Configure security groups and network access as needed
-6. Return ONLY a valid JSON object, with no extra text, explanations, or Markdown outside the JSON object
+6. Return ONLY a raw JSON object, with no markdown formatting, code blocks, or extra text
+7. Do not wrap the response in \`\`\`json or any other markdown formatting
 
 The JSON object must have two fields:
 - "code": a string containing the complete Terraform code (all files concatenated, with clear file boundaries as comments)
 - "documentation": a string containing Markdown documentation for the infrastructure
 
-**Example output format:**
+**Example output format (return exactly this format, no markdown):**
 {
   "code": "// main.tf\n...\n// variables.tf\n...\n",
   "documentation": "# Infrastructure Documentation\n..."
-}
-
-Do not include any explanations, Markdown, or text outside the JSON object.`;
+}`;
 
     console.log("[IaC Backend] Sending request to OpenAI");
     const response = await openai.chat.completions.create({
@@ -221,8 +220,19 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
     console.log("[IaC Backend] Full response:", fullResponse);
 
     try {
-      const parsedResponse = JSON.parse(fullResponse);
+      // Clean the response by removing any markdown formatting
+      const cleanedResponse = fullResponse
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+
+      const parsedResponse = JSON.parse(cleanedResponse);
       console.log("[IaC Backend] Parsed response:", parsedResponse);
+
+      // Validate the response structure
+      if (!parsedResponse.code || !parsedResponse.documentation) {
+        throw new Error("Response missing required fields: code and documentation");
+      }
 
       // Save the generated code to a file if projectId is provided
       if (projectId) {
@@ -238,13 +248,20 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
       }
 
       res.json(parsedResponse);
-    } catch (parseError) {
-      console.error("[IaC Backend] Error parsing response:", parseError);
-      res.status(500).json({ error: "Failed to parse AI response" });
+    } catch (error: unknown) {
+      console.error("[IaC Backend] Error parsing response:", error);
+      res.status(500).json({ 
+        error: "Failed to parse AI response",
+        details: error instanceof Error ? error.message : "Unknown error",
+        rawResponse: fullResponse
+      });
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[IaC Backend] Error generating IaC:", error);
-    res.status(500).json({ error: "Failed to generate infrastructure code" });
+    res.status(500).json({ 
+      error: "Failed to generate infrastructure code",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
   }
 };
 
