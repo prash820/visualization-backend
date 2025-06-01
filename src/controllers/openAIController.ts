@@ -4,6 +4,8 @@ import { Request, Response,  } from "express";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import Anthropic from '@anthropic-ai/sdk';
+import path from "path";
+import fs from "fs";
 dotenv.config();
 const router = express.Router();
 export default router;
@@ -158,38 +160,77 @@ export const generateVisualization = async (req: Request, res: Response) => {
 };
 
 export const generateIaC = async (req: Request, res: Response): Promise<void> => {
-  const { prompt } = req.body;
+  console.log("[IaC Backend] Received request to generate infrastructure code");
+  const { prompt, projectId, umlDiagrams } = req.body;
+  console.log("[IaC Backend] Request body:", { prompt, projectId, umlDiagrams });
 
   if (!prompt) {
+    console.log("[IaC Backend] Missing prompt in request");
     res.status(400).json({ error: "Prompt is required" });
     return;
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+    console.log("[IaC Backend] Constructing system prompt");
+    // Construct a strict system prompt that requires only a JSON object in the response
+    const systemPrompt = `You are an AI assistant that generates Infrastructure as Code (IaC) using Terraform.
+
+Your task is to generate production-ready Terraform code for the user's project, based on their prompt and UML diagrams.
+
+**IMPORTANT INSTRUCTIONS:**
+- Return ONLY a valid JSON object, with no extra text, explanations, or Markdown outside the JSON object.
+- The JSON object must have two fields:
+  - "code": a string containing the complete Terraform code (all files concatenated, with clear file boundaries as comments, e.g., "// main.tf", "// variables.tf", etc.)
+  - "documentation": a string containing Markdown documentation for the infrastructure.
+
+**Example output:**
+{
+  "code": "// main.tf\n...\n// variables.tf\n...\n",
+  "documentation": "# Infrastructure Documentation\n..."
+}
+
+Do not include any explanations, Markdown, or text outside the JSON object.`;
+
+    console.log("[IaC Backend] Sending request to OpenAI");
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-0125-preview",
       messages: [
-        {
-          role: "system",
-          content: "You are an AI assistant specialized in generating Infrastructure as Code (IaC) using Terraform."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt },
       ],
-      temperature: 0.7,
+      max_tokens: 4096,
+      temperature: 0.5,
     });
 
-    const response = completion.choices[0]?.message?.content;
-    if (!response) {
-      throw new Error('No response from OpenAI');
-    }
+    console.log("[IaC Backend] Received response from OpenAI");
+    const fullResponse = response.choices[0]?.message?.content || "";
+    console.log("[IaC Backend] Full response:", fullResponse);
 
-    res.json({ code: response });
+    try {
+      const parsedResponse = JSON.parse(fullResponse);
+      console.log("[IaC Backend] Parsed response:", parsedResponse);
+
+      // Save the generated code to a file if projectId is provided
+      if (projectId) {
+        const projectDir = path.join(process.cwd(), "workspace", projectId);
+        if (!fs.existsSync(projectDir)) {
+          fs.mkdirSync(projectDir, { recursive: true });
+        }
+
+        // Save the Terraform code
+        fs.writeFileSync(path.join(projectDir, "terraform.tf"), parsedResponse.code);
+        // Save the documentation
+        fs.writeFileSync(path.join(projectDir, "README.md"), parsedResponse.documentation);
+      }
+
+      res.json(parsedResponse);
+    } catch (parseError) {
+      console.error("[IaC Backend] Error parsing response:", parseError);
+      res.status(500).json({ error: "Failed to parse AI response" });
+    }
   } catch (error) {
-    console.error('Error generating IaC:', error);
-    res.status(500).json({ error: 'Failed to generate Infrastructure as Code' });
+    console.error("[IaC Backend] Error generating IaC:", error);
+    res.status(500).json({ error: "Failed to generate infrastructure code" });
   }
 };
 

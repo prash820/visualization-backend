@@ -8,7 +8,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import openAIRoutes from "./routes/openAI";
 import authRoutes from "./routes/auth";
 import projectRoutes from "./routes/project";
-import iaCRoutes from "./routes/iacRoutes"; // ✅ New IaC Route
+import iaCRoutes from "./routes/iac"; // Updated import path
 import deployRoutes from "./routes/deployRoutes";
 import umlRoutes from "./routes/uml";
 import documentationRoutes from "./routes/documentation";
