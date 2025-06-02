@@ -141,7 +141,7 @@ export interface Project {
   userId: string;
   name: string;
   description: string;
-  lastPrompt: string;
+  prompt?: string;
   lastCode: string;
   framework: string;
   diagramType: string;

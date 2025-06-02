@@ -11,6 +11,7 @@ import projectRoutes from "./routes/project";
 import iaCRoutes from "./routes/iac"; // Updated import path
 import deployRoutes from "./routes/deployRoutes";
 import umlRoutes from "./routes/uml";
+import codeRoutes from "./routes/appCode";
 import documentationRoutes from "./routes/documentation";
 
 dotenv.config();
@@ -89,6 +90,7 @@ app.use("/api/iac", iaCRoutes); // ✅ New Route for IaC
 app.use("/api/deploy", deployRoutes);
 app.use("/api/uml", umlRoutes);
 app.use("/api/documentation", documentationRoutes);
+app.use("/api/code", codeRoutes);
 
 // 🔹 Global Error Handler
 app.use(errorHandler);

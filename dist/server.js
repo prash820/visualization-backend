@@ -13,7 +13,7 @@ const errorHandler_1 = require("./middleware/errorHandler");
 const openAI_1 = __importDefault(require("./routes/openAI"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const project_1 = __importDefault(require("./routes/project"));
-const iacRoutes_1 = __importDefault(require("./routes/iacRoutes")); // ✅ New IaC Route
+const iac_1 = __importDefault(require("./routes/iac")); // Updated import path
 const deployRoutes_1 = __importDefault(require("./routes/deployRoutes"));
 const uml_1 = __importDefault(require("./routes/uml"));
 const documentation_1 = __importDefault(require("./routes/documentation"));
@@ -78,7 +78,7 @@ app.use(simpleRateLimiter);
 app.use("/api/generate", openAI_1.default);
 app.use("/api/auth", auth_1.default);
 app.use("/api/projects", project_1.default);
-app.use("/api/iac", iacRoutes_1.default); // ✅ New Route for IaC
+app.use("/api/iac", iac_1.default); // ✅ New Route for IaC
 app.use("/api/deploy", deployRoutes_1.default);
 app.use("/api/uml", uml_1.default);
 app.use("/api/documentation", documentation_1.default);

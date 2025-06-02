@@ -27,6 +27,7 @@ export const getProjects = async (req: Request, res: Response) => {
 export const updateProject = async (req: Request, res: Response) => {
   const project = await getProjectById(req.params.id);
   if (!project) return res.status(404).json({ error: "Project not found" });
+  console.log("Updating project", req.body);
   const updated: Project = { ...project, ...req.body };
   await saveProject(updated);
   res.json(updated);
@@ -40,7 +41,7 @@ export const removeProject = async (req: Request, res: Response) => {
 
 export const saveProjectState = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { lastPrompt, lastCode } = req.body;
+  const { prompt, lastCode } = req.body;
 
   const project = await getProjectById(id);
   if (!project) {
@@ -48,7 +49,7 @@ export const saveProjectState = async (req: Request, res: Response) => {
     return;
   }
 
-  project.lastPrompt = lastPrompt;
+  if (prompt !== undefined) project.prompt = prompt;
   project.lastCode = lastCode;
   await saveProject(project);
 

@@ -12,5 +12,6 @@ router.get("/:id", authenticateToken, asyncHandler(getProject));
 router.put("/:id", authenticateToken, asyncHandler(updateProject));
 router.delete("/:id", authenticateToken, asyncHandler(removeProject));
 router.post("/:id/state", authenticateToken, asyncHandler(saveProjectState));
+router.patch("/:id/state", authenticateToken, asyncHandler(saveProjectState));
 
 export default router;

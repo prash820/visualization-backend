@@ -312,3 +312,219 @@ const parseGenericResponse = (response: string) => {
     throw new Error("Invalid generic diagram response format");
   }
 };
+
+export const generateApplicationCode = async (req: Request, res: Response): Promise<void> => {
+  console.log("[App Code Backend] Received request to generate application code");
+  const { prompt, projectId, umlDiagrams } = req.body;
+  console.log("[App Code Backend] Request body:", { prompt, projectId, umlDiagrams });
+
+  if (!prompt) {
+    console.log("[App Code Backend] Missing prompt in request");
+    res.status(400).json({ error: "Prompt is required" });
+    return;
+  }
+
+  try {
+    console.log("[App Code Backend] Constructing system prompt");
+    const systemPrompt = `You are an AI assistant that generates production-ready application code based on UML diagrams.
+
+Your task is to generate application code that implements the system design shown in the UML diagrams.
+
+**IMPORTANT INSTRUCTIONS:**
+1. Analyze the provided UML diagrams (component, sequence, class) to understand the system architecture
+2. Generate code that implements the components, interactions, and data structures shown in the diagrams
+3. Follow best practices for the specified technology stack
+4. Include proper error handling, logging, and documentation
+5. Return ONLY a raw JSON object, with no markdown formatting, code blocks, or extra text
+6. Do not wrap the response in \`\`\`json or any other markdown formatting
+
+The JSON object must have these fields:
+- "frontend": object containing frontend code files
+  - "components": object mapping component names to their code
+  - "pages": object mapping page names to their code
+  - "utils": object mapping utility function names to their code
+- "backend": object containing backend code files
+  - "controllers": object mapping controller names to their code
+  - "models": object mapping model names to their code
+  - "routes": object mapping route names to their code
+  - "utils": object mapping utility function names to their code
+- "documentation": string containing Markdown documentation for the application
+
+**Example output format (return exactly this format, no markdown):**
+{
+  "frontend": {
+    "components": {
+      "UserProfile.tsx": "import React from 'react';\n...",
+      "PostList.tsx": "import React from 'react';\n..."
+    },
+    "pages": {
+      "Home.tsx": "import React from 'react';\n...",
+      "Profile.tsx": "import React from 'react';\n..."
+    },
+    "utils": {
+      "api.ts": "export const fetchData = async () => {\n...",
+      "auth.ts": "export const login = async () => {\n..."
+    }
+  },
+  "backend": {
+    "controllers": {
+      "userController.ts": "export const getUser = async (req, res) => {\n...",
+      "postController.ts": "export const createPost = async (req, res) => {\n..."
+    },
+    "models": {
+      "User.ts": "export interface User {\n...",
+      "Post.ts": "export interface Post {\n..."
+    },
+    "routes": {
+      "userRoutes.ts": "import express from 'express';\n...",
+      "postRoutes.ts": "import express from 'express';\n..."
+    },
+    "utils": {
+      "db.ts": "export const connectDB = async () => {\n...",
+      "auth.ts": "export const verifyToken = async (token) => {\n..."
+    }
+  },
+  "documentation": "# Application Documentation\n..."
+}`;
+
+    console.log("[App Code Backend] Sending request to OpenAI");
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-0125-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { 
+          role: "user", 
+          content: `Generate application code for the following system:
+          
+Prompt: ${prompt}
+
+UML Diagrams:
+${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).join('\n\n')}`
+        },
+      ],
+      max_tokens: 4096,
+      temperature: 0.5,
+    });
+
+    console.log("[App Code Backend] Received response from OpenAI");
+    const fullResponse = response.choices[0]?.message?.content || "";
+    console.log("[App Code Backend] Full response:", fullResponse);
+
+    try {
+      // Clean the response by removing any markdown formatting
+      const cleanedResponse = fullResponse
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+
+      const parsedResponse = JSON.parse(cleanedResponse);
+      console.log("[App Code Backend] Parsed response:", parsedResponse);
+
+      // Validate the response structure
+      if (!parsedResponse.frontend || !parsedResponse.backend || !parsedResponse.documentation) {
+        throw new Error("Response missing required fields: frontend, backend, and documentation");
+      }
+
+      // Save the generated code to files if projectId is provided
+      if (projectId) {
+        const projectDir = path.join(process.cwd(), "workspace", projectId);
+        if (!fs.existsSync(projectDir)) {
+          fs.mkdirSync(projectDir, { recursive: true });
+        }
+
+        // Save frontend code
+        const frontendDir = path.join(projectDir, "frontend");
+        if (!fs.existsSync(frontendDir)) {
+          fs.mkdirSync(frontendDir, { recursive: true });
+        }
+
+        // Save frontend components
+        const componentsDir = path.join(frontendDir, "components");
+        if (!fs.existsSync(componentsDir)) {
+          fs.mkdirSync(componentsDir, { recursive: true });
+        }
+        Object.entries(parsedResponse.frontend.components).forEach(([filename, content]) => {
+          fs.writeFileSync(path.join(componentsDir, filename), content as string);
+        });
+
+        // Save frontend pages
+        const pagesDir = path.join(frontendDir, "pages");
+        if (!fs.existsSync(pagesDir)) {
+          fs.mkdirSync(pagesDir, { recursive: true });
+        }
+        Object.entries(parsedResponse.frontend.pages).forEach(([filename, content]) => {
+          fs.writeFileSync(path.join(pagesDir, filename), content as string);
+        });
+
+        // Save frontend utils
+        const frontendUtilsDir = path.join(frontendDir, "utils");
+        if (!fs.existsSync(frontendUtilsDir)) {
+          fs.mkdirSync(frontendUtilsDir, { recursive: true });
+        }
+        Object.entries(parsedResponse.frontend.utils).forEach(([filename, content]) => {
+          fs.writeFileSync(path.join(frontendUtilsDir, filename), content as string);
+        });
+
+        // Save backend code
+        const backendDir = path.join(projectDir, "backend");
+        if (!fs.existsSync(backendDir)) {
+          fs.mkdirSync(backendDir, { recursive: true });
+        }
+
+        // Save backend controllers
+        const controllersDir = path.join(backendDir, "controllers");
+        if (!fs.existsSync(controllersDir)) {
+          fs.mkdirSync(controllersDir, { recursive: true });
+        }
+        Object.entries(parsedResponse.backend.controllers).forEach(([filename, content]) => {
+          fs.writeFileSync(path.join(controllersDir, filename), content as string);
+        });
+
+        // Save backend models
+        const modelsDir = path.join(backendDir, "models");
+        if (!fs.existsSync(modelsDir)) {
+          fs.mkdirSync(modelsDir, { recursive: true });
+        }
+        Object.entries(parsedResponse.backend.models).forEach(([filename, content]) => {
+          fs.writeFileSync(path.join(modelsDir, filename), content as string);
+        });
+
+        // Save backend routes
+        const routesDir = path.join(backendDir, "routes");
+        if (!fs.existsSync(routesDir)) {
+          fs.mkdirSync(routesDir, { recursive: true });
+        }
+        Object.entries(parsedResponse.backend.routes).forEach(([filename, content]) => {
+          fs.writeFileSync(path.join(routesDir, filename), content as string);
+        });
+
+        // Save backend utils
+        const backendUtilsDir = path.join(backendDir, "utils");
+        if (!fs.existsSync(backendUtilsDir)) {
+          fs.mkdirSync(backendUtilsDir, { recursive: true });
+        }
+        Object.entries(parsedResponse.backend.utils).forEach(([filename, content]) => {
+          fs.writeFileSync(path.join(backendUtilsDir, filename), content as string);
+        });
+
+        // Save documentation
+        fs.writeFileSync(path.join(projectDir, "README.md"), parsedResponse.documentation);
+      }
+
+      res.json(parsedResponse);
+    } catch (error: unknown) {
+      console.error("[App Code Backend] Error parsing response:", error);
+      res.status(500).json({ 
+        error: "Failed to parse AI response",
+        details: error instanceof Error ? error.message : "Unknown error",
+        rawResponse: fullResponse
+      });
+    }
+  } catch (error: unknown) {
+    console.error("[App Code Backend] Error generating application code:", error);
+    res.status(500).json({ 
+      error: "Failed to generate application code",
+      details: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+};

@@ -1,24 +1,21 @@
-# Infrastructure Documentation for Task Management App
+# Infrastructure Documentation
 
-This Terraform configuration sets up the infrastructure for a Task Management application on AWS, including networking, security, and container service resources.
+This documentation outlines the AWS infrastructure for an Uber clone app, provisioned using Terraform. The setup includes AWS Cognito for authentication, DynamoDB for data storage, Lambda functions for business logic, API Gateway for RESTful services, and SNS for notifications.
 
-## Resources Created
+## Components
 
-- **AWS VPC**: A virtual private cloud to host the application resources.
-- **AWS Subnet**: A subnet within the VPC for the application components.
-- **AWS Security Group**: Security group for controlling access to the application.
-- **AWS ECS Cluster**: The Amazon Elastic Container Service cluster to run the application's containers.
-- **AWS ECS Task Definition**: The task definition for running the application's container.
-
-## Variables
-
-- `aws_region`: The AWS region where resources will be created.
-- `vpc_cidr`: CIDR block for the VPC.
-- `subnet_cidr`: CIDR block for the subnet.
-- `availability_zone`: Availability zone for the subnet.
-- `allowed_cidr`: CIDR blocks allowed to access the application.
-- `container_image`: Docker image for the task management app.
+- **Amazon Cognito**: Manages user authentication and authorization.
+- **DynamoDB**: NoSQL database for storing user, driver, rider, and trip data.
+- **Lambda Functions**: Four separate Lambda functions for rider management, driver management, trip management, and payment processing.
+- **API Gateway**: Provides RESTful API endpoints for the app's frontend to interact with the backend services.
+- **Simple Notification Service (SNS)**: Used for sending notifications to riders and drivers.
 
 ## Security
 
-The security group is configured to allow inbound traffic on port 80 (HTTP) from specified CIDR blocks, ensuring that the application can be accessed over the web while restricting unauthorized access.
+- IAM roles and policies are set up to grant the necessary permissions to the Lambda functions for accessing DynamoDB and SNS.
+
+## Networking
+
+- API Gateway is configured to expose the Lambda functions as HTTP endpoints, which are secured using Amazon Cognito for user authentication.
+
+This infrastructure is designed to be scalable and secure, providing a solid foundation for building a ride-sharing application on AWS.
