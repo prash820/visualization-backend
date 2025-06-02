@@ -16,6 +16,7 @@ const project_1 = __importDefault(require("./routes/project"));
 const iac_1 = __importDefault(require("./routes/iac")); // Updated import path
 const deployRoutes_1 = __importDefault(require("./routes/deployRoutes"));
 const uml_1 = __importDefault(require("./routes/uml"));
+const appCode_1 = __importDefault(require("./routes/appCode"));
 const documentation_1 = __importDefault(require("./routes/documentation"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -82,6 +83,7 @@ app.use("/api/iac", iac_1.default); // ✅ New Route for IaC
 app.use("/api/deploy", deployRoutes_1.default);
 app.use("/api/uml", uml_1.default);
 app.use("/api/documentation", documentation_1.default);
+app.use("/api/code", appCode_1.default);
 // 🔹 Global Error Handler
 app.use(errorHandler_1.errorHandler);
 // Create server with increased timeout

@@ -1,0 +1,15 @@
+import React from 'react';
+
+export default function OrderSummary({ order }) {
+  return (
+    <div>
+      <h2>Order Summary</h2>
+      <p>Status: {order.status}</p>
+      <ul>
+        {order.items.map(item => (
+          <li key={item.id}>{item.name} - ${item.price}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}

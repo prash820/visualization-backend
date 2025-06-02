@@ -38,6 +38,7 @@ const updateProject = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     const project = yield (0, projectFileStore_1.getProjectById)(req.params.id);
     if (!project)
         return res.status(404).json({ error: "Project not found" });
+    console.log("Updating project", req.body);
     const updated = Object.assign(Object.assign({}, project), req.body);
     yield (0, projectFileStore_1.saveProject)(updated);
     res.json(updated);
@@ -51,13 +52,14 @@ const removeProject = (req, res) => __awaiter(void 0, void 0, void 0, function* 
 exports.removeProject = removeProject;
 const saveProjectState = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
-    const { lastPrompt, lastCode } = req.body;
+    const { prompt, lastCode } = req.body;
     const project = yield (0, projectFileStore_1.getProjectById)(id);
     if (!project) {
         res.status(404).json({ error: "Project not found" });
         return;
     }
-    project.lastPrompt = lastPrompt;
+    if (prompt !== undefined)
+        project.prompt = prompt;
     project.lastCode = lastCode;
     yield (0, projectFileStore_1.saveProject)(project);
     res.status(200).json({ project });

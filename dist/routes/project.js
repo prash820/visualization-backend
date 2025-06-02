@@ -15,4 +15,5 @@ router.get("/:id", authMiddleware_1.authenticateToken, (0, asyncHandler_1.defaul
 router.put("/:id", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(projectController_1.updateProject));
 router.delete("/:id", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(projectController_1.removeProject));
 router.post("/:id/state", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(projectController_1.saveProjectState));
+router.patch("/:id/state", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(projectController_1.saveProjectState));
 exports.default = router;

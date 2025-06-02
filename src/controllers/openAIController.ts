@@ -245,6 +245,18 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         fs.writeFileSync(path.join(projectDir, "terraform.tf"), parsedResponse.code);
         // Save the documentation
         fs.writeFileSync(path.join(projectDir, "README.md"), parsedResponse.documentation);
+
+        // Save infraCode to the project
+        try {
+          const { getProjectById, saveProject } = await import("../utils/projectFileStore");
+          const project = await getProjectById(projectId);
+          if (project) {
+            project.infraCode = parsedResponse.code;
+            await saveProject(project);
+          }
+        } catch (err) {
+          console.error("[IaC Backend] Error saving infraCode to project:", err);
+        }
       }
 
       res.json(parsedResponse);
@@ -315,8 +327,15 @@ const parseGenericResponse = (response: string) => {
 
 export const generateApplicationCode = async (req: Request, res: Response): Promise<void> => {
   console.log("[App Code Backend] Received request to generate application code");
-  const { prompt, projectId, umlDiagrams } = req.body;
-  console.log("[App Code Backend] Request body:", { prompt, projectId, umlDiagrams });
+  console.log("[App Code Backend] Request body:", JSON.stringify(req.body, null, 2));
+  const { prompt, projectId, umlDiagrams, documentation, infraCode } = req.body;
+  console.log("[App Code Backend] Extracted data:", {
+    prompt,
+    projectId,
+    hasUmlDiagrams: !!umlDiagrams,
+    hasDocumentation: !!documentation,
+    hasInfraCode: !!infraCode
+  });
 
   if (!prompt) {
     console.log("[App Code Backend] Missing prompt in request");
@@ -326,66 +345,42 @@ export const generateApplicationCode = async (req: Request, res: Response): Prom
 
   try {
     console.log("[App Code Backend] Constructing system prompt");
-    const systemPrompt = `You are an AI assistant that generates production-ready application code based on UML diagrams.
+    const systemPrompt = `You are an expert software engineer AI assistant.
 
-Your task is to generate application code that implements the system design shown in the UML diagrams.
+Your task is to generate production-ready, feature-complete application code based on the following context. 
+You must implement ALL features, business logic, and integrations described in the prompt, UML diagrams, and documentation. 
+Do NOT generate placeholder, mock, or trivial code. 
+Every function, API, and component must have real, working logic, including error handling, data validation, and integration between frontend and backend.
 
-**IMPORTANT INSTRUCTIONS:**
-1. Analyze the provided UML diagrams (component, sequence, class) to understand the system architecture
-2. Generate code that implements the components, interactions, and data structures shown in the diagrams
-3. Follow best practices for the specified technology stack
-4. Include proper error handling, logging, and documentation
-5. Return ONLY a raw JSON object, with no markdown formatting, code blocks, or extra text
-6. Do not wrap the response in \`\`\`json or any other markdown formatting
-
-The JSON object must have these fields:
-- "frontend": object containing frontend code files
-  - "components": object mapping component names to their code
-  - "pages": object mapping page names to their code
-  - "utils": object mapping utility function names to their code
-- "backend": object containing backend code files
-  - "controllers": object mapping controller names to their code
-  - "models": object mapping model names to their code
-  - "routes": object mapping route names to their code
-  - "utils": object mapping utility function names to their code
-- "documentation": string containing Markdown documentation for the application
-
-**Example output format (return exactly this format, no markdown):**
+Return ONLY a JSON object with this structure:
 {
   "frontend": {
-    "components": {
-      "UserProfile.tsx": "import React from 'react';\n...",
-      "PostList.tsx": "import React from 'react';\n..."
-    },
-    "pages": {
-      "Home.tsx": "import React from 'react';\n...",
-      "Profile.tsx": "import React from 'react';\n..."
-    },
-    "utils": {
-      "api.ts": "export const fetchData = async () => {\n...",
-      "auth.ts": "export const login = async () => {\n..."
-    }
+    "components": { ... },
+    "pages": { ... },
+    "utils": { ... }
   },
   "backend": {
-    "controllers": {
-      "userController.ts": "export const getUser = async (req, res) => {\n...",
-      "postController.ts": "export const createPost = async (req, res) => {\n..."
-    },
-    "models": {
-      "User.ts": "export interface User {\n...",
-      "Post.ts": "export interface Post {\n..."
-    },
-    "routes": {
-      "userRoutes.ts": "import express from 'express';\n...",
-      "postRoutes.ts": "import express from 'express';\n..."
-    },
-    "utils": {
-      "db.ts": "export const connectDB = async () => {\n...",
-      "auth.ts": "export const verifyToken = async (token) => {\n..."
-    }
+    "controllers": { ... },
+    "models": { ... },
+    "routes": { ... },
+    "utils": { ... }
   },
-  "documentation": "# Application Documentation\n..."
-}`;
+  "documentation": "markdown documentation here"
+}
+
+DO NOT include any markdown formatting, code blocks, or explanatory text. Return ONLY the raw JSON object.
+
+Context for code generation:
+Prompt: ${prompt}
+
+UML Diagrams:
+${JSON.stringify(umlDiagrams, null, 2)}
+
+Documentation:
+${documentation || "No documentation provided."}
+
+Infrastructure Code:
+${infraCode || "No infrastructure code provided."}`;
 
     console.log("[App Code Backend] Sending request to OpenAI");
     const response = await openai.chat.completions.create({
@@ -509,6 +504,18 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
 
         // Save documentation
         fs.writeFileSync(path.join(projectDir, "README.md"), parsedResponse.documentation);
+
+        // Save appCode to the project
+        try {
+          const { getProjectById, saveProject } = await import("../utils/projectFileStore");
+          const project = await getProjectById(projectId);
+          if (project) {
+            project.appCode = parsedResponse;
+            await saveProject(project);
+          }
+        } catch (err) {
+          console.error("[App Code Backend] Error saving appCode to project:", err);
+        }
       }
 
       res.json(parsedResponse);
