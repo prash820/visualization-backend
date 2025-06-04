@@ -6,7 +6,7 @@
     "dev": "ts-node-dev src/server.ts",
     "build": "tsc && node build.js",
     "start": "node dist/server.js",
-    "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js && npx puppeteer browsers install chrome && cp visualization-backend/src/utils/aws-logo-names.txt visualization-backend/dist/utils/aws-logo-names.txt"
+    "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js && npx puppeteer browsers install chrome && cp ~/src/utils/aws-logo-names.txt ~/dist/utils/aws-logo-names.txt"
   },
   "keywords": [],
   "author": "",
