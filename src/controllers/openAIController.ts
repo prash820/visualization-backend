@@ -345,30 +345,35 @@ export const generateApplicationCode = async (req: Request, res: Response): Prom
 
   try {
     console.log("[App Code Backend] Constructing system prompt");
-    const systemPrompt = `You are an expert software engineer AI assistant.
+    const systemPrompt = `You are an expert fullstack developer and technical writer.
 
-Your task is to generate production-ready, feature-complete application code based on the following context. 
-You must implement ALL features, business logic, and integrations described in the prompt, UML diagrams, and documentation. 
-Do NOT generate placeholder, mock, or trivial code. 
-Every function, API, and component must have real, working logic, including error handling, data validation, and integration between frontend and backend.
+Given the following app idea and context, generate a complete, production-ready codebase for both the frontend and backend, using best practices. Your response must include:
 
-Return ONLY a JSON object with this structure:
+- **Frontend**: All necessary components, pages, and utility functions, organized in a way that is ready to use in a modern React (or your stack) application.
+- **Backend**: All necessary controllers, models, routes, and utility functions, organized for a Node.js/Express (or your stack) backend.
+- **Documentation**: A clear, concise README or documentation that explains how to run, build, and use the app.
+
+**Response format (JSON):**
 {
   "frontend": {
-    "components": { ... },
-    "pages": { ... },
-    "utils": { ... }
+    "components": { "ComponentName": "code..." },
+    "pages": { "PageName": "code..." },
+    "utils": { "utilName": "code..." }
   },
   "backend": {
-    "controllers": { ... },
-    "models": { ... },
-    "routes": { ... },
-    "utils": { ... }
+    "controllers": { "ControllerName": "code..." },
+    "models": { "ModelName": "code..." },
+    "routes": { "RouteName": "code..." },
+    "utils": { "utilName": "code..." }
   },
-  "documentation": "markdown documentation here"
+  "documentation": "README or usage instructions here"
 }
 
-DO NOT include any markdown formatting, code blocks, or explanatory text. Return ONLY the raw JSON object.
+**Important:**
+- Do NOT return empty objects. If a section is not needed, omit it.
+- Each code section should contain real, working code (not just placeholders).
+- Documentation should be clear and actionable.
+- DO NOT include any markdown formatting, code blocks, or explanatory text. Return ONLY the raw JSON object.
 
 Context for code generation:
 Prompt: ${prompt}

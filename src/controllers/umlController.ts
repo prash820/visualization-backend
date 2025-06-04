@@ -20,6 +20,7 @@ export const generateUmlDiagrams = async (req: Request, res: Response): Promise<
   try {
     // Generate and parse diagrams
     const aiResponse = await generateUmlFromPrompt(prompt);
+    
     const project = await getProjectById(projectId);
     if (!project) {
       res.status(404).json({ error: 'Project not found' });
