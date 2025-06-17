@@ -61,90 +61,162 @@ export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams
           Diagram Type Guidelines:
 
           1. Class Diagram Rules:
-             - Use proper Mermaid class diagram syntax
-             - Class definition: class ClassName { attributes and methods }
-             - Attributes: +public, -private, #protected
-             - Methods: +methodName(param: type): returnType
-             - Relationships:
-               * Inheritance: ClassA <|-- ClassB
-               * Composition: ClassA *-- ClassB
-               * Aggregation: ClassA o-- ClassB
-               * Association: ClassA --> ClassB
-               * Dependency: ClassA ..> ClassB
-             - Multiplicity: ClassA "1" -- "0..*" ClassB
-             - Enums: enum EnumName { value1, value2 }
-             - Example:
-             \`\`\`mermaid
-             classDiagram
-                 class User {
-                     +String name
-                     +String email
-                     -String password
-                     +login(): boolean
-                 }
-                 class Admin {
-                     +String role
-                     +manageUsers(): void
-                 }
-                 User <|-- Admin
-                 User "1" -- "0..*" Post
-             \`\`\`
+             Class diagrams represent the structure of software classes, their properties, methods, and relationships. When using Mermaid, follow these rules:
+
+            Use the correct declaration: Start with classDiagram.
+
+            Define classes using the class ClassName syntax. Use PascalCase for class names.
+
+            Properties and methods:
+
+            Use + for public, - for private, # for protected.
+
+            Syntax: +propertyName: Type, +methodName(param: Type): ReturnType
+
+            Relationships:
+
+            Inheritance: ClassA <|-- ClassB
+
+            Association: ClassA --> ClassB
+
+            Aggregation: ClassA o-- ClassB
+
+            Composition: ClassA *-- ClassB
+
+            Dependency: ClassA ..> ClassB
+
+            Use class blocks to define attributes and methods inline:
+
+            \`\`\`mermaid
+            class User {
+              +id: int
+              +name: string
+              +login(): boolean
+            }
+            \`\`\`
+            Keep labels short and meaningful. Avoid generic names like Class1, DataModel.
+
+            Example:
+
+            \`\`\`mermaid
+            classDiagram
+              class User {
+                +id: int
+                +name: string
+                +login(): boolean
+              }
+              class Admin {
+                +accessLevel: int
+              }
+              User <|-- Admin
+            \`\`\`
+            Use this format to create readable and consistent object-oriented diagrams.
 
           2. Sequence Diagram Rules:
-             - Use proper Mermaid sequence diagram syntax
-             - Participants: participant Name
-             - Messages: Name1->>Name2: message
-             - Activation: activate/deactivate
-             - Notes: Note over Name: text
-             - Example:
-             \`\`\`mermaid
-             sequenceDiagram
-                 participant U as User
-                 participant A as Auth
-                 participant D as Database
-                 U->>A: login(credentials)
-                 activate A
-                 A->>D: validateUser(credentials)
-                 D-->>A: userData
-                 A-->>U: token
-                 deactivate A
-             \`\`\`
+            Sequence diagrams show how objects or components interact over time. Follow these rules when generating them using Mermaid:
 
-          3. ER Diagram Rules:
-             - Use proper Mermaid ER diagram syntax
-             - Entities: ENTITY_NAME { attributes }
-             - Relationships: ENTITY1 {relationship} ENTITY2
-             - Cardinality: |o, ||, }o, }|
-             - Example:
-             \`\`\`mermaid
-             erDiagram
-                 USER ||--o{ ORDER : places
-                 ORDER ||--|{ ORDER_ITEM : contains
-                 PRODUCT ||--o{ ORDER_ITEM : includes
-             \`\`\`
+            Use the correct declaration: Start with sequenceDiagram.
 
-          4. Component Diagram Rules:
-             - Use proper Mermaid flowchart syntax
-             - Components: [Component Name]
-             - Interfaces: (Interface Name)
-             - Dependencies: -->, -.->, ==>>
-             - Example:
-             \`\`\`mermaid
-             flowchart TB
-                 subgraph Frontend
-                     [Web App]
-                     [Mobile App]
-                 end
-                 subgraph Backend
-                     [API Gateway]
-                     [Auth Service]
-                     [User Service]
-                 end
-                 [Web App] --> [API Gateway]
-                 [Mobile App] --> [API Gateway]
-                 [API Gateway] --> [Auth Service]
-                 [API Gateway] --> [User Service]
-             \`\`\`
+            Define participants using participant, actor, or autonumber for labeled steps.
+
+            Message syntax:
+
+            Synchronous: A->>B: Message
+
+            Asynchronous: A->>+B: Start Call
+
+            Response/Return: B-->>A: Response
+
+            Activation: activate B / deactivate B
+
+            Use Note to annotate timelines:
+
+            Note right of A: note content
+
+            Note over A,B: shared note
+
+            Avoid unnecessary actors. Label each participant with a meaningful name (e.g., User, AuthService, DB).
+
+            Indicate lifelines properly and avoid bidirectional confusion.
+
+            Example:
+
+            \`\`\`mermaid
+            sequenceDiagram
+              participant User
+              participant WebApp
+              participant API
+              participant DB
+
+              User->>WebApp: Clicks Login
+              WebApp->>API: Sends Credentials
+              API->>DB: Query User
+              DB-->>API: User Data
+              API-->>WebApp: Auth Token
+              WebApp-->>User: Login Successful
+            \`\`\`
+            Use this format for readable, time-ordered interaction flows between components.
+
+          3. Component Diagram Rules:
+             Component diagrams help visualize the structure and interactions between software components in a system. The following rules should be followed when generating component diagrams using Mermaid syntax.
+
+              Use the correct Mermaid declaration: Start with flowchart TB for top-down or flowchart LR for left-to-right layout.
+
+              Group related components using subgraph: Subgraphs logically group components like Frontend, Backend, or Storage. Do not nest subgraphs. Use Title Case for subgraph names.
+
+              Node types:
+
+              Components: Represent using square brackets, e.g., [User Service]. Use short, descriptive, and Title Case labels.
+
+              Interfaces (optional): Use parentheses, e.g., (User API), to show exposed interfaces.
+
+              External systems/databases (optional): Also use [Label], and distinguish using naming or placement in dedicated subgraphs.
+
+              Connection types (dependencies):
+
+              --> for direct dependency. Example: [Client App] --> [API Gateway]
+
+              -.-> for optional or indirect dependency. Example: [Service A] -.-> [Cache Layer]
+
+              ==>> for strong or event-based dependency. Example: [Order Service] ==>> [Event Stream]
+
+              Layout tips: Choose TB or LR for directional clarity. Use subgraphs to separate frontends, backends, databases, and third-party services. Maintain logical flow (e.g., clients → APIs → services → databases).
+
+              Naming conventions: Use meaningful, concise names like Auth Service or Event Broker. Avoid vague labels like System 1.
+
+              Example:
+
+              \`\`\`mermaid
+              flowchart TB
+                subgraph Frontend
+                  [Web App]
+                  [Mobile App]
+                end
+                subgraph Backend
+                  [API Gateway]
+                  [Auth Service]
+                  [User Service]
+                  [Notification Service]
+                end
+                subgraph Storage
+                  [PostgreSQL Database]
+                  [S3 Bucket]
+                end
+                subgraph Auth
+                  [Cognito]
+                end
+                [Web App] --> [API Gateway]
+                [Mobile App] --> [API Gateway]
+                [API Gateway] --> [Auth Service]
+                [API Gateway] --> [User Service]
+                [API Gateway] --> [Notification Service]
+                [User Service] --> [PostgreSQL Database]
+                [Notification Service] --> [S3 Bucket]
+                [Auth Service] --> [Cognito]
+                \`\`\`
+              Use this structure to ensure clarity, maintainability, and visual consistency across all generated component diagrams.
+
+          4. Architecture Diagram Rules:
 
           \`\`\`mermaid
           architecture-beta
@@ -300,7 +372,7 @@ export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams
           content: prompt
         }
       ],
-      temperature: 0.7,
+      temperature: 0.5,
     });
 
     const response = completion.choices[0].message?.content;
