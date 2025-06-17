@@ -8,7 +8,6 @@ export const sanitizeAndValidateMermaidCode = (rawCode: string, diagramType: str
       "classDiagram",
       "stateDiagram",
       "gantt",
-      "erDiagram",
       "journey",
       "pie",
       "requirementDiagram",
