@@ -1,12 +1,14 @@
 import React from 'react';
 
-export default function SneakerCard({ sneaker, onAddToCart }) {
+function SneakerCard({ sneaker }) {
   return (
-    <div className='sneaker-card'>
+    <div>
       <img src={sneaker.getImage()} alt={sneaker.name} />
       <h3>{sneaker.name}</h3>
       <p>${sneaker.price}</p>
-      <button onClick={() => onAddToCart(sneaker)}>Add to Cart</button>
+      <button>Add to Cart</button>
     </div>
   );
 }
+
+export default SneakerCard;

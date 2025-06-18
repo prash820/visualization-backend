@@ -1,0 +1,25 @@
+import React, { useState, useEffect } from 'react';
+import Navbar from '../components/Navbar';
+import SneakerCard from '../components/SneakerCard';
+import { fetchSneakers } from '../utils/api';
+
+function SneakerPage() {
+  const [sneakers, setSneakers] = useState([]);
+
+  useEffect(() => {
+    fetchSneakers().then(setSneakers);
+  }, []);
+
+  return (
+    <div>
+      <Navbar />
+      <div>
+        {sneakers.map((sneaker) => (
+          <SneakerCard key={sneaker.id} sneaker={sneaker} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default SneakerPage;

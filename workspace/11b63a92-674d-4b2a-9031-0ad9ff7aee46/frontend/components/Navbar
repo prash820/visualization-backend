@@ -1,0 +1,15 @@
+import React from 'react';
+
+function Navbar() {
+  return (
+    <nav>
+      <ul>
+        <li><a href='/'>Home</a></li>
+        <li><a href='/sneakers'>Sneakers</a></li>
+        <li><a href='/cart'>Cart</a></li>
+      </ul>
+    </nav>
+  );
+}
+
+export default Navbar;

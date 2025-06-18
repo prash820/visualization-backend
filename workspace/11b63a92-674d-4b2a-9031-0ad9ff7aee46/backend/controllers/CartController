@@ -1,0 +1,16 @@
+const ShoppingCart = require('../models/ShoppingCart');
+
+exports.addItemToCart = async (req, res) => {
+  const { userId, sneakerId, quantity } = req.body;
+  const cart = await ShoppingCart.findOne({ userId });
+  cart.addItem(sneakerId, quantity);
+  await cart.save();
+  res.status(201).send('Item added to cart');
+};
+
+exports.checkout = async (req, res) => {
+  const { userId } = req.body;
+  const cart = await ShoppingCart.findOne({ userId });
+  const order = await cart.checkout();
+  res.json(order);
+};

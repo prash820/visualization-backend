@@ -159,122 +159,85 @@ export const generateVisualization = async (req: Request, res: Response) => {
   }
 };
 
-export const generateIaC = async (req: Request, res: Response): Promise<void> => {
-  console.log("[IaC Backend] Received request to generate infrastructure code");
-  const { prompt, projectId, umlDiagrams } = req.body;
-  console.log("[IaC Backend] Request body:", { prompt, projectId, umlDiagrams });
+// In-memory job store for IaC jobs
+const iacJobs: Record<string, { status: string; progress: number; result?: any; error?: string }> = {};
 
+function generateJobId() {
+  return `iac-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+}
+
+export const generateIaC = async (req: Request, res: Response): Promise<void> => {
+  const { prompt, projectId, umlDiagrams } = req.body;
   if (!prompt) {
-    console.log("[IaC Backend] Missing prompt in request");
     res.status(400).json({ error: "Prompt is required" });
     return;
   }
+  const jobId = generateJobId();
+  iacJobs[jobId] = { status: "pending", progress: 0 };
+  // Start background job
+  processIaCJob(jobId, prompt, projectId, umlDiagrams);
+  res.json({ jobId, status: "accepted" });
+};
 
+async function processIaCJob(jobId: string, prompt: string, projectId: string, umlDiagrams: any) {
   try {
-    console.log("[IaC Backend] Constructing system prompt");
-    // Construct a strict system prompt that requires only a JSON object in the response
-    const systemPrompt = `You are an AI assistant that generates Infrastructure as Code (IaC) using Terraform.
-
-Your task is to generate production-ready Terraform code for the user's project, based on their prompt and UML diagrams.
-
-**IMPORTANT INSTRUCTIONS:**
-1. Analyze the provided UML diagrams to understand the system architecture
-2. Generate Terraform code that exactly matches the components and relationships shown in the diagrams
-3. Include all necessary AWS services shown in the diagrams (e.g., API Gateway, Lambda, S3, DynamoDB, Cognito)
-4. Set up proper IAM roles and permissions for service interactions
-5. Configure security groups and network access as needed
-6. Return ONLY a raw JSON object, with no markdown formatting, code blocks, or extra text
-7. Do not wrap the response in \`\`\`json or any other markdown formatting
-
-The JSON object must have two fields:
-- "code": a string containing the complete Terraform code (all files concatenated, with clear file boundaries as comments)
-- "documentation": a string containing Markdown documentation for the infrastructure
-
-**Example output format (return exactly this format, no markdown):**
-{
-  "code": "// main.tf\n...\n// variables.tf\n...\n",
-  "documentation": "# Infrastructure Documentation\n..."
-}`;
-
-    console.log("[IaC Backend] Sending request to OpenAI");
+    iacJobs[jobId] = { status: "processing", progress: 10 };
+    const systemPrompt = `You are an AI assistant that generates Infrastructure as Code (IaC) using Terraform.\n\nYour task is to generate production-ready Terraform code for the user's project, based on their prompt and UML diagrams.\n\n**IMPORTANT INSTRUCTIONS:**\n1. Analyze the provided UML diagrams to understand the system architecture\n2. Generate Terraform code that exactly matches the components and relationships shown in the diagrams\n3. Include all necessary AWS services shown in the diagrams (e.g., API Gateway, Lambda, S3, DynamoDB, Cognito)\n4. Set up proper IAM roles and permissions for service interactions\n5. Configure security groups and network access as needed\n6. Return ONLY a raw JSON object, with no markdown formatting, code blocks, or extra text\n7. Do not wrap the response in \`json or any other markdown formatting\n\nThe JSON object must have two fields:\n- \"code\": a string containing the complete Terraform code (all files concatenated, with clear file boundaries as comments)\n- \"documentation\": a string containing Markdown documentation for the infrastructure\n\n**Example output format (return exactly this format, no markdown):**\n{\n  \"code\": \"// main.tf\\n...\\n// variables.tf\\n...\\n\",\n  \"documentation\": \"# Infrastructure Documentation\\n...\"\n}`;
+    iacJobs[jobId].progress = 20;
     const response = await openai.chat.completions.create({
       model: "gpt-4-0125-preview",
       messages: [
         { role: "system", content: systemPrompt },
-        { 
-          role: "user", 
-          content: `Generate infrastructure code for the following system:
-          
-Prompt: ${prompt}
-
-UML Diagrams:
-${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).join('\n\n')}`
+        {
+          role: "user",
+          content: `Generate infrastructure code for the following system:\n\nPrompt: ${prompt}\n\nUML Diagrams:\n${Object.entries(umlDiagrams || {}).map(([name, content]) => `${name}:\n${content}`).join('\n\n')}`
         },
       ],
       max_tokens: 4096,
       temperature: 0.5,
     });
-
-    console.log("[IaC Backend] Received response from OpenAI");
+    iacJobs[jobId].progress = 60;
     const fullResponse = response.choices[0]?.message?.content || "";
-    console.log("[IaC Backend] Full response:", fullResponse);
-
-    try {
-      // Clean the response by removing any markdown formatting
-      const cleanedResponse = fullResponse
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-
-      const parsedResponse = JSON.parse(cleanedResponse);
-      console.log("[IaC Backend] Parsed response:", parsedResponse);
-
-      // Validate the response structure
-      if (!parsedResponse.code || !parsedResponse.documentation) {
-        throw new Error("Response missing required fields: code and documentation");
-      }
-
-      // Save the generated code to a file if projectId is provided
-      if (projectId) {
-        const projectDir = path.join(process.cwd(), "workspace", projectId);
-        if (!fs.existsSync(projectDir)) {
-          fs.mkdirSync(projectDir, { recursive: true });
-        }
-
-        // Save the Terraform code
-        fs.writeFileSync(path.join(projectDir, "terraform.tf"), parsedResponse.code);
-        // Save the documentation
-        fs.writeFileSync(path.join(projectDir, "README.md"), parsedResponse.documentation);
-
-        // Save infraCode to the project
-        try {
-          const { getProjectById, saveProject } = await import("../utils/projectFileStore");
-          const project = await getProjectById(projectId);
-          if (project) {
-            project.infraCode = parsedResponse.code;
-            await saveProject(project);
-          }
-        } catch (err) {
-          console.error("[IaC Backend] Error saving infraCode to project:", err);
-        }
-      }
-
-      res.json(parsedResponse);
-    } catch (error: unknown) {
-      console.error("[IaC Backend] Error parsing response:", error);
-      res.status(500).json({ 
-        error: "Failed to parse AI response",
-        details: error instanceof Error ? error.message : "Unknown error",
-        rawResponse: fullResponse
-      });
+    const cleanedResponse = fullResponse
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+    const parsedResponse = JSON.parse(cleanedResponse);
+    if (!parsedResponse.code || !parsedResponse.documentation) {
+      throw new Error("Response missing required fields: code and documentation");
     }
-  } catch (error: unknown) {
-    console.error("[IaC Backend] Error generating IaC:", error);
-    res.status(500).json({ 
-      error: "Failed to generate infrastructure code",
-      details: error instanceof Error ? error.message : "Unknown error"
-    });
+    // Save the generated code to a file if projectId is provided
+    if (projectId) {
+      const projectDir = path.join(process.cwd(), "workspace", projectId);
+      if (!fs.existsSync(projectDir)) {
+        fs.mkdirSync(projectDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(projectDir, "terraform.tf"), parsedResponse.code);
+      fs.writeFileSync(path.join(projectDir, "README.md"), parsedResponse.documentation);
+      try {
+        const { getProjectById, saveProject } = await import("../utils/projectFileStore");
+        const project = await getProjectById(projectId);
+        if (project) {
+          project.infraCode = parsedResponse.code;
+          await saveProject(project);
+        }
+      } catch (err) {
+        console.error("[IaC Backend] Error saving infraCode to project:", err);
+      }
+    }
+    iacJobs[jobId] = { status: "completed", progress: 100, result: parsedResponse };
+  } catch (error: any) {
+    iacJobs[jobId] = { status: "failed", progress: 100, error: error.message || "Unknown error" };
   }
+}
+
+export const getIaCJobStatus = async (req: Request, res: Response): Promise<void> => {
+  const { jobId } = req.params;
+  if (!jobId || !iacJobs[jobId]) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.json(iacJobs[jobId]);
 };
 
 const parseArchitectureResponse = (response: string): ArchitectureResponse => {

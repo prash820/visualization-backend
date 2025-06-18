@@ -1,7 +1,7 @@
-export const fetchSneakers = async () => {
+export async function fetchSneakers() {
   const response = await fetch('/api/sneakers');
   if (!response.ok) {
-    throw new Error('Network response was not ok');
+    throw new Error('Network response was not ok.');
   }
-  return await response.json();
-};
+  return response.json();
+}

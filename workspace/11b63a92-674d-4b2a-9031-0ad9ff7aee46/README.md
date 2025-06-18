@@ -1,16 +1,14 @@
 To run the application:
+1. Frontend:
+   - Navigate to the frontend directory.
+   - Run 'npm install' to install dependencies.
+   - Run 'npm start' to start the development server.
+   - The application should now be running on http://localhost:3000.
+2. Backend:
+   - Navigate to the backend directory.
+   - Run 'npm install' to install dependencies.
+   - Create a .env file and set MONGODB_URI to your MongoDB connection string.
+   - Run 'npm run dev' to start the server.
+   - The API should now be accessible on http://localhost:5000.
 
-Frontend:
-1. Navigate to the frontend directory.
-2. Run 'npm install' to install dependencies.
-3. Run 'npm start' to start the development server.
-
-Backend:
-1. Navigate to the backend directory.
-2. Run 'npm install' to install dependencies.
-3. Setup MongoDB connection string in your environment variables.
-4. Run 'npm run dev' to start the server.
-
-API Endpoints:
-GET /api/sneakers - Fetches all sneakers.
-POST /api/checkout - Processes checkout.
+Note: Ensure AWS services are configured as per the infrastructure code provided.

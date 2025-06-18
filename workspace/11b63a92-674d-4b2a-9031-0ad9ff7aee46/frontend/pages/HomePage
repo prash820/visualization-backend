@@ -1,32 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import SneakerCard from '../components/SneakerCard';
-import Cart from '../components/Cart';
+import React from 'react';
+import Navbar from '../components/Navbar';
 
-export default function HomePage() {
-  const [sneakers, setSneakers] = useState([]);
-  const [cart, setCart] = useState([]);
-
-  useEffect(() => {
-    // Fetch sneakers from API
-  }, []);
-
-  const addToCart = (sneaker) => {
-    setCart([...cart, sneaker]);
-  };
-
-  const checkout = () => {
-    // Handle checkout
-  };
-
+function HomePage() {
   return (
     <div>
-      <h1>Sneaker Drops</h1>
-      <div className='sneaker-grid'>
-        {sneakers.map(sneaker => (
-          <SneakerCard key={sneaker.id} sneaker={sneaker} onAddToCart={addToCart} />
-        ))}
-      </div>
-      <Cart cartItems={cart} onCheckout={checkout} />
+      <Navbar />
+      <h1>Welcome to Our Sneaker Store</h1>
     </div>
   );
 }
+
+export default HomePage;

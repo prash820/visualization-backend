@@ -72,7 +72,7 @@ app.use(
     origin: "*",
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "X-Client-Version"],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "FETCH"],
   })
 );
 
