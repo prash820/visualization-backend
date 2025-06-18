@@ -1,0 +1,17 @@
+exports.getSneakers = async (req, res) => {
+  try {
+    // Logic to fetch sneakers from database
+    res.json(sneakers);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+};
+
+exports.checkout = async (req, res) => {
+  try {
+    // Logic to handle checkout
+    res.status(200).send({ message: 'Checkout successful' });
+  } catch (error) {
+    res.status(500).send(error);
+  }
+};

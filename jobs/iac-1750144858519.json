@@ -1,0 +1,73 @@
+{
+  "id": "iac-1750144858519",
+  "status": "completed",
+  "progress": 100,
+  "createdAt": "2025-06-17T07:20:58.519Z",
+  "projectId": "270b24bc-8f66-4f20-86e4-d66810c68f6d",
+  "prompt": "MealMuse is an intelligent meal planning app that uses AI to generate personalized recipes and weekly plans based on your taste preferences, dietary restrictions, and available ingredients. Whether you're vegan, keto, diabetic, or just trying to eat healthier, MealMuse adapts to your lifestyle in seconds. \n\nUsers begin by selecting their dietary goals, favorite cuisines, disliked ingredients, and how much time they usually have to cook. From there, MealMuse creates a tailored weekly menu, complete with easy-to-follow recipes, portion guidance, and a smart shopping list. The app also supports pantry syncing — input what’s in your kitchen, and it recommends dishes you can cook right now.\n\nIntegrated calorie and macro tracking makes it a helpful tool for fitness and health goals. Plus, MealMuse learns with each use — the more you cook and rate meals, the better it gets at predicting what you'll love.\n\nAdditional features include integration with grocery delivery services, voice-guided cooking mode, and options for batch cooking or single servings.\n\nMealMuse is not just a recipe app — it’s your AI-powered kitchen companion designed to save time, reduce food waste, and make healthy eating intuitive, personalized, and enjoyable. ",
+  "umlDiagrams": {
+    "class": "classDiagram\n  class User {\n    +id: int\n    +name: string\n    +email: string\n    +setPreferences(diet: string, cuisines: list, dislikes: list, cookTime: int): void\n    +syncPantry(ingredients: list): void\n    +rateMeal(mealId: int, rating: float): void\n  }\n\n  class MealMuse {\n    +generateMenu(user: User): Menu\n    +trackCalories(user: User): void\n    +recommendDishes(user: User): list\n  }\n\n  class Menu {\n    +weeklyPlan: list\n    +shoppingList: list\n    +getRecipes(): list\n  }\n\n  class Recipe {\n    +title: string\n    +ingredients: list\n    +instructions: string\n    +portionSize: int\n    +calories: int\n    +macros: dict\n  }\n\n  class GroceryDeliveryService {\n    +orderGroceries(shoppingList: list): void\n  }\n\n  User --> MealMuse\n  MealMuse --> Menu\n  Menu --> Recipe\n  MealMuse ..> GroceryDeliveryService",
+    "sequence": "sequenceDiagram\n  participant User\n  participant MealMuse\n  participant AIEngine\n  participant GroceryDeliveryService\n\n  User->>MealMuse: Set Preferences\n  MealMuse->>AIEngine: Generate Menu\n  AIEngine-->>MealMuse: Return Menu\n  MealMuse-->>User: Provide Weekly Menu\n\n  User->>MealMuse: Sync Pantry\n  MealMuse->>AIEngine: Recommend Dishes\n  AIEngine-->>MealMuse: Return Dish Recommendations\n  MealMuse-->>User: Suggest Dishes\n\n  User->>MealMuse: Order Groceries\n  MealMuse->>GroceryDeliveryService: Send Order\n  GroceryDeliveryService-->>User: Confirm Order",
+    "component": "flowchart TB\n  subgraph UserInterface\n    mobileApp[Mobile App]\n    webApp[Web App]\n  end\n\n  subgraph Backend\n    aiEngine[AI Engine]\n    recipeService[Recipe Service]\n    userService[User Service]\n    pantryService[Pantry Service]\n    calorieTracker[Calorie Tracker]\n  end\n\n  subgraph ExternalServices\n    groceryService[Grocery Delivery Service]\n  end\n\n  UserInterface --> Backend\n  aiEngine --> recipeService\n  userService --> aiEngine\n  pantryService --> aiEngine\n  calorieTracker --> aiEngine\n  Backend --> ExternalServices",
+    "architecture": "architecture-beta\n  group UserInterface(logos:aws-amplify)[User Interface]\n    service mobileApp(logos:aws-mobilehub)[Mobile App] in UserInterface\n    service webApp(logos:aws-cloudfront)[Web App] in UserInterface\n  end\n\n  group Backend(logos:aws-lambda)[Backend]\n    service aiEngine(logos:aws-sagemaker)[AI Engine] in Backend\n    service recipeService(logos:aws-lambda)[Recipe Service] in Backend\n    service userService(logos:aws-dynamodb)[User Service] in Backend\n    service pantryService(logos:aws-lambda)[Pantry Service] in Backend\n    service calorieTracker(logos:aws-lambda)[Calorie Tracker] in Backend\n  end\n\n  group ExternalServices(logos:aws-api-gateway)[External Services]\n    service groceryService(logos:aws-appsync)[Grocery Delivery Service] in ExternalServices\n  end\n\n  mobileApp:R --> L:webApp\n  webApp:R --> L:aiEngine\n  aiEngine:R --> L:recipeService\n  aiEngine:R --> L:userService\n  aiEngine:R --> L:pantryService\n  aiEngine:R --> L:calorieTracker\n  aiEngine:R --> L:groceryService"
+  },
+  "result": {
+    "code": "resource \"aws_lambda_function\" \"ai_engine\" {\n  filename      = \"ai_engine.zip\"\n  function_name = \"ai_engine\"\n  role          = aws_iam_role.ai_lambda.arn\n  handler       = \"exports.handler\"\n  source_code_hash = filebase64sha256(\"ai_engine.zip\")\n  runtime       = \"nodejs12.x\"\n}\n\nresource \"aws_lambda_function\" \"recipe_service\" {\n  filename      = \"recipe_service.zip\"\n  function_name = \"recipe_service\"\n  role          = aws_iam_role.recipe_lambda.arn\n  handler       = \"exports.handler\"\n  source_code_hash = filebase64sha256(\"recipe_service.zip\")\n  runtime       = \"nodejs12.x\"\n}\n\nresource \"aws_dynamodb_table\" \"user_service\" {\n  name           = \"user_service\"\n  billing_mode   = \"PAY_PER_REQUEST\"\n  hash_key       = \"id\"\n  attribute {\n    name = \"id\"\n    type = \"N\"\n  }\n}\n\nresource \"aws_lambda_function\" \"pantry_service\" {\n  filename      = \"pantry_service.zip\"\n  function_name = \"pantry_service\"\n  role          = aws_iam_role.pantry_lambda.arn\n  handler       = \"exports.handler\"\n  source_code_hash = filebase64sha256(\"pantry_service.zip\")\n  runtime       = \"nodejs12.x\"\n}\n\nresource \"aws_lambda_function\" \"calorie_tracker\" {\n  filename      = \"calorie_tracker.zip\"\n  function_name = \"calorie_tracker\"\n  role          = aws_iam_role.calorie_lambda.arn\n  handler       = \"exports.handler\"\n  source_code_hash = filebase64sha256(\"calorie_tracker.zip\")\n  runtime       = \"nodejs12.x\"\n}\n\nresource \"aws_api_gateway\" \"grocery_service\" {\n  name          = \"grocery_service\"\n  description   = \"API for grocery delivery service\"\n  protocol_type = \"HTTP\"\n}",
+    "documentation": {
+      "overview": "The infrastructure for MealMuse includes AWS Lambda functions for the AI engine, recipe service, pantry service, and calorie tracker. User data is stored in an AWS DynamoDB table. The grocery delivery service is exposed via an AWS API Gateway.",
+      "components": [
+        {
+          "name": "AI Engine",
+          "description": "This AWS Lambda function uses machine learning to generate personalized menus and recommend dishes."
+        },
+        {
+          "name": "Recipe Service",
+          "description": "This AWS Lambda function manages recipe data."
+        },
+        {
+          "name": "User Service",
+          "description": "This DynamoDB table stores user data, including dietary preferences and pantry inventory."
+        },
+        {
+          "name": "Pantry Service",
+          "description": "This AWS Lambda function manages pantry data."
+        },
+        {
+          "name": "Calorie Tracker",
+          "description": "This AWS Lambda function tracks calorie intake."
+        },
+        {
+          "name": "Grocery Delivery Service",
+          "description": "This AWS API Gateway exposes the grocery delivery service."
+        }
+      ],
+      "security": "All AWS Lambda functions are assigned IAM roles with least privilege access. User data in DynamoDB is encrypted at rest. The API Gateway for the grocery delivery service uses HTTPS for secure data transmission.",
+      "outputs": [
+        {
+          "name": "ai_engine_arn",
+          "description": "The ARN of the AI Engine Lambda function."
+        },
+        {
+          "name": "recipe_service_arn",
+          "description": "The ARN of the Recipe Service Lambda function."
+        },
+        {
+          "name": "user_service_table_name",
+          "description": "The name of the User Service DynamoDB table."
+        },
+        {
+          "name": "pantry_service_arn",
+          "description": "The ARN of the Pantry Service Lambda function."
+        },
+        {
+          "name": "calorie_tracker_arn",
+          "description": "The ARN of the Calorie Tracker Lambda function."
+        },
+        {
+          "name": "grocery_service_url",
+          "description": "The URL of the Grocery Delivery Service API Gateway."
+        }
+      ]
+    }
+  }
+}

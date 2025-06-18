@@ -1,0 +1,65 @@
+{
+  "id": "iac-1750145194367",
+  "status": "completed",
+  "progress": 100,
+  "createdAt": "2025-06-17T07:26:34.367Z",
+  "projectId": "e73dba15-ca04-4666-a6a2-a68ee4bf2f03",
+  "prompt": "Create a task management app using aws",
+  "umlDiagrams": {
+    "class": "classDiagram\n    class User {\n      +String userId\n      +String email\n      +login(): Boolean\n      +logout(): Void\n    }\n    class Task {\n      +String taskId\n      +String description\n      +DateTime dueDate\n      +Boolean completed\n      +create(): Task\n      +update(): Boolean\n      +delete(): Void\n    }\n    class NotificationService {\n      +sendNotification(): Void\n    }\n    class AuthenticationService {\n      +authenticateUser(): User\n    }\n    class TaskService {\n      +List~Task~ getAllTasks(): List\n      +getTaskById(): Task\n    }\n    User \"1\" -- \"*\" Task : owns\n    User -- AuthenticationService : uses\n    TaskService -- NotificationService : uses",
+    "sequence": "sequenceDiagram\n    participant User as User\n    participant Auth as Authentication Service\n    participant TaskSvc as Task Service\n    participant DB as DynamoDB\n    participant SNS as Notification Service\n\n    User->>+Auth: Login\n    Auth-->>-User: Authentication Token\n    User->>+TaskSvc: Create Task\n    TaskSvc->>+DB: Save Task\n    DB-->>-TaskSvc: Task Saved\n    TaskSvc->>+SNS: Send Notification\n    SNS-->>-User: Task Creation Notification",
+    "component": "flowchart TB\n    subgraph Frontend\n        web[Web App]\n        mobile[Mobile App]\n    end\n    subgraph API\n        apiGateway[API Gateway]\n        lambda[Lambda Functions]\n    end\n    subgraph Auth\n        cognito[Cognito]\n    end\n    subgraph Storage\n        dynamoDB[DynamoDB]\n    end\n    subgraph Notification\n        sns[SNS]\n    end\n    web --> apiGateway\n    mobile --> apiGateway\n    apiGateway --> lambda\n    lambda --> cognito\n    lambda --> dynamoDB\n    lambda --> sns\n    cognito --> web\n    cognito --> mobile",
+    "architecture": "architecture-beta\n    group frontend(cloud)[Frontend]\n        service web(logos:aws-amplify)[Web App] in frontend\n        service mobile(logos:aws-amplify)[Mobile App] in frontend\n    group auth(logos:aws-cognito)[Auth]\n        service cognito(logos:aws-cognito)[Cognito] in auth\n    group api(logos:aws-api-gateway)[API]\n        service apiGateway(logos:aws-api-gateway)[API Gateway] in api\n    group functions(logos:aws-lambda)[Serverless Functions]\n        service lambda(logos:aws-lambda)[Lambda] in functions\n    group db(logos:aws-dynamodb)[Database]\n        service dynamoDB(logos:aws-dynamodb)[DynamoDB] in db\n    group notifications(logos:aws-sns)[Notifications]\n        service sns(logos:aws-sns)[SNS] in notifications\n\n    web:L --> R:apiGateway\n    mobile:L --> R:apiGateway\n    apiGateway:L --> R:lambda\n    lambda:L --> R:dynamoDB\n    lambda:L --> R:sns\n    lambda:L --> R:cognito"
+  },
+  "result": {
+    "code": "provider \"aws\" {\n  region = \"us-west-2\"\n}\n\nresource \"aws_cognito_user_pool\" \"main\" {\n  name = \"main_user_pool\"\n}\n\nresource \"aws_dynamodb_table\" \"main\" {\n  name     = \"main_table\"\n  hash_key = \"taskId\"\n  attribute {\n    name = \"taskId\"\n    type = \"S\"\n  }\n}\n\nresource \"aws_sns_topic\" \"main\" {\n  name = \"main\"\n}\n\nresource \"aws_lambda_function\" \"main\" {\n  filename      = \"lambda_function_payload.zip\"\n  function_name = \"lambda_function_name\"\n  role          = aws_iam_role.iam_for_lambda.arn\n  handler       = \"exports.test\"\n  source_code_hash = filebase64sha256(\"lambda_function_payload.zip\")\n  runtime       = \"nodejs12.x\"\n}\n\nresource \"aws_api_gateway_rest_api\" \"MyDemoAPI\" {\n  name        = \"MyDemoAPI\"\n  description = \"This is my API for demonstration purposes\"\n}\n\nresource \"aws_iam_role\" \"iam_for_lambda\" {\n  name = \"iam_for_lambda\"\n  assume_role_policy = <<EOF\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Action\": \"sts:AssumeRole\",\n      \"Principal\": {\n        \"Service\": \"lambda.amazonaws.com\"\n      },\n      \"Effect\": \"Allow\",\n      \"Sid\": \"\"\n    }\n  ]\n}\nEOF\n}",
+    "documentation": {
+      "overview": "This is a task management application using AWS services. It consists of a frontend (web and mobile), backend (Lambda functions), Authentication (Cognito), Database (DynamoDB), and Notification service (SNS).",
+      "components": [
+        {
+          "name": "AWS Cognito",
+          "description": "Used for user authentication."
+        },
+        {
+          "name": "AWS DynamoDB",
+          "description": "Used as the main database for storing tasks."
+        },
+        {
+          "name": "AWS SNS",
+          "description": "Used for sending notifications."
+        },
+        {
+          "name": "AWS Lambda",
+          "description": "Used for running backend code without provisioning or managing servers."
+        },
+        {
+          "name": "AWS API Gateway",
+          "description": "Used as a fully managed service that makes it easy for developers to create, publish, maintain, monitor, and secure APIs."
+        }
+      ],
+      "security": "This application uses AWS Cognito for user authentication. All data stored in DynamoDB is encrypted at rest. All communication between services is done through secure HTTPS connections.",
+      "outputs": [
+        {
+          "name": "user_pool_id",
+          "description": "The ID of the Cognito User Pool."
+        },
+        {
+          "name": "dynamodb_table_name",
+          "description": "The name of the DynamoDB table."
+        },
+        {
+          "name": "sns_topic_arn",
+          "description": "The ARN of the SNS Topic."
+        },
+        {
+          "name": "lambda_function_arn",
+          "description": "The ARN of the Lambda function."
+        },
+        {
+          "name": "api_gateway_id",
+          "description": "The ID of the API Gateway."
+        }
+      ]
+    }
+  }
+}

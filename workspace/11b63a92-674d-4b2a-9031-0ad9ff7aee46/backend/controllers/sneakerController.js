@@ -1,0 +1,10 @@
+const Sneaker = require('../models/Sneaker');
+
+exports.getAllSneakers = async (req, res) => {
+  try {
+    const sneakers = await Sneaker.find();
+    res.json(sneakers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

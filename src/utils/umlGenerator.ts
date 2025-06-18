@@ -49,13 +49,13 @@ export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams
           \`\`\`
 
           \`\`\`mermaid
-          erDiagram
-          [Your entity relationship diagram here showing data model]
-          \`\`\`
-
-          \`\`\`mermaid
           flowchart TB
           [Your component diagram here showing system architecture]
+          \`\`\`
+
+           \`\`\`mermaid
+          architecture-beta
+          [Your architecture diagram here showing AWS services and infrastructure]
           \`\`\`
 
           Diagram Type Guidelines:

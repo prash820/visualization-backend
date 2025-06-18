@@ -1,0 +1,32 @@
+import React, { useState, useEffect } from 'react';
+import SneakerCard from '../components/SneakerCard';
+import Cart from '../components/Cart';
+
+export default function HomePage() {
+  const [sneakers, setSneakers] = useState([]);
+  const [cart, setCart] = useState([]);
+
+  useEffect(() => {
+    // Fetch sneakers from API
+  }, []);
+
+  const addToCart = (sneaker) => {
+    setCart([...cart, sneaker]);
+  };
+
+  const checkout = () => {
+    // Handle checkout
+  };
+
+  return (
+    <div>
+      <h1>Sneaker Drops</h1>
+      <div className='sneaker-grid'>
+        {sneakers.map(sneaker => (
+          <SneakerCard key={sneaker.id} sneaker={sneaker} onAddToCart={addToCart} />
+        ))}
+      </div>
+      <Cart cartItems={cart} onCheckout={checkout} />
+    </div>
+  );
+}

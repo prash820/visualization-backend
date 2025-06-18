@@ -420,10 +420,21 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
       const parsedResponse = JSON.parse(cleanedResponse);
       console.log("[App Code Backend] Parsed response:", parsedResponse);
 
-      // Validate the response structure
-      if (!parsedResponse.frontend || !parsedResponse.backend || !parsedResponse.documentation) {
-        throw new Error("Response missing required fields: frontend, backend, and documentation");
-      }
+      // Validate and ensure required structure with defaults
+      const validatedResponse = {
+        frontend: {
+          components: parsedResponse.frontend?.components || {},
+          pages: parsedResponse.frontend?.pages || {},
+          utils: parsedResponse.frontend?.utils || {}
+        },
+        backend: {
+          controllers: parsedResponse.backend?.controllers || {},
+          models: parsedResponse.backend?.models || {},
+          routes: parsedResponse.backend?.routes || {},
+          utils: parsedResponse.backend?.utils || {}
+        },
+        documentation: parsedResponse.documentation || "No documentation provided."
+      };
 
       // Save the generated code to files if projectId is provided
       if (projectId) {
@@ -443,7 +454,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         if (!fs.existsSync(componentsDir)) {
           fs.mkdirSync(componentsDir, { recursive: true });
         }
-        Object.entries(parsedResponse.frontend.components).forEach(([filename, content]) => {
+        Object.entries(validatedResponse.frontend.components).forEach(([filename, content]) => {
           fs.writeFileSync(path.join(componentsDir, filename), content as string);
         });
 
@@ -452,7 +463,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         if (!fs.existsSync(pagesDir)) {
           fs.mkdirSync(pagesDir, { recursive: true });
         }
-        Object.entries(parsedResponse.frontend.pages).forEach(([filename, content]) => {
+        Object.entries(validatedResponse.frontend.pages).forEach(([filename, content]) => {
           fs.writeFileSync(path.join(pagesDir, filename), content as string);
         });
 
@@ -461,7 +472,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         if (!fs.existsSync(frontendUtilsDir)) {
           fs.mkdirSync(frontendUtilsDir, { recursive: true });
         }
-        Object.entries(parsedResponse.frontend.utils).forEach(([filename, content]) => {
+        Object.entries(validatedResponse.frontend.utils).forEach(([filename, content]) => {
           fs.writeFileSync(path.join(frontendUtilsDir, filename), content as string);
         });
 
@@ -476,7 +487,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         if (!fs.existsSync(controllersDir)) {
           fs.mkdirSync(controllersDir, { recursive: true });
         }
-        Object.entries(parsedResponse.backend.controllers).forEach(([filename, content]) => {
+        Object.entries(validatedResponse.backend.controllers).forEach(([filename, content]) => {
           fs.writeFileSync(path.join(controllersDir, filename), content as string);
         });
 
@@ -485,7 +496,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         if (!fs.existsSync(modelsDir)) {
           fs.mkdirSync(modelsDir, { recursive: true });
         }
-        Object.entries(parsedResponse.backend.models).forEach(([filename, content]) => {
+        Object.entries(validatedResponse.backend.models).forEach(([filename, content]) => {
           fs.writeFileSync(path.join(modelsDir, filename), content as string);
         });
 
@@ -494,7 +505,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         if (!fs.existsSync(routesDir)) {
           fs.mkdirSync(routesDir, { recursive: true });
         }
-        Object.entries(parsedResponse.backend.routes).forEach(([filename, content]) => {
+        Object.entries(validatedResponse.backend.routes).forEach(([filename, content]) => {
           fs.writeFileSync(path.join(routesDir, filename), content as string);
         });
 
@@ -503,19 +514,19 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         if (!fs.existsSync(backendUtilsDir)) {
           fs.mkdirSync(backendUtilsDir, { recursive: true });
         }
-        Object.entries(parsedResponse.backend.utils).forEach(([filename, content]) => {
+        Object.entries(validatedResponse.backend.utils).forEach(([filename, content]) => {
           fs.writeFileSync(path.join(backendUtilsDir, filename), content as string);
         });
 
         // Save documentation
-        fs.writeFileSync(path.join(projectDir, "README.md"), parsedResponse.documentation);
+        fs.writeFileSync(path.join(projectDir, "README.md"), validatedResponse.documentation);
 
         // Save appCode to the project
         try {
           const { getProjectById, saveProject } = await import("../utils/projectFileStore");
           const project = await getProjectById(projectId);
           if (project) {
-            project.appCode = parsedResponse;
+            project.appCode = validatedResponse;
             await saveProject(project);
           }
         } catch (err) {
@@ -523,7 +534,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
         }
       }
 
-      res.json(parsedResponse);
+      res.json(validatedResponse);
     } catch (error: unknown) {
       console.error("[App Code Backend] Error parsing response:", error);
       res.status(500).json({ 

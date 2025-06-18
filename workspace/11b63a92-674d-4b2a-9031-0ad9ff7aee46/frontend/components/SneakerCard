@@ -1,0 +1,12 @@
+import React from 'react';
+
+export default function SneakerCard({ sneaker, onAddToCart }) {
+  return (
+    <div className='sneaker-card'>
+      <img src={sneaker.getImage()} alt={sneaker.name} />
+      <h3>{sneaker.name}</h3>
+      <p>${sneaker.price}</p>
+      <button onClick={() => onAddToCart(sneaker)}>Add to Cart</button>
+    </div>
+  );
+}
