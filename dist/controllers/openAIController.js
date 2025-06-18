@@ -324,7 +324,7 @@ const parseGenericResponse = (response) => {
     }
 };
 const generateApplicationCode = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     console.log("[App Code Backend] Received request to generate application code");
     console.log("[App Code Backend] Request body:", JSON.stringify(req.body, null, 2));
     const { prompt, projectId, umlDiagrams, documentation, infraCode } = req.body;
@@ -342,30 +342,35 @@ const generateApplicationCode = (req, res) => __awaiter(void 0, void 0, void 0, 
     }
     try {
         console.log("[App Code Backend] Constructing system prompt");
-        const systemPrompt = `You are an expert software engineer AI assistant.
+        const systemPrompt = `You are an expert fullstack developer and technical writer.
 
-Your task is to generate production-ready, feature-complete application code based on the following context. 
-You must implement ALL features, business logic, and integrations described in the prompt, UML diagrams, and documentation. 
-Do NOT generate placeholder, mock, or trivial code. 
-Every function, API, and component must have real, working logic, including error handling, data validation, and integration between frontend and backend.
+Given the following app idea and context, generate a complete, production-ready codebase for both the frontend and backend, using best practices. Your response must include:
 
-Return ONLY a JSON object with this structure:
+- **Frontend**: All necessary components, pages, and utility functions, organized in a way that is ready to use in a modern React (or your stack) application.
+- **Backend**: All necessary controllers, models, routes, and utility functions, organized for a Node.js/Express (or your stack) backend.
+- **Documentation**: A clear, concise README or documentation that explains how to run, build, and use the app.
+
+**Response format (JSON):**
 {
   "frontend": {
-    "components": { ... },
-    "pages": { ... },
-    "utils": { ... }
+    "components": { "ComponentName": "code..." },
+    "pages": { "PageName": "code..." },
+    "utils": { "utilName": "code..." }
   },
   "backend": {
-    "controllers": { ... },
-    "models": { ... },
-    "routes": { ... },
-    "utils": { ... }
+    "controllers": { "ControllerName": "code..." },
+    "models": { "ModelName": "code..." },
+    "routes": { "RouteName": "code..." },
+    "utils": { "utilName": "code..." }
   },
-  "documentation": "markdown documentation here"
+  "documentation": "README or usage instructions here"
 }
 
-DO NOT include any markdown formatting, code blocks, or explanatory text. Return ONLY the raw JSON object.
+**Important:**
+- Do NOT return empty objects. If a section is not needed, omit it.
+- Each code section should contain real, working code (not just placeholders).
+- Documentation should be clear and actionable.
+- DO NOT include any markdown formatting, code blocks, or explanatory text. Return ONLY the raw JSON object.
 
 Context for code generation:
 Prompt: ${prompt}
@@ -407,10 +412,21 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                 .trim();
             const parsedResponse = JSON.parse(cleanedResponse);
             console.log("[App Code Backend] Parsed response:", parsedResponse);
-            // Validate the response structure
-            if (!parsedResponse.frontend || !parsedResponse.backend || !parsedResponse.documentation) {
-                throw new Error("Response missing required fields: frontend, backend, and documentation");
-            }
+            // Validate and ensure required structure with defaults
+            const validatedResponse = {
+                frontend: {
+                    components: ((_c = parsedResponse.frontend) === null || _c === void 0 ? void 0 : _c.components) || {},
+                    pages: ((_d = parsedResponse.frontend) === null || _d === void 0 ? void 0 : _d.pages) || {},
+                    utils: ((_e = parsedResponse.frontend) === null || _e === void 0 ? void 0 : _e.utils) || {}
+                },
+                backend: {
+                    controllers: ((_f = parsedResponse.backend) === null || _f === void 0 ? void 0 : _f.controllers) || {},
+                    models: ((_g = parsedResponse.backend) === null || _g === void 0 ? void 0 : _g.models) || {},
+                    routes: ((_h = parsedResponse.backend) === null || _h === void 0 ? void 0 : _h.routes) || {},
+                    utils: ((_j = parsedResponse.backend) === null || _j === void 0 ? void 0 : _j.utils) || {}
+                },
+                documentation: parsedResponse.documentation || "No documentation provided."
+            };
             // Save the generated code to files if projectId is provided
             if (projectId) {
                 const projectDir = path_1.default.join(process.cwd(), "workspace", projectId);
@@ -427,7 +443,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                 if (!fs_1.default.existsSync(componentsDir)) {
                     fs_1.default.mkdirSync(componentsDir, { recursive: true });
                 }
-                Object.entries(parsedResponse.frontend.components).forEach(([filename, content]) => {
+                Object.entries(validatedResponse.frontend.components).forEach(([filename, content]) => {
                     fs_1.default.writeFileSync(path_1.default.join(componentsDir, filename), content);
                 });
                 // Save frontend pages
@@ -435,7 +451,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                 if (!fs_1.default.existsSync(pagesDir)) {
                     fs_1.default.mkdirSync(pagesDir, { recursive: true });
                 }
-                Object.entries(parsedResponse.frontend.pages).forEach(([filename, content]) => {
+                Object.entries(validatedResponse.frontend.pages).forEach(([filename, content]) => {
                     fs_1.default.writeFileSync(path_1.default.join(pagesDir, filename), content);
                 });
                 // Save frontend utils
@@ -443,7 +459,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                 if (!fs_1.default.existsSync(frontendUtilsDir)) {
                     fs_1.default.mkdirSync(frontendUtilsDir, { recursive: true });
                 }
-                Object.entries(parsedResponse.frontend.utils).forEach(([filename, content]) => {
+                Object.entries(validatedResponse.frontend.utils).forEach(([filename, content]) => {
                     fs_1.default.writeFileSync(path_1.default.join(frontendUtilsDir, filename), content);
                 });
                 // Save backend code
@@ -456,7 +472,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                 if (!fs_1.default.existsSync(controllersDir)) {
                     fs_1.default.mkdirSync(controllersDir, { recursive: true });
                 }
-                Object.entries(parsedResponse.backend.controllers).forEach(([filename, content]) => {
+                Object.entries(validatedResponse.backend.controllers).forEach(([filename, content]) => {
                     fs_1.default.writeFileSync(path_1.default.join(controllersDir, filename), content);
                 });
                 // Save backend models
@@ -464,7 +480,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                 if (!fs_1.default.existsSync(modelsDir)) {
                     fs_1.default.mkdirSync(modelsDir, { recursive: true });
                 }
-                Object.entries(parsedResponse.backend.models).forEach(([filename, content]) => {
+                Object.entries(validatedResponse.backend.models).forEach(([filename, content]) => {
                     fs_1.default.writeFileSync(path_1.default.join(modelsDir, filename), content);
                 });
                 // Save backend routes
@@ -472,7 +488,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                 if (!fs_1.default.existsSync(routesDir)) {
                     fs_1.default.mkdirSync(routesDir, { recursive: true });
                 }
-                Object.entries(parsedResponse.backend.routes).forEach(([filename, content]) => {
+                Object.entries(validatedResponse.backend.routes).forEach(([filename, content]) => {
                     fs_1.default.writeFileSync(path_1.default.join(routesDir, filename), content);
                 });
                 // Save backend utils
@@ -480,17 +496,17 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                 if (!fs_1.default.existsSync(backendUtilsDir)) {
                     fs_1.default.mkdirSync(backendUtilsDir, { recursive: true });
                 }
-                Object.entries(parsedResponse.backend.utils).forEach(([filename, content]) => {
+                Object.entries(validatedResponse.backend.utils).forEach(([filename, content]) => {
                     fs_1.default.writeFileSync(path_1.default.join(backendUtilsDir, filename), content);
                 });
                 // Save documentation
-                fs_1.default.writeFileSync(path_1.default.join(projectDir, "README.md"), parsedResponse.documentation);
+                fs_1.default.writeFileSync(path_1.default.join(projectDir, "README.md"), validatedResponse.documentation);
                 // Save appCode to the project
                 try {
                     const { getProjectById, saveProject } = yield Promise.resolve().then(() => __importStar(require("../utils/projectFileStore")));
                     const project = yield getProjectById(projectId);
                     if (project) {
-                        project.appCode = parsedResponse;
+                        project.appCode = validatedResponse;
                         yield saveProject(project);
                     }
                 }
@@ -498,7 +514,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
                     console.error("[App Code Backend] Error saving appCode to project:", err);
                 }
             }
-            res.json(parsedResponse);
+            res.json(validatedResponse);
         }
         catch (error) {
             console.error("[App Code Backend] Error parsing response:", error);

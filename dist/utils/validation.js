@@ -10,7 +10,6 @@ const sanitizeAndValidateMermaidCode = (rawCode, diagramType) => {
         "classDiagram",
         "stateDiagram",
         "gantt",
-        "erDiagram",
         "journey",
         "pie",
         "requirementDiagram",
