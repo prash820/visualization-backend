@@ -44,92 +44,31 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_SECRET_KEY, // defaults to process.env["ANTHROPIC_API_KEY"]
 });
 
+// In-memory job store for diagram jobs
+const diagramJobs: Record<string, { status: string; progress: number; result?: any; error?: string }> = {};
+
 export const generateVisualization = async (req: Request, res: Response) => {
   const { prompt, diagramType } = req.body;
-  console.log("🔹 Prompt:", req.body);
   if (!prompt || !diagramType) {
-    console.log("🔹 Missing required parameters.");
     return res.status(400).json({ error: "Missing required parameters." });
-    
   }
-  type DiagramType = "flowchart" | "architecture" | "sequence" | "uml";
+  const jobId = generateJobId();
+  diagramJobs[jobId] = { status: "pending", progress: 0 };
+  processDiagramJob(jobId, prompt, diagramType);
+  res.json({ jobId, status: "accepted" });
+};
 
-
-  console.log(`[AI] Generating diagram for prompt: ${prompt} with diagramType: ${diagramType}`);
-
-  const systemPrompt : Record<DiagramType, string> = {
-    flowchart: `
-                  You are an AI assistant specialized in generating flowcharts based on user prompts.
-              Return only valid JSON with two arrays: "nodes" and "edges".
-              Each node should have an "id", "label", "role", and a default position.
-              Each edge should connect nodes using "sourceLabel", "targetLabel" and edge label that says what is happening between steps.
-              Role means the type of node, like start/end, process, decision, input output, etc
-              Do not include any extra text.          
-      `,
-    architecture: `You are an AI assistant specialized in generating **cloud architecture diagrams** based on user prompts.
-
-### **🔹 User Query:** "<User's Input>"
-### **🔹 Diagram Type:** "architecture"
-
-## **🌟 Rules for Generating JSON Output**
-1️⃣ **Group services under their respective cloud providers** (AWS, Azure, OCI).  
-2️⃣ **If a cloud provider has a VPC, the services inside that VPC should be grouped inside it.**  
-3️⃣ **Keep cloud providers as separate top-level groups**, even if services communicate between providers.  
-4️⃣ **Ensure correct edge connections** between services, even across different providers.  
-5️⃣ **Use proper hierarchical nesting** to reflect real-world cloud architectures.  
-
-### **📌 Expected JSON Format** No Other text should be part of the response or no additional follow up questions
-
-{
-  "groups": [
-    { "id": "aws-services", "label": "AWS Services" },
-    { "id": "aws-vpc-1", "label": "AWS VPC 1", "parentGroup": "aws-services" },
-    { "id": "azure-services", "label": "Azure Services" },
-    { "id": "oci-services", "label": "OCI Services" }
-  ],
-  "nodes": [
-    { "id": "api-gateway", "label": "API Gateway", "service": "api-gateway", "group": "aws-services" },
-    { "id": "lambda-1", "label": "Lambda Function", "service": "lambda", "group": "aws-vpc-1" },
-    { "id": "s3", "label": "S3 Storage", "service": "s3", "group": "aws-services" },
-    { "id": "rds", "label": "RDS Database", "service": "rds", "group": "aws-services" },
-    { "id": "azure-app-service", "label": "Azure Web App", "service": "app-service", "group": "azure-services" },
-    { "id": "oci-object-storage", "label": "OCI Object Storage", "service": "object-storage", "group": "oci-services" }
-  ],
-  "edges": [
-  { "source": "api-gateway", "target": "lambda-1", "label": "Invokes" },
-  { "source": "lambda-1", "target": "s3", "label": "Stores Data" },
-  { "source": "lambda-1", "target": "rds", "label": "Queries" },
-  { "source": "azure-app-service", "target": "oci-object-storage", "label": "Writes To" }
-]
-
-}
-`,
-    sequence: `
-          You are an AI assistant specialized in generating sequence diagrams based on user prompts.
-        Return only valid JSON with two arrays: "nodes" and "edges".
-        Nodes represent actors or steps, and edges represent the flow of interactions.
-        Format example:
-        {
-          "nodes": [{ "label": "Actor or Step" }],
-          "edges": [{ "sourceLabel": "Label", "targetLabel": "Label", "label": "Message" }]
-        }
-        Do not include any extra text.
-      `,
-    uml: `
-                You are an AI assistant specialized in generating UML class diagrams based on user prompts.
-                Return only valid JSON with two arrays: "nodes" and "edges".
-                Each node represents a class (with a "label"), and edges represent relationships between classes.
-                Format example:
-                {
-                  "nodes": [{ "label": "ClassName" }],
-                  "edges": [{ "sourceLabel": "ClassName", "targetLabel": "ClassName", "label": "Relationship" }]
-                }
-                Do not include any extra text.
-                      `
-  };
-  // Choose a system prompt based on diagramType
+async function processDiagramJob(jobId: string, prompt: string, diagramType: string) {
   try {
-    console.log("User Prompt:", prompt);
+    diagramJobs[jobId] = { status: "processing", progress: 10 };
+    type DiagramType = "flowchart" | "architecture" | "sequence" | "uml";
+    const systemPrompt: Record<DiagramType, string> = {
+      flowchart: `You are an AI assistant specialized in generating flowcharts based on user prompts.\nReturn only valid JSON with two arrays: \"nodes\" and \"edges\".\nEach node should have an \"id\", \"label\", \"role\", and a default position.\nEach edge should connect nodes using \"sourceLabel\", \"targetLabel\" and edge label that says what is happening between steps.\nRole means the type of node, like start/end, process, decision, input output, etc\nDo not include any extra text.`,
+      architecture: `You are an AI assistant specialized in generating **cloud architecture diagrams** based on user prompts.\n...`,
+      sequence: `You are an AI assistant specialized in generating sequence diagrams based on user prompts.\nReturn only valid JSON with two arrays: \"nodes\" and \"edges\".\nNodes represent actors or steps, and edges represent the flow of interactions.\nFormat example: { \"nodes\": [{ \"label\": \"Actor or Step\" }], \"edges\": [{ \"sourceLabel\": \"Label\", \"targetLabel\": \"Label\", \"label\": \"Message\" }] }\nDo not include any extra text.`,
+      uml: `You are an AI assistant specialized in generating UML class diagrams based on user prompts.\nReturn only valid JSON with two arrays: \"nodes\" and \"edges\".\nEach node represents a class (with a \"label\"), and edges represent relationships between classes.\nFormat example: { \"nodes\": [{ \"label\": \"ClassName\" }], \"edges\": [{ \"sourceLabel\": \"ClassName\", \"targetLabel\": \"ClassName\", \"label\": \"Relationship\" }] }\nDo not include any extra text.`
+    };
+    diagramJobs[jobId].progress = 20;
     const response = await openai.chat.completions.create({
       model: "gpt-4-0125-preview",
       messages: [
@@ -139,24 +78,27 @@ export const generateVisualization = async (req: Request, res: Response) => {
       max_tokens: 4096,
       temperature: 0.5,
     });
-
-
+    diagramJobs[jobId].progress = 60;
     const fullResponse = response.choices[0]?.message?.content || "";
-    switch (diagramType)  {
-      case "architecture" : {
-        const parsedData = parseArchitectureResponse(fullResponse);
-        return res.json(parsedData);
-      }
-      default : {
-        const parseData = parseGenericResponse(fullResponse);
-        return res.json(parseData);
-      }
+    let parsedData;
+    if (diagramType === "architecture") {
+      parsedData = parseArchitectureResponse(fullResponse);
+    } else {
+      parsedData = parseGenericResponse(fullResponse);
     }
-
-  } catch (error) {
-    console.error("Error generating visualization:", error);
-    return res.status(500).json({ error: "Failed to generate diagram." });
+    diagramJobs[jobId] = { status: "completed", progress: 100, result: parsedData };
+  } catch (error: any) {
+    diagramJobs[jobId] = { status: "failed", progress: 100, error: error.message || "Unknown error" };
   }
+}
+
+export const getDiagramJobStatus = async (req: Request, res: Response): Promise<void> => {
+  const { jobId } = req.params;
+  if (!jobId || !diagramJobs[jobId]) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.json(diagramJobs[jobId]);
 };
 
 // In-memory job store for IaC jobs
