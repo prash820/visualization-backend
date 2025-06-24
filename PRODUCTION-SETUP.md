@@ -12,7 +12,7 @@ This guide covers deploying a **production-ready, multi-tenant AWS infrastructur
 │   (Frontend)    │◄──►│   (Backend)      │◄──►│  (Resources)    │
 │                 │    │                  │    │                 │
 │ ✓ Next.js UI    │    │ ✓ Node.js API    │    │ ✓ Per-user      │
-│ ✓ Tabs: Infra   │    │ ✓ Python/Terraform│   │   resources     │
+│ ✓ Tabs: Infra   │    │ ✓ terraform-runner│   │   resources     │
 │   & Application │    │ ✓ AWS SDK        │    │ ✓ Tagged &      │
 │ ✓ Purge flows   │    │ ✓ STS Roles      │    │   isolated      │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
@@ -147,6 +147,7 @@ aws ce get-cost-and-usage --time-period Start=2024-01-01,End=2024-01-31 --granul
 ### **Key Files (in visualization-backend directory):**
 - `Procfile` - Heroku process configuration
 - `package.json` - Main deployment manifest with AWS SDK dependencies
+- `terraform-runner/` - Python scripts for Terraform execution
 - `src/config/aws.ts` - AWS credential manager
 - `src/services/quotaService.ts` - Cost/quota controls
 - `setup-heroku-production.sh` - Automated deployment script
@@ -295,4 +296,4 @@ cd visualization-backend
 ./verify-deployment.sh your-app-name
 ```
 
-This production setup provides a **robust, scalable, and secure platform** for multi-tenant AWS infrastructure provisioning, ready to handle 100+ users creating applications from prompts. 
+This production setup provides a **robust, scalable, and secure platform** for multi-tenant AWS infrastructure provisioning, ready to handle 100+ users creating applications from prompts.

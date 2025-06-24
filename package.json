@@ -7,9 +7,9 @@
     "dev": "ts-node-dev src/server.ts",
     "build": "tsc && node build.js",
     "start": "node dist/server.js",
-    "start:terraform": "cd ../terraform-services && python main.py",
+    "start:terraform": "cd terraform-runner && python main.py",
     "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js && npx puppeteer browsers install chrome && cp src/utils/aws-logo-names.txt dist/utils/aws-logo-names.txt",
-    "postinstall": "cd ../terraform-services && pip install -r requirements.txt || echo 'Terraform services install skipped'"
+    "postinstall": "cd terraform-runner && pip install -r requirements.txt || echo 'Terraform runner dependencies install skipped'"
   },
   "keywords": [
     "aws",
