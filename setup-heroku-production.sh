@@ -4,6 +4,19 @@
 # This script sets up Heroku deployment with AWS integration for multi-tenant infrastructure provisioning
 # Run this from the visualization-backend directory
 
+# =============================================================================
+# CONFIGURATION - Update these values for your environment
+# =============================================================================
+AWS_ACCOUNT_ID="413486338132"  # Replace with your actual AWS Account ID
+
+# Default configuration values (update as needed)
+DEFAULT_HEROKU_APP_NAME="chart-app-$(date +%s)"  # Unique app name with timestamp
+DEFAULT_AWS_REGION="us-east-1"
+DEFAULT_FRONTEND_URL="https://v0-image-analysis-gp-omega.vercel.app"  # Update with actual frontend URL
+# Add your actual API keys here or set as environment variables
+DEFAULT_OPENAI_API_KEY="${OPENAI_API_KEY}"  # Uses env var if set
+DEFAULT_JWT_SECRET=""  # Will be auto-generated if empty
+
 set -e
 
 echo "🚀 Setting up Heroku production deployment for Chart App..."
@@ -68,21 +81,43 @@ check_requirements() {
 get_configuration() {
     print_status "Getting configuration details..."
     
-    read -p "Enter your Heroku app name: " HEROKU_APP_NAME
-    read -p "Enter your AWS Account ID: " AWS_ACCOUNT_ID
-    read -p "Enter your Vercel frontend URL (e.g., https://your-app.vercel.app): " FRONTEND_URL
-    read -p "Enter your OpenAI API key: " OPENAI_API_KEY
-    read -s -p "Enter a JWT secret (leave empty to generate): " JWT_SECRET
-    echo
+    HEROKU_APP_NAME=${HEROKU_APP_NAME:-$DEFAULT_HEROKU_APP_NAME}
+    AWS_REGION=${AWS_REGION:-$DEFAULT_AWS_REGION}
+    FRONTEND_URL=${FRONTEND_URL:-$DEFAULT_FRONTEND_URL}
+    OPENAI_API_KEY=${OPENAI_API_KEY:-$DEFAULT_OPENAI_API_KEY}
+    JWT_SECRET=${JWT_SECRET:-$DEFAULT_JWT_SECRET}
     
     if [ -z "$JWT_SECRET" ]; then
         JWT_SECRET=$(openssl rand -base64 32)
         print_success "Generated JWT secret"
     fi
     
-    # Generate external ID for AWS role
-    EXTERNAL_ID=$(openssl rand -base64 24)
-    print_success "Generated AWS external ID"
+    # Auto-detect credential approach based on environment variables
+    if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
+        # Direct credentials available
+        USE_DIRECT_CREDENTIALS=true
+        print_success "Detected direct AWS credentials (Access Key/Secret)"
+        print_success "Using AWS Region: $AWS_REGION"
+    else
+        # Use IAM role approach
+        USE_DIRECT_CREDENTIALS=false
+        print_success "No direct AWS credentials found, using IAM role approach"
+        print_success "Using AWS Account ID: $AWS_ACCOUNT_ID (configured at top of script)"
+        
+        # Generate external ID for AWS role
+        EXTERNAL_ID=$(openssl rand -base64 24)
+        print_success "Generated AWS external ID: ${EXTERNAL_ID:0:12}..."
+    fi
+    
+    # Display configuration summary
+    echo
+    print_status "Configuration Summary:"
+    echo "  • Heroku App: $HEROKU_APP_NAME"
+    echo "  • Frontend URL: $FRONTEND_URL"
+    echo "  • AWS Region: $AWS_REGION"
+    echo "  • Credential Type: $([ "$USE_DIRECT_CREDENTIALS" = "true" ] && echo "Direct" || echo "IAM Role")"
+    echo "  • OpenAI API Key: $([ -n "$OPENAI_API_KEY" ] && echo "✅ Set" || echo "❌ Missing")"
+    echo
 }
 
 # Create Heroku app
@@ -130,6 +165,13 @@ setup_addons() {
 
 # Create AWS IAM resources
 setup_aws_iam() {
+    if [ "$USE_DIRECT_CREDENTIALS" = "true" ]; then
+        print_status "Skipping AWS IAM role setup (using direct credentials)"
+        print_warning "Note: Direct credentials are simpler but less secure for production"
+        print_warning "Consider using IAM role assumption for production environments"
+        return 0
+    fi
+    
     print_status "Setting up AWS IAM resources..."
     
     # Create IAM policy
@@ -235,10 +277,20 @@ set_env_vars() {
     print_status "Setting Heroku environment variables..."
     
     # AWS Configuration
-    heroku config:set AWS_REGION=us-east-1 -a $HEROKU_APP_NAME
-    heroku config:set AWS_ROLE_ARN="$ROLE_ARN" -a $HEROKU_APP_NAME
-    heroku config:set AWS_EXTERNAL_ID="$EXTERNAL_ID" -a $HEROKU_APP_NAME
-    heroku config:set AWS_SESSION_NAME=chart-app-heroku-session -a $HEROKU_APP_NAME
+    if [ "$USE_DIRECT_CREDENTIALS" = "true" ]; then
+        # Direct credentials approach
+        heroku config:set AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" -a $HEROKU_APP_NAME
+        heroku config:set AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" -a $HEROKU_APP_NAME
+        heroku config:set AWS_DEFAULT_REGION="$AWS_REGION" -a $HEROKU_APP_NAME
+        print_success "Set direct AWS credentials"
+    else
+        # IAM role assumption approach
+        heroku config:set AWS_REGION=us-east-1 -a $HEROKU_APP_NAME
+        heroku config:set AWS_ROLE_ARN="$ROLE_ARN" -a $HEROKU_APP_NAME
+        heroku config:set AWS_EXTERNAL_ID="$EXTERNAL_ID" -a $HEROKU_APP_NAME
+        heroku config:set AWS_SESSION_NAME=chart-app-heroku-session -a $HEROKU_APP_NAME
+        print_success "Set AWS role assumption credentials"
+    fi
     
     # Application Configuration
     heroku config:set NODE_ENV=production -a $HEROKU_APP_NAME
@@ -279,27 +331,47 @@ deploy_app() {
 }
 
 # Print deployment summary
-print_summary() {
+print_completion() {
+    echo "🎉 Heroku deployment setup complete!"
     echo
-    echo "🎉 Deployment Complete!"
-    echo "=================================="
-    echo "Heroku App: https://$HEROKU_APP_NAME.herokuapp.com"
-    echo "AWS Role ARN: $ROLE_ARN"
-    echo "External ID: $EXTERNAL_ID"
+    echo "📝 Summary:"
+    echo "  • Heroku app: $HEROKU_APP_NAME"
+    echo "  • App URL: https://$HEROKU_APP_NAME.herokuapp.com"
+    echo "  • Frontend URL: $FRONTEND_URL"
+    
+    if [ "$USE_DIRECT_CREDENTIALS" = "true" ]; then
+        echo "  • AWS Credentials: Direct access key/secret"
+        echo "  • AWS Region: $AWS_REGION"
+    else
+        echo "  • AWS Role ARN: $ROLE_ARN"
+        echo "  • AWS External ID: $EXTERNAL_ID"
+    fi
+    
     echo
-    echo "Next Steps:"
-    echo "1. Update your Vercel frontend environment variables:"
-    echo "   NEXT_PUBLIC_API_URL=https://$HEROKU_APP_NAME.herokuapp.com/api"
+    echo "🚀 Next steps:"
+    echo "  1. Verify deployment: heroku logs --tail -a $HEROKU_APP_NAME"
+    echo "  2. Test the API: curl https://$HEROKU_APP_NAME.herokuapp.com/api/health"
+    echo "  3. Update your frontend to use: https://$HEROKU_APP_NAME.herokuapp.com"
     echo
-    echo "2. Monitor your app:"
-    echo "   heroku logs --tail -a $HEROKU_APP_NAME"
+    
+    if [ "$USE_DIRECT_CREDENTIALS" = "false" ]; then
+        echo "🔐 AWS Role Setup Complete:"
+        echo "  • Role ARN: $ROLE_ARN"
+        echo "  • External ID: $EXTERNAL_ID"
+        echo "  • This role allows your Heroku app to provision AWS resources"
+        echo
+    fi
+    
+    echo "📊 Resource Limits (configured):"
+    echo "  • Max projects per user: 10"
+    echo "  • Max cost per project: $50"
+    echo "  • Max total cost per user: $100"
+    echo "  • Resource timeout: 60 minutes"
     echo
-    echo "3. Scale for production:"
-    echo "   heroku ps:scale web=2 -a $HEROKU_APP_NAME"
-    echo
-    echo "4. Set up monitoring dashboard in your AWS console"
-    echo
-    print_success "Setup complete! Your app is ready for production."
+    echo "🔧 Management commands:"
+    echo "  • heroku logs --tail -a $HEROKU_APP_NAME"
+    echo "  • heroku ps:scale web=1 terraform=1 -a $HEROKU_APP_NAME"
+    echo "  • heroku config -a $HEROKU_APP_NAME"
 }
 
 # Main execution
@@ -313,7 +385,7 @@ main() {
     setup_aws_iam
     set_env_vars
     deploy_app
-    print_summary
+    print_completion
 }
 
 # Run main function

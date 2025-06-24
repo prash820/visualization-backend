@@ -95,28 +95,62 @@ export class AWSCredentialManager {
 
   /**
    * Get AWS credentials with fallback for local development
+   * Supports both direct credentials and IAM role assumption
    */
   async getCredentials(userId?: string, projectId?: string) {
-    // In production, always use role assumption
-    if (process.env.NODE_ENV === 'production') {
+    // Check if we should use direct credentials
+    const hasDirectCredentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+    const hasRoleConfig = process.env.AWS_ROLE_ARN && process.env.AWS_EXTERNAL_ID;
+
+    // Log the credential approach being used
+    if (hasDirectCredentials && !hasRoleConfig) {
+      console.log("[AWS] Using direct AWS credentials (Access Key/Secret)");
+      return {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        sessionToken: process.env.AWS_SESSION_TOKEN // Optional
+      };
+    }
+
+    // If we have role configuration, use role assumption
+    if (hasRoleConfig) {
       if (!userId || !projectId) {
-        throw new Error("userId and projectId are required in production");
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error("userId and projectId are required for IAM role assumption in production");
+        }
+        // In development, we can proceed without user context for testing
+        console.log("[AWS] Warning: Using role assumption without user context (development only)");
+        return this.getCredentialsForUser('dev-user', 'dev-project');
       }
+      
+      console.log(`[AWS] Using IAM role assumption for user ${userId}, project ${projectId}`);
       return this.getCredentialsForUser(userId, projectId);
     }
 
-    // In development, check if we should use role assumption or local credentials
-    if (process.env.AWS_ROLE_ARN && userId && projectId) {
-      return this.getCredentialsForUser(userId, projectId);
+    // If we have both, prefer role assumption in production
+    if (hasDirectCredentials && hasRoleConfig) {
+      if (process.env.NODE_ENV === 'production') {
+        console.log("[AWS] Both credential types available, using IAM role assumption for production");
+        if (!userId || !projectId) {
+          throw new Error("userId and projectId are required for IAM role assumption in production");
+        }
+        return this.getCredentialsForUser(userId, projectId);
+      } else {
+        console.log("[AWS] Both credential types available, using direct credentials for development");
+        return {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          sessionToken: process.env.AWS_SESSION_TOKEN
+        };
+      }
     }
 
-    // Fall back to default AWS credentials (for local development)
-    console.log("[AWS] Using default AWS credentials for local development");
-    return {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      sessionToken: process.env.AWS_SESSION_TOKEN
-    };
+    // No valid credentials found
+    throw new Error(
+      "No valid AWS credentials found. Please set either:\n" +
+      "1. Direct credentials: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY\n" +
+      "2. Role assumption: AWS_ROLE_ARN and AWS_EXTERNAL_ID"
+    );
   }
 
   /**

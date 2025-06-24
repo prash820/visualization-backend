@@ -13,15 +13,24 @@ This backend service provides:
 
 ## 🚀 Quick Deployment to Heroku
 
-**All commands must be run from this directory:**
+**Fully automated setup - zero user prompts required!**
 
 ```bash
-# 1. Automated Heroku setup
-./setup-heroku-production.sh
+# 1. Check configuration (optional)
+./check-config.sh
 
-# 2. Verify deployment
-./verify-deployment.sh your-heroku-app-name
+# 2. Test what setup would do (optional)
+./test-config.sh
+
+# 3. Run automated setup (no input required!)
+./setup-heroku-production.sh
 ```
+
+The setup script automatically:
+- ✅ Generates unique Heroku app name with timestamp
+- ✅ Auto-detects AWS credential approach (direct vs IAM role)
+- ✅ Uses sensible defaults for all configuration
+- ✅ Creates and deploys everything without any prompts
 
 ## 🔧 Project Structure
 
@@ -193,5 +202,20 @@ heroku config -a your-app-name
 # Restart application
 heroku restart -a your-app-name
 ```
+
+## ⚙️ Configuration
+
+### AWS Account ID Setup
+The script uses a constant AWS Account ID for IAM role creation. Update this once:
+
+```bash
+# Edit setup-heroku-production.sh, line 9:
+AWS_ACCOUNT_ID="123456789012"  # Replace with your actual account ID
+
+# Check current configuration:
+./check-config.sh
+```
+
+This simplifies setup by not asking for the account ID every time you run the script.
 
 This backend service provides a complete multi-tenant AWS infrastructure provisioning platform, ready for production use with proper security, cost controls, and scalability. 
