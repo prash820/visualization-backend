@@ -92,6 +92,16 @@ app.use("/api/uml", umlRoutes);
 app.use("/api/documentation", documentationRoutes);
 app.use("/api/code", codeRoutes);
 
+// 🔹 Health Check Endpoint
+app.get("/health", (req: Request, res: Response) => {
+  res.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development"
+  });
+});
+
 // 🔹 Global Error Handler
 app.use(errorHandler);
 

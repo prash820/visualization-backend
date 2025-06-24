@@ -10,6 +10,8 @@ const router = express_1.default.Router();
 console.log("In IAC");
 // Generate Infrastructure as Code (IaC)
 router.post("/", (0, asyncHandler_1.default)(openAIController_1.generateIaC));
+// Poll IaC job status
+router.get("/status/:jobId", (0, asyncHandler_1.default)(openAIController_1.getIaCJobStatus));
 // Generate Application Code
 router.post("/app", (0, asyncHandler_1.default)(openAIController_1.generateApplicationCode));
 exports.default = router;

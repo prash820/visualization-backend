@@ -69,7 +69,7 @@ app.use((0, cors_1.default)({
     origin: "*",
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "X-Client-Version"],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "FETCH"],
 }));
 // 🔹 Apply rate limiter
 app.use(simpleRateLimiter);
@@ -84,6 +84,15 @@ app.use("/api/deploy", deployRoutes_1.default);
 app.use("/api/uml", uml_1.default);
 app.use("/api/documentation", documentation_1.default);
 app.use("/api/code", appCode_1.default);
+// 🔹 Health Check Endpoint
+app.get("/health", (req, res) => {
+    res.json({
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || "development"
+    });
+});
 // 🔹 Global Error Handler
 app.use(errorHandler_1.errorHandler);
 // Create server with increased timeout

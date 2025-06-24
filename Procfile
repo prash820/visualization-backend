@@ -1,1 +1,2 @@
-web: npm install && npm run build && node dist/server.js
+web: npm start
+terraform: npm run start:terraform

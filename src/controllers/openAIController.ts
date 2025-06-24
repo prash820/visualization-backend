@@ -123,11 +123,65 @@ export const generateIaC = async (req: Request, res: Response): Promise<void> =>
 
 async function processIaCJob(jobId: string, prompt: string, projectId: string, umlDiagrams: any) {
   try {
+    console.log(`[IaC] Job started: jobId=${jobId}, projectId=${projectId}`);
+    console.log(`[IaC] Prompt: ${prompt}`);
     iacJobs[jobId] = { status: "processing", progress: 10 };
-    const systemPrompt = `You are an AI assistant that generates Infrastructure as Code (IaC) using Terraform.\n\nYour task is to generate production-ready Terraform code for the user's project, based on their prompt and UML diagrams.\n\n**IMPORTANT INSTRUCTIONS:**\n1. Analyze the provided UML diagrams to understand the system architecture\n2. Generate Terraform code that exactly matches the components and relationships shown in the diagrams\n3. Include all necessary AWS services shown in the diagrams (e.g., API Gateway, Lambda, S3, DynamoDB, Cognito)\n4. Set up proper IAM roles and permissions for service interactions\n5. Configure security groups and network access as needed\n6. Return ONLY a raw JSON object, with no markdown formatting, code blocks, or extra text\n7. Do not wrap the response in \`json or any other markdown formatting\n\nThe JSON object must have two fields:\n- \"code\": a string containing the complete Terraform code (all files concatenated, with clear file boundaries as comments)\n- \"documentation\": a string containing Markdown documentation for the infrastructure\n\n**Example output format (return exactly this format, no markdown):**\n{\n  \"code\": \"// main.tf\\n...\\n// variables.tf\\n...\\n\",\n  \"documentation\": \"# Infrastructure Documentation\\n...\"\n}`;
+    const systemPrompt = `
+You are an expert in generating production-ready Terraform code for AWS.
+
+**IMPORTANT RULES:**
+1. Always include a top-level terraform block with:
+   - required_providers specifying AWS (source: "hashicorp/aws", version: "~> 5.0")
+   - required_version set to ">= 1.5.0"
+2. Always include a provider "aws" block with a region (default to "us-east-1" if not specified).
+3. Always include at least one real AWS resource block (e.g., aws_instance, aws_s3_bucket, etc.).
+4. Optionally include variable blocks for any configurable values.
+5. Optionally include output blocks for important outputs.
+6. All code must be valid Terraform HCL (no JSON, no YAML, no Markdown, no extra text).
+7. Do NOT wrap the code in code fences or add any explanations.
+8. The code must be ready to pass basic validation for required blocks.
+9. **Do NOT reference S3 objects, S3 keys, or Lambda deployment packages that are not provisioned in this Terraform code. Do not assume any pre-existing S3 buckets or files. If you create a Lambda function, use local file references only if the file is included in the same Terraform directory.**
+10. This is a greenfield AWS environment: provision everything needed from scratch, and do not assume any pre-existing infrastructure unless absolutely necessary for a minimal working example.
+
+**Example structure:**
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+  required_version = ">= 1.5.0"
+}
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+resource "aws_instance" "app_server" {
+  ami           = "ami-0abcdef1234567890"
+  instance_type = "t2.micro"
+  tags = {
+    Name = "ExampleAppServerInstance"
+  }
+}
+
+variable "region" {
+  description = "AWS region where resources will be deployed."
+  type        = string
+  default     = "us-east-1"
+}
+
+output "instance_ip" {
+  value       = aws_instance.app_server.public_ip
+  description = "Public IP of the EC2 instance."
+}
+
+**Your output must follow this structure and include all required blocks.**
+`;
     iacJobs[jobId].progress = 20;
     const response = await openai.chat.completions.create({
-      model: "gpt-4-0125-preview",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         {
@@ -139,36 +193,35 @@ async function processIaCJob(jobId: string, prompt: string, projectId: string, u
       temperature: 0.5,
     });
     iacJobs[jobId].progress = 60;
-    const fullResponse = response.choices[0]?.message?.content || "";
-    const cleanedResponse = fullResponse
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
-    const parsedResponse = JSON.parse(cleanedResponse);
-    if (!parsedResponse.code || !parsedResponse.documentation) {
-      throw new Error("Response missing required fields: code and documentation");
+    const terraformCode = response.choices[0]?.message?.content?.trim() || "";
+    console.log(`[IaC] OpenAI raw response for jobId=${jobId}:`, response.choices[0]?.message?.content);
+    console.log(`[IaC] Extracted terraformCode length: ${terraformCode.length}`);
+    if (!terraformCode) {
+      console.error(`[IaC] No Terraform code generated for jobId=${jobId}, projectId=${projectId}`);
     }
     // Save the generated code to a file if projectId is provided
     if (projectId) {
-      const projectDir = path.join(process.cwd(), "workspace", projectId);
+      const projectDir = path.join(process.cwd(), "terraform-runner/workspace", projectId);
       if (!fs.existsSync(projectDir)) {
         fs.mkdirSync(projectDir, { recursive: true });
+        console.log(`[IaC] Created project directory: ${projectDir}`);
       }
-      fs.writeFileSync(path.join(projectDir, "terraform.tf"), parsedResponse.code);
-      fs.writeFileSync(path.join(projectDir, "README.md"), parsedResponse.documentation);
+      fs.writeFileSync(path.join(projectDir, "terraform.tf"), terraformCode);
+      console.log(`[IaC] Saved terraform.tf for projectId=${projectId} at ${projectDir}`);
       try {
         const { getProjectById, saveProject } = await import("../utils/projectFileStore");
         const project = await getProjectById(projectId);
         if (project) {
-          project.infraCode = parsedResponse.code;
+          project.infraCode = terraformCode;
           await saveProject(project);
         }
       } catch (err) {
         console.error("[IaC Backend] Error saving infraCode to project:", err);
       }
     }
-    iacJobs[jobId] = { status: "completed", progress: 100, result: parsedResponse };
+    iacJobs[jobId] = { status: "completed", progress: 100, result: { code: terraformCode } };
   } catch (error: any) {
+    console.error(`[IaC] Error in processIaCJob for jobId=${jobId}, projectId=${projectId}:`, error);
     iacJobs[jobId] = { status: "failed", progress: 100, error: error.message || "Unknown error" };
   }
 }
@@ -294,7 +347,7 @@ ${infraCode || "No infrastructure code provided."}`;
 
     console.log("[App Code Backend] Sending request to OpenAI");
     const response = await openai.chat.completions.create({
-      model: "gpt-4-0125-preview",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { 
@@ -343,7 +396,7 @@ ${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).j
 
       // Save the generated code to files if projectId is provided
       if (projectId) {
-        const projectDir = path.join(process.cwd(), "workspace", projectId);
+        const projectDir = path.join(process.cwd(), "terraform-runner/workspace", projectId);
         if (!fs.existsSync(projectDir)) {
           fs.mkdirSync(projectDir, { recursive: true });
         }

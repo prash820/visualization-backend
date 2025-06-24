@@ -200,7 +200,7 @@ UML Diagrams: ${JSON.stringify(umlDiagrams)}`;
     console.log('[generateDesignDocument] Calling OpenAI with prompt and UML diagrams...');
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Application Description: ${prompt}\n\nUML Diagrams: ${JSON.stringify(umlDiagrams)}` }

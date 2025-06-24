@@ -1,18 +1,33 @@
 {
   "name": "visualization-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Chart App Production Backend - Multi-tenant AWS Infrastructure Provisioning",
+  "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev src/server.ts",
     "build": "tsc && node build.js",
     "start": "node dist/server.js",
-    "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js && npx puppeteer browsers install chrome && cp src/utils/aws-logo-names.txt dist/utils/aws-logo-names.txt"
+    "start:terraform": "cd ../terraform-services && python main.py",
+    "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js && npx puppeteer browsers install chrome && cp src/utils/aws-logo-names.txt dist/utils/aws-logo-names.txt",
+    "postinstall": "cd ../terraform-services && pip install -r requirements.txt || echo 'Terraform services install skipped'"
   },
-  "keywords": [],
-  "author": "",
-  "description": "",
+  "keywords": [
+    "aws",
+    "terraform",
+    "infrastructure",
+    "multi-tenant",
+    "heroku",
+    "production"
+  ],
+  "author": "Chart App Team",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@aws-sdk/client-api-gateway": "^3.835.0",
+    "@aws-sdk/client-cost-explorer": "^3.835.0",
+    "@aws-sdk/client-dynamodb": "^3.835.0",
+    "@aws-sdk/client-lambda": "^3.835.0",
+    "@aws-sdk/client-s3": "^3.835.0",
+    "@aws-sdk/client-sts": "^3.835.0",
     "@mermaid-js/mermaid-cli": "^11.4.2",
     "@types/body-parser": "^1.19.5",
     "@types/cors": "^2.8.18",
@@ -47,6 +62,7 @@
     "@types/node": "^18.x"
   },
   "engines": {
-    "node": ">=18.19.0 <19 || >=20"
+    "node": ">=18.19.0 <19 || >=20",
+    "npm": ">=9.0.0"
   }
 }

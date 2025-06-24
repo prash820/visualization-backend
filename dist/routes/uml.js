@@ -9,4 +9,6 @@ const authMiddleware_1 = require("../middleware/authMiddleware");
 const asyncHandler_1 = __importDefault(require("../utils/asyncHandler"));
 const router = express_1.default.Router();
 router.post("/generate", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(umlController_1.generateUmlDiagrams));
+// Poll UML job status
+router.get("/status/:jobId", (0, asyncHandler_1.default)(umlController_1.getUmlJobStatus));
 exports.default = router;

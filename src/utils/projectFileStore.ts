@@ -146,6 +146,7 @@ export interface Project {
   framework: string;
   diagramType: string;
   createdAt: string;
+  updatedAt?: string;
   umlDiagrams?: UMLDiagrams;
   documentation?: Documentation;
   designDocument?: DesignDocument;
@@ -163,6 +164,16 @@ export interface Project {
       utils: Record<string, string>;
     };
     documentation: string;
+  };
+  deploymentStatus?: 'not_deployed' | 'pending' | 'deployed' | 'failed' | 'destroyed';
+  deploymentJobId?: string;
+  deploymentOutputs?: any;
+  appDeploymentStatus?: 'not_deployed' | 'deploying' | 'deployed' | 'failed';
+  appDeploymentJobId?: string;
+  appDeploymentOutputs?: {
+    apiGatewayUrl: string;
+    frontendUrl: string;
+    lambdaFunctionName: string;
   };
 }
 
