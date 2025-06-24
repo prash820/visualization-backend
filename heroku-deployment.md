@@ -140,10 +140,11 @@ heroku buildpacks:add https://github.com/HashiCorp/heroku-buildpack-terraform
 
 Create `Procfile`:
 ```
-web: cd visualization-backend && npm start
-terraform: cd terraform-services && python main.py
-worker: cd visualization-backend && npm run worker
+web: npm start
+terraform: npm run start:terraform
 ```
+
+The terraform process runs the Python FastAPI service from the `terraform-runner/` directory.
 
 ### **5. AWS Credential Management in Code**
 
@@ -237,13 +238,13 @@ export class QuotaService {
 ### **7. Deployment Commands**
 
 ```bash
-# Deploy to Heroku
+# Deploy to Heroku from visualization-backend directory
 git add .
 git commit -m "Production deployment with multi-tenant AWS setup"
-git push heroku main
+git push heroku HEAD:main
 
-# Scale the services
-heroku ps:scale web=2 terraform=1 worker=1
+# Scale the services (web + terraform processes)
+heroku ps:scale web=1 terraform=1
 
 # Monitor logs
 heroku logs --tail
@@ -294,7 +295,7 @@ heroku config:set AWS_EXTERNAL_ID=new_external_id
 
 ```bash
 # Scale for production load
-heroku ps:scale web=3 terraform=2 worker=2
+heroku ps:scale web=3 terraform=1
 heroku addons:create heroku-postgresql:standard-0
 heroku addons:create heroku-redis:premium-0
 ```
