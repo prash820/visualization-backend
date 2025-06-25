@@ -16,6 +16,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def deploy_terraform(project_id):
+    # Ensure Terraform binary is in PATH (for Heroku deployment)
+    if '/app/bin' not in os.environ.get('PATH', ''):
+        os.environ['PATH'] = '/app/bin:' + os.environ.get('PATH', '')
+        logger.info(f"[DEPLOY] Updated PATH: {os.environ['PATH']}")
+    
     workspace_dir = os.path.join(os.path.dirname(__file__), "workspace", project_id)
     logger.info(f"[DEPLOY] Using workspace directory: {workspace_dir}")
     if not os.path.exists(workspace_dir):
@@ -287,9 +292,21 @@ def cleanup_api_gateways(apigateway_client, apigatewayv2_client, gateways):
     return cleanup_logs
 
 def destroy_terraform_with_cleanup(project_id):
-    """Enhanced destroy function with automatic AWS resource cleanup"""
-    workspace_dir = os.path.join(os.path.dirname(__file__), "workspace", project_id)
+    """
+    Destroy Terraform infrastructure with comprehensive cleanup.
+    This function handles AWS resource cleanup before running terraform destroy.
+    """
+    # Ensure Terraform binary is in PATH (for Heroku deployment)
+    if '/app/bin' not in os.environ.get('PATH', ''):
+        os.environ['PATH'] = '/app/bin:' + os.environ.get('PATH', '')
+        logger.info(f"[DESTROY] Updated PATH: {os.environ['PATH']}")
     
+    workspace_dir = os.path.join(os.path.dirname(__file__), "workspace", project_id)
+    logger.info(f"🗑️ [DESTROY] Starting infrastructure destruction for project: {project_id}")
+    logger.info(f"🗑️ [DESTROY] Using workspace directory: {workspace_dir}")
+    
+    cleanup_logs = []
+
     if not os.path.exists(workspace_dir):
         logger.warning(f"📁 Workspace directory does not exist: {workspace_dir}")
         return {
@@ -316,7 +333,6 @@ def destroy_terraform_with_cleanup(project_id):
             "cleanup_logs": []
         }
 
-    cleanup_logs = []
     aws_clients = get_aws_clients()
     
     # Step 1: Read Terraform state and extract resources
