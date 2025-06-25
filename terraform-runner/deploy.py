@@ -16,10 +16,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def deploy_terraform(project_id):
-    # Ensure Terraform binary is in PATH (for Heroku deployment)
-    if '/app/bin' not in os.environ.get('PATH', ''):
-        os.environ['PATH'] = '/app/bin:' + os.environ.get('PATH', '')
-        logger.info(f"[DEPLOY] Updated PATH: {os.environ['PATH']}")
+    # Find terraform binary location
+    script_dir = os.path.dirname(__file__)
+    terraform_bin_path = os.path.join(script_dir, "..", "bin", "terraform")
+    
+    # Ensure Terraform binary is accessible
+    if os.path.exists(terraform_bin_path):
+        logger.info(f"[DEPLOY] Found Terraform binary at: {terraform_bin_path}")
+        # Add the bin directory to PATH
+        bin_dir = os.path.dirname(terraform_bin_path)
+        if bin_dir not in os.environ.get('PATH', ''):
+            os.environ['PATH'] = bin_dir + ':' + os.environ.get('PATH', '')
+            logger.info(f"[DEPLOY] Updated PATH: {os.environ['PATH']}")
+    else:
+        logger.warning(f"[DEPLOY] Terraform binary not found at: {terraform_bin_path}")
+        logger.info(f"[DEPLOY] Falling back to system PATH")
     
     workspace_dir = os.path.join(os.path.dirname(__file__), "workspace", project_id)
     logger.info(f"[DEPLOY] Using workspace directory: {workspace_dir}")
@@ -40,8 +51,10 @@ def deploy_terraform(project_id):
     
     # Test if terraform binary is accessible
     try:
-        result = subprocess.run(['/app/bin/terraform', 'version'], capture_output=True, text=True, timeout=10)
+        result = subprocess.run(["terraform", "version"], capture_output=True, text=True, timeout=10)
         logger.info(f"[DEPLOY] Terraform version check: {result.stdout}")
+        if result.returncode != 0:
+            logger.error(f"[DEPLOY] Terraform version check failed: {result.stderr}")
     except Exception as e:
         logger.error(f"[DEPLOY] Terraform binary test failed: {e}")
     
@@ -304,10 +317,21 @@ def destroy_terraform_with_cleanup(project_id):
     Destroy Terraform infrastructure with comprehensive cleanup.
     This function handles AWS resource cleanup before running terraform destroy.
     """
-    # Ensure Terraform binary is in PATH (for Heroku deployment)
-    if '/app/bin' not in os.environ.get('PATH', ''):
-        os.environ['PATH'] = '/app/bin:' + os.environ.get('PATH', '')
-        logger.info(f"[DESTROY] Updated PATH: {os.environ['PATH']}")
+    # Find terraform binary location
+    script_dir = os.path.dirname(__file__)
+    terraform_bin_path = os.path.join(script_dir, "..", "bin", "terraform")
+    
+    # Ensure Terraform binary is accessible
+    if os.path.exists(terraform_bin_path):
+        logger.info(f"[DESTROY] Found Terraform binary at: {terraform_bin_path}")
+        # Add the bin directory to PATH
+        bin_dir = os.path.dirname(terraform_bin_path)
+        if bin_dir not in os.environ.get('PATH', ''):
+            os.environ['PATH'] = bin_dir + ':' + os.environ.get('PATH', '')
+            logger.info(f"[DESTROY] Updated PATH: {os.environ['PATH']}")
+    else:
+        logger.warning(f"[DESTROY] Terraform binary not found at: {terraform_bin_path}")
+        logger.info(f"[DESTROY] Falling back to system PATH")
     
     workspace_dir = os.path.join(os.path.dirname(__file__), "workspace", project_id)
     logger.info(f"🗑️ [DESTROY] Starting infrastructure destruction for project: {project_id}")
