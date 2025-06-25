@@ -101,7 +101,7 @@ const startTerraformService = () => {
     var _a, _b;
     console.log("🚀 Starting Terraform FastAPI service...");
     const terraformRunnerPath = path_1.default.join(__dirname, "../terraform-runner");
-    const pythonProcess = (0, child_process_1.spawn)("python", ["main.py"], {
+    const pythonProcess = (0, child_process_1.spawn)("uvicorn", ["main:app", "--host", "0.0.0.0", "--port", "8000"], {
         cwd: terraformRunnerPath,
         env: Object.assign(Object.assign({}, process.env), { PATH: "/app/bin:" + process.env.PATH, TERRAFORM_PORT: "8000" }),
         stdio: ["pipe", "pipe", "pipe"]
