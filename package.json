@@ -8,7 +8,7 @@
     "build": "tsc && node build.js",
     "start": "node dist/server.js",
     "start:terraform": "cd terraform-runner && python main.py",
-    "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js && npx puppeteer browsers install chrome && cp src/utils/aws-logo-names.txt dist/utils/aws-logo-names.txt"
+    "heroku-postbuild": "npm rebuild bcrypt --build-from-source && node build.js && npx puppeteer browsers install chrome && cp src/utils/aws-logo-names.txt dist/utils/aws-logo-names.txt && chmod +x install-terraform.sh && ./install-terraform.sh"
   },
   "keywords": [
     "aws",
