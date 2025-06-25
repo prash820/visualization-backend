@@ -13,11 +13,13 @@ const errorHandler_1 = require("./middleware/errorHandler");
 const openAI_1 = __importDefault(require("./routes/openAI"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const project_1 = __importDefault(require("./routes/project"));
-const iac_1 = __importDefault(require("./routes/iac")); // Updated import path
+const iacRoutes_1 = __importDefault(require("./routes/iacRoutes"));
 const deployRoutes_1 = __importDefault(require("./routes/deployRoutes"));
 const uml_1 = __importDefault(require("./routes/uml"));
 const appCode_1 = __importDefault(require("./routes/appCode"));
 const documentation_1 = __importDefault(require("./routes/documentation"));
+const child_process_1 = require("child_process");
+const path_1 = __importDefault(require("path"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5001;
@@ -79,7 +81,7 @@ app.use(simpleRateLimiter);
 app.use("/api/generate", openAI_1.default);
 app.use("/api/auth", auth_1.default);
 app.use("/api/projects", project_1.default);
-app.use("/api/iac", iac_1.default); // ✅ New Route for IaC
+app.use("/api/iac", iacRoutes_1.default); // ✅ New Route for IaC
 app.use("/api/deploy", deployRoutes_1.default);
 app.use("/api/uml", uml_1.default);
 app.use("/api/documentation", documentation_1.default);
@@ -95,9 +97,39 @@ app.get("/health", (req, res) => {
 });
 // 🔹 Global Error Handler
 app.use(errorHandler_1.errorHandler);
+const startTerraformService = () => {
+    var _a, _b;
+    console.log("🚀 Starting Terraform FastAPI service...");
+    const terraformRunnerPath = path_1.default.join(__dirname, "../terraform-runner");
+    const pythonProcess = (0, child_process_1.spawn)("python", ["main.py"], {
+        cwd: terraformRunnerPath,
+        env: Object.assign(Object.assign({}, process.env), { PATH: "/app/bin:" + process.env.PATH, TERRAFORM_PORT: "8000" }),
+        stdio: ["pipe", "pipe", "pipe"]
+    });
+    (_a = pythonProcess.stdout) === null || _a === void 0 ? void 0 : _a.on("data", (data) => {
+        console.log(`[Terraform Service] ${data.toString().trim()}`);
+    });
+    (_b = pythonProcess.stderr) === null || _b === void 0 ? void 0 : _b.on("data", (data) => {
+        console.error(`[Terraform Service Error] ${data.toString().trim()}`);
+    });
+    pythonProcess.on("close", (code) => {
+        console.log(`[Terraform Service] Process exited with code ${code}`);
+        if (code !== 0) {
+            console.error("🚨 Terraform service crashed, restarting in 5 seconds...");
+            setTimeout(startTerraformService, 5000);
+        }
+    });
+    pythonProcess.on("error", (error) => {
+        console.error(`[Terraform Service] Failed to start: ${error.message}`);
+    });
+    return pythonProcess;
+};
 // Create server with increased timeout
 const server = app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
     // Set server timeout to 5 minutes
     server.timeout = 300000;
+    // Start Terraform service as a subprocess
+    startTerraformService();
 });
