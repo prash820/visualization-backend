@@ -162,6 +162,8 @@ setup_addons() {
     heroku addons:create papertrail:choklad -a $HEROKU_APP_NAME || print_warning "Papertrail addon might already exist"
     
     print_success "Add-ons configured"
+    
+
 }
 
 # Create AWS IAM resources
