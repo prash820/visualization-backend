@@ -9,7 +9,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import openAIRoutes from "./routes/openAI";
 import authRoutes from "./routes/auth";
 import projectRoutes from "./routes/project";
-import iacRoutes from "./routes/iacRoutes";
+import iacRoutes from "./routes/iac";
 import deployRoutes from "./routes/deployRoutes";
 import umlRoutes from "./routes/uml";
 import codeRoutes from "./routes/appCode";
