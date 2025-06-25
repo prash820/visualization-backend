@@ -12,10 +12,12 @@ echo "🔍 Available space: $(df -h . | tail -1)"
 TERRAFORM_VERSION="1.5.7"
 TERRAFORM_URL="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
 
-# Create bin directory in the current build directory
-echo "📁 Creating bin directory..."
-mkdir -p ./bin
-echo "📁 Created bin directory at: $(pwd)/bin"
+# Get the script directory and create bin directory there
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN_DIR="${SCRIPT_DIR}/bin"
+
+echo "📁 Creating bin directory at: ${BIN_DIR}"
+mkdir -p "${BIN_DIR}"
 
 # Download and install Terraform
 echo "⬇️ Downloading Terraform ${TERRAFORM_VERSION}..."
@@ -26,13 +28,13 @@ cd /tmp
 unzip -q terraform.zip
 chmod +x terraform
 
-echo "📍 Installing Terraform to $(pwd)/../bin/..."
-mv terraform "$(dirname "$0")/bin/"
+echo "📍 Installing Terraform to ${BIN_DIR}..."
+mv terraform "${BIN_DIR}/"
 
 echo "✅ Terraform installation completed!"
-echo "🔍 Terraform binary location: $(dirname "$0")/bin/terraform"
+echo "🔍 Terraform binary location: ${BIN_DIR}/terraform"
 echo "🔍 Terraform version:"
-"$(dirname "$0")/bin/terraform" version
+"${BIN_DIR}/terraform" version
 
 echo "🔍 Final bin directory contents:"
-ls -la "$(dirname "$0")/bin/" 
+ls -la "${BIN_DIR}/" 
