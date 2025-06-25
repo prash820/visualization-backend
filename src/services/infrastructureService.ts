@@ -198,18 +198,26 @@ export class InfrastructureService {
    */
   static async validateTerraformConfig(projectId: string): Promise<{ valid: boolean; errors: string[] }> {
     try {
-      const workspaceDir = path.join(process.cwd(), "terraform-runner/workspace", projectId);
-      const terraformFile = path.join(workspaceDir, "terraform.tf");
+      // Get project details from store
+      const { getProjectById } = await import("../utils/projectFileStore");
+      const project = await getProjectById(projectId);
       
-      if (!fs.existsSync(terraformFile)) {
+      if (!project) {
         return {
           valid: false,
-          errors: ["Terraform configuration file not found"]
+          errors: ["Project not found"]
         };
       }
 
-      // Basic validation - check if the file contains valid Terraform syntax
-      const content = fs.readFileSync(terraformFile, 'utf-8');
+      if (!project.infraCode) {
+        return {
+          valid: false,
+          errors: ["No infrastructure code found for this project"]
+        };
+      }
+
+      // Validate the infrastructure code content
+      const content = project.infraCode;
       const errors: string[] = [];
 
       // Check for basic Terraform blocks
@@ -223,6 +231,18 @@ export class InfrastructureService {
 
       if (!content.includes('resource "aws_')) {
         errors.push("No AWS resources defined");
+      }
+
+      // Additional validation checks
+      if (content.trim().length < 50) {
+        errors.push("Infrastructure code appears to be too short or incomplete");
+      }
+
+      // Check for common syntax issues
+      const openBraces = (content.match(/{/g) || []).length;
+      const closeBraces = (content.match(/}/g) || []).length;
+      if (openBraces !== closeBraces) {
+        errors.push("Mismatched curly braces in configuration");
       }
 
       return {
