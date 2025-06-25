@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import FastAPI, Request
 from deploy import deploy_terraform, destroy_terraform, get_terraform_outputs, get_terraform_state
 
@@ -67,3 +68,19 @@ async def state(request: Request):
     except Exception as e:
         logger.exception("❌ [STATE] Getting state failed")
         return {"error": "Failed to get state", "logs": str(e)}
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Get port from environment variable (Heroku sets this)
+    port = int(os.environ.get("TERRAFORM_PORT", 8000))
+    
+    logger.info(f"🚀 Starting Terraform FastAPI service on port {port}")
+    
+    # Run the server
+    uvicorn.run(
+        app, 
+        host="0.0.0.0",  # Bind to all interfaces for Heroku
+        port=port,
+        log_level="info"
+    )

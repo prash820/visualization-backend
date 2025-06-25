@@ -185,10 +185,39 @@ NEXT_PUBLIC_API_URL=https://your-heroku-app.herokuapp.com/api
 
 ### Common Issues
 
-1. **AWS Permissions**: Verify IAM role and external ID configuration
-2. **Terraform Failures**: Check AWS credentials and regional restrictions
-3. **Build Failures**: Ensure all dependencies are in package.json
-4. **High Costs**: Review resource cleanup settings and user quotas
+1. **"pip: not found" during Heroku build**
+   - **Fixed**: Added `requirements.txt` at root level for Python buildpack
+   - **Cause**: Heroku needs Python dependencies at root, not in subdirectory
+   - **Solution**: Build process now uses proper buildpack order:
+     ```
+     1. Node.js buildpack (npm dependencies)
+     2. Python buildpack (requirements.txt)  
+     3. Terraform buildpack (terraform CLI)
+     ```
+
+2. **"ECONNREFUSED 127.0.0.1:8000" - Terraform service not running**
+   - **Fixed**: Added proper FastAPI server startup code and uvicorn configuration
+   - **Cause**: Python FastAPI app was missing server startup code
+   - **Solution**: 
+     ```bash
+     # Scale the terraform process
+     heroku ps:scale terraform=1 -a your-app-name
+     
+     # Check process status
+     heroku ps -a your-app-name
+     
+     # Should show both processes running:
+     # web.1: up (Node.js server)
+     # terraform.1: up (Python FastAPI service)
+     ```
+
+3. **AWS Permissions**: Verify IAM role and external ID configuration
+
+4. **Terraform Failures**: Check AWS credentials and regional restrictions
+
+5. **Build Failures**: Ensure all dependencies are in package.json
+
+6. **High Costs**: Review resource cleanup settings and user quotas
 
 ### Support Commands
 

@@ -144,7 +144,8 @@ setup_buildpacks() {
     heroku buildpacks:add heroku/python -a $HEROKU_APP_NAME
     heroku buildpacks:add https://github.com/HashiCorp/heroku-buildpack-terraform -a $HEROKU_APP_NAME
     
-    print_success "Buildpacks configured"
+    print_success "Buildpacks configured (Node.js → Python → Terraform)"
+    print_success "Python dependencies will be installed from requirements.txt"
 }
 
 # Add required Heroku add-ons
