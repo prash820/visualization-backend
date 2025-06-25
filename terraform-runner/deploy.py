@@ -6,6 +6,7 @@ import subprocess
 import boto3
 from python_terraform import Terraform
 from dotenv import load_dotenv
+from botocore.exceptions import ClientError
 
 
 # ✅ Load .env variables into os.environ
@@ -15,7 +16,143 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def deploy_terraform(project_id):
+class AWSCredentialManager:
+    """Python implementation of the STS assume role credential manager"""
+    
+    def __init__(self):
+        self.cached_credentials = {}
+        self.sts_client = None
+        
+    def _get_sts_client(self):
+        """Initialize STS client if not already done"""
+        if self.sts_client is None:
+            # Use default credentials (from environment) to create STS client
+            self.sts_client = boto3.client('sts', region_name=os.getenv('AWS_REGION', 'us-east-1'))
+        return self.sts_client
+    
+    def get_credentials_for_user(self, user_id, project_id):
+        """Get temporary credentials for a specific user/project using STS assume role"""
+        cache_key = f"{user_id}-{project_id}"
+        
+        # Check cache first (with expiration)
+        if cache_key in self.cached_credentials:
+            cached = self.cached_credentials[cache_key]
+            if cached['expiration'] > time.time():
+                logger.info(f"[AWS] Using cached credentials for user {user_id}, project {project_id}")
+                return cached['credentials']
+            else:
+                # Remove expired credentials
+                del self.cached_credentials[cache_key]
+        
+        try:
+            logger.info(f"[AWS] Assuming role for user {user_id}, project {project_id}")
+            
+            # Validate required environment variables
+            role_arn = os.getenv('AWS_ROLE_ARN')
+            external_id = os.getenv('AWS_EXTERNAL_ID')
+            
+            if not role_arn:
+                raise ValueError("AWS_ROLE_ARN environment variable is required for STS assume role")
+            
+            if not external_id:
+                raise ValueError("AWS_EXTERNAL_ID environment variable is required for STS assume role")
+            
+            # Assume role with user-specific session
+            sts_client = self._get_sts_client()
+            response = sts_client.assume_role(
+                RoleArn=role_arn,
+                RoleSessionName=f"chart-app-{user_id}-{project_id}",
+                ExternalId=external_id,
+                DurationSeconds=3600,  # 1 hour
+                Tags=[
+                    {'Key': 'UserId', 'Value': user_id},
+                    {'Key': 'ProjectId', 'Value': project_id},
+                    {'Key': 'ManagedBy', 'Value': 'chart-app-platform'},
+                    {'Key': 'Environment', 'Value': os.getenv('NODE_ENV', 'development')},
+                    {'Key': 'CreatedAt', 'Value': time.strftime('%Y-%m-%dT%H:%M:%SZ')}
+                ]
+            )
+            
+            if 'Credentials' not in response:
+                raise ValueError("Failed to assume AWS role - no credentials returned")
+            
+            credentials = {
+                'aws_access_key_id': response['Credentials']['AccessKeyId'],
+                'aws_secret_access_key': response['Credentials']['SecretAccessKey'],
+                'aws_session_token': response['Credentials']['SessionToken']
+            }
+            
+            # Cache credentials (expire 10 minutes before actual expiration for safety)
+            expiration_time = response['Credentials']['Expiration'].timestamp() - (10 * 60)
+            
+            self.cached_credentials[cache_key] = {
+                'credentials': credentials,
+                'expiration': expiration_time
+            }
+            
+            logger.info(f"[AWS] Successfully assumed role for user {user_id}, expires at {time.ctime(expiration_time)}")
+            return credentials
+            
+        except Exception as e:
+            logger.error(f"[AWS] Failed to assume role for user {user_id}: {e}")
+            raise Exception(f"AWS role assumption failed: {str(e)}")
+    
+    def get_credentials(self, user_id=None, project_id=None):
+        """
+        Get AWS credentials with fallback for local development.
+        Supports both direct credentials and IAM role assumption.
+        """
+        # Check if we should use direct credentials
+        has_direct_credentials = os.getenv('AWS_ACCESS_KEY_ID') and os.getenv('AWS_SECRET_ACCESS_KEY')
+        has_role_config = os.getenv('AWS_ROLE_ARN') and os.getenv('AWS_EXTERNAL_ID')
+        
+        # Log the credential approach being used
+        if has_direct_credentials and not has_role_config:
+            logger.info("[AWS] Using direct AWS credentials (Access Key/Secret)")
+            return {
+                'aws_access_key_id': os.getenv('AWS_ACCESS_KEY_ID'),
+                'aws_secret_access_key': os.getenv('AWS_SECRET_ACCESS_KEY'),
+                'aws_session_token': os.getenv('AWS_SESSION_TOKEN')  # Optional
+            }
+        
+        # If we have role configuration, use role assumption
+        if has_role_config:
+            if not user_id or not project_id:
+                if os.getenv('NODE_ENV') == 'production':
+                    raise ValueError("user_id and project_id are required for IAM role assumption in production")
+                # In development, we can proceed without user context for testing
+                logger.info("[AWS] Warning: Using role assumption without user context (development only)")
+                return self.get_credentials_for_user('dev-user', 'dev-project')
+            
+            logger.info(f"[AWS] Using IAM role assumption for user {user_id}, project {project_id}")
+            return self.get_credentials_for_user(user_id, project_id)
+        
+        # If we have both, prefer role assumption in production
+        if has_direct_credentials and has_role_config:
+            if os.getenv('NODE_ENV') == 'production':
+                logger.info("[AWS] Both credential types available, using IAM role assumption for production")
+                if not user_id or not project_id:
+                    raise ValueError("user_id and project_id are required for IAM role assumption in production")
+                return self.get_credentials_for_user(user_id, project_id)
+            else:
+                logger.info("[AWS] Both credential types available, using direct credentials for development")
+                return {
+                    'aws_access_key_id': os.getenv('AWS_ACCESS_KEY_ID'),
+                    'aws_secret_access_key': os.getenv('AWS_SECRET_ACCESS_KEY'),
+                    'aws_session_token': os.getenv('AWS_SESSION_TOKEN')
+                }
+        
+        # No valid credentials found
+        raise ValueError(
+            "No valid AWS credentials found. Please set either:\n"
+            "1. Direct credentials: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY\n"
+            "2. Role assumption: AWS_ROLE_ARN and AWS_EXTERNAL_ID"
+        )
+
+# Global credential manager instance
+aws_credential_manager = AWSCredentialManager()
+
+def deploy_terraform(project_id, user_id=None):
     # Find terraform binary location
     script_dir = os.path.dirname(__file__)
     terraform_bin_path = os.path.join(script_dir, "..", "bin", "terraform")
@@ -39,8 +176,23 @@ def deploy_terraform(project_id):
         logger.info(f"[DEPLOY] Created workspace directory: {workspace_dir}")
     else:
         logger.info(f"[DEPLOY] Using existing workspace directory: {workspace_dir}")
-    print("Deploying to AWS region:", os.getenv("AWS_DEFAULT_REGION"))
-    logger.info("[DEPLOY] Using AWS credentials from .env")
+    
+    # Get AWS credentials using the credential manager
+    try:
+        credentials = aws_credential_manager.get_credentials(user_id, project_id)
+        logger.info("[DEPLOY] Successfully obtained AWS credentials")
+        
+        # Set AWS credentials in environment for Terraform
+        for key, value in credentials.items():
+            if value:  # Only set non-None values
+                os.environ[key.upper()] = value
+                
+    except Exception as e:
+        logger.error(f"[DEPLOY] Failed to get AWS credentials: {e}")
+        return {"status": "error", "logs": str(e), "error": "Failed to get AWS credentials"}
+    
+    print("Deploying to AWS region:", os.getenv("AWS_DEFAULT_REGION", os.getenv("AWS_REGION", "us-east-1")))
+    logger.info("[DEPLOY] Using AWS credentials from credential manager")
     os.environ["TF_LOG"] = "INFO"
     state_file = os.path.join(workspace_dir, "terraform.tfstate")
     if os.path.exists(state_file) and os.stat(state_file).st_size == 0:
@@ -74,13 +226,15 @@ def deploy_terraform(project_id):
         logger.error("[DEPLOY] Terraform apply failed")
     return {"status": "success" if return_code == 0 else "error", "stdout": stdout, "stderr": stderr}
 
-def get_aws_clients():
+def get_aws_clients(user_id=None, project_id=None):
     """Initialize AWS clients with proper error handling"""
     try:
+        credentials = aws_credential_manager.get_credentials(user_id, project_id)
         session = boto3.Session(
-            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-            region_name=os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
+            aws_access_key_id=credentials['aws_access_key_id'],
+            aws_secret_access_key=credentials['aws_secret_access_key'],
+            aws_session_token=credentials.get('aws_session_token'),
+            region_name=os.getenv('AWS_DEFAULT_REGION', os.getenv('AWS_REGION', 'us-east-1'))
         )
         
         return {
@@ -312,7 +466,7 @@ def cleanup_api_gateways(apigateway_client, apigatewayv2_client, gateways):
     
     return cleanup_logs
 
-def destroy_terraform_with_cleanup(project_id):
+def destroy_terraform_with_cleanup(project_id, user_id=None):
     """
     Destroy Terraform infrastructure with comprehensive cleanup.
     This function handles AWS resource cleanup before running terraform destroy.
@@ -349,7 +503,20 @@ def destroy_terraform_with_cleanup(project_id):
         }
 
     logger.info(f"🗑️ Starting enhanced destroy for project: {project_id}")
-    logger.info("🔐 Using AWS credentials from .env")
+    
+    # Get AWS credentials using the credential manager
+    try:
+        credentials = aws_credential_manager.get_credentials(user_id, project_id)
+        logger.info("🔐 [DESTROY] Successfully obtained AWS credentials")
+        
+        # Set AWS credentials in environment for Terraform
+        for key, value in credentials.items():
+            if value:  # Only set non-None values
+                os.environ[key.upper()] = value
+                
+    except Exception as e:
+        logger.error(f"[DESTROY] Failed to get AWS credentials: {e}")
+        cleanup_logs.append(f"Warning: Could not get AWS credentials - {e}")
 
     # Enable Terraform debug logs
     os.environ["TF_LOG"] = "INFO"
@@ -365,7 +532,7 @@ def destroy_terraform_with_cleanup(project_id):
             "cleanup_logs": []
         }
 
-    aws_clients = get_aws_clients()
+    aws_clients = get_aws_clients(user_id, project_id)
     
     # Step 1: Read Terraform state and extract resources
     try:
@@ -483,9 +650,9 @@ def destroy_terraform_with_cleanup(project_id):
     }
 
 # Keep the original function name for backward compatibility
-def destroy_terraform(project_id):
+def destroy_terraform(project_id, user_id=None):
     """Wrapper function for backward compatibility"""
-    return destroy_terraform_with_cleanup(project_id)
+    return destroy_terraform_with_cleanup(project_id, user_id)
 
 def get_terraform_outputs(project_id):
     workspace_dir = os.path.join(os.path.dirname(__file__), "workspace", project_id)

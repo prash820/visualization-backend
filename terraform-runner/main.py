@@ -17,10 +17,11 @@ async def health_check():
 async def deploy(request: Request):
     data = await request.json()
     project_id = data.get("projectId")
-    logger.info(f"📦 [DEPLOY] Received deploy request for project: {project_id}")
+    user_id = data.get("userId")  # Optional for STS assume role
+    logger.info(f"📦 [DEPLOY] Received deploy request for project: {project_id}, user: {user_id}")
 
     try:
-        result = deploy_terraform(project_id)
+        result = deploy_terraform(project_id, user_id)
         logger.info(f"📝 [DEPLOY] Result: {result['status']}")
         return result
     except Exception as e:
@@ -31,10 +32,11 @@ async def deploy(request: Request):
 async def destroy(request: Request):
     data = await request.json()
     project_id = data.get("projectId")
-    logger.info(f"🗑️ [DESTROY] Received destroy request for project: {project_id}")
+    user_id = data.get("userId")  # Optional for STS assume role
+    logger.info(f"🗑️ [DESTROY] Received destroy request for project: {project_id}, user: {user_id}")
 
     try:
-        result = destroy_terraform(project_id)
+        result = destroy_terraform(project_id, user_id)
         logger.info(f"📝 [DESTROY] Result: {result['status']}")
         return result
     except Exception as e:
@@ -45,7 +47,8 @@ async def destroy(request: Request):
 async def outputs(request: Request):
     data = await request.json()
     project_id = data.get("projectId")
-    logger.info(f"📊 [OUTPUTS] Received outputs request for project: {project_id}")
+    user_id = data.get("userId")  # Optional for STS assume role
+    logger.info(f"📊 [OUTPUTS] Received outputs request for project: {project_id}, user: {user_id}")
 
     try:
         result = get_terraform_outputs(project_id)
@@ -59,7 +62,8 @@ async def outputs(request: Request):
 async def state(request: Request):
     data = await request.json()
     project_id = data.get("projectId")
-    logger.info(f"📋 [STATE] Received state request for project: {project_id}")
+    user_id = data.get("userId")  # Optional for STS assume role
+    logger.info(f"📋 [STATE] Received state request for project: {project_id}, user: {user_id}")
 
     try:
         result = get_terraform_state(project_id)
