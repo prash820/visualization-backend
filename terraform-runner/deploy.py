@@ -17,9 +17,12 @@ logger = logging.getLogger(__name__)
 
 def deploy_terraform(project_id):
     # Ensure Terraform binary is in PATH (for Heroku deployment)
+    terraform_path = "terraform"  # Default path
     if '/app/bin' not in os.environ.get('PATH', ''):
         os.environ['PATH'] = '/app/bin:' + os.environ.get('PATH', '')
+        terraform_path = "/app/bin/terraform"  # Explicit path for Heroku
         logger.info(f"[DEPLOY] Updated PATH: {os.environ['PATH']}")
+        logger.info(f"[DEPLOY] Using Terraform binary at: {terraform_path}")
     
     workspace_dir = os.path.join(os.path.dirname(__file__), "workspace", project_id)
     logger.info(f"[DEPLOY] Using workspace directory: {workspace_dir}")
@@ -35,7 +38,7 @@ def deploy_terraform(project_id):
     if os.path.exists(state_file) and os.stat(state_file).st_size == 0:
         os.remove(state_file)
         logger.info(f"[DEPLOY] Removed empty state file: {state_file}")
-    tf = Terraform(working_dir=workspace_dir)
+    tf = Terraform(working_dir=workspace_dir, terraform_path=terraform_path)
     logger.info("[DEPLOY] Running terraform init...")
     init_return_code, init_stdout, init_stderr = tf.init(upgrade=True)
     logger.info(f"[DEPLOY] Init stdout:\n{init_stdout}")
