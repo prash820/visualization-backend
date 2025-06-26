@@ -34,7 +34,7 @@ function generateApplicationJobId() {
 }
 
 const saveIaCToFile = (projectId: string, iacCode: string): string => {
-  console.log("Saving IAC to file");
+    console.log("Saving IAC to file");
   const workspaceDir = path.join(__dirname, "../../terraform-runner/workspace", projectId);
   if (!fs.existsSync(workspaceDir)) {
     fs.mkdirSync(workspaceDir, { recursive: true });
@@ -82,7 +82,7 @@ async function processDeploymentJob(jobId: string, projectId: string, iacCode: s
 
     // Save IaC code to file
     saveIaCToFile(projectId, iacCode);
-    
+
     infrastructureDeploymentJobs[jobId].progress = 20;
 
     // Call Terraform runner

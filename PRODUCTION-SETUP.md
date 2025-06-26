@@ -296,4 +296,4 @@ cd visualization-backend
 ./verify-deployment.sh your-app-name
 ```
 
-This production setup provides a **robust, scalable, and secure platform** for multi-tenant AWS infrastructure provisioning, ready to handle 100+ users creating applications from prompts.
+This production setup provides a **robust, scalable, and secure platform** for multi-tenant AWS infrastructure provisioning, ready to handle 100+ users creating applications from prompts. 

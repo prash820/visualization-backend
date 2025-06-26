@@ -4,6 +4,8 @@ import time
 import json
 import subprocess
 import boto3
+import zipfile
+import tempfile
 from python_terraform import Terraform
 from dotenv import load_dotenv
 from botocore.exceptions import ClientError
@@ -152,6 +154,72 @@ class AWSCredentialManager:
 # Global credential manager instance
 aws_credential_manager = AWSCredentialManager()
 
+def create_lambda_zip_files(workspace_dir):
+    """Create dummy ZIP files for Lambda functions referenced in Terraform configuration"""
+    logger.info("[DEPLOY] Creating Lambda ZIP files...")
+    
+    # Read the terraform configuration to find Lambda functions
+    terraform_file = os.path.join(workspace_dir, "terraform.tf")
+    if not os.path.exists(terraform_file):
+        logger.warning(f"[DEPLOY] No terraform.tf found at {terraform_file}")
+        return
+    
+    try:
+        with open(terraform_file, 'r') as f:
+            terraform_content = f.read()
+        
+        # Find all filename references in Lambda functions
+        import re
+        filename_pattern = r'filename\s*=\s*["\']([^"\']+)["\']'
+        filenames = re.findall(filename_pattern, terraform_content)
+        
+        for filename in filenames:
+            if filename.endswith('.zip'):
+                zip_path = os.path.join(workspace_dir, filename)
+                
+                if not os.path.exists(zip_path):
+                    logger.info(f"[DEPLOY] Creating dummy ZIP file: {filename}")
+                    
+                    # Create a simple Lambda function
+                    lambda_code = '''
+import json
+
+def handler(event, context):
+    """
+    Dummy Lambda function created by chart-app deployment system.
+    This function should be replaced with actual application code.
+    """
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'message': 'Hello from Lambda!',
+            'event': event,
+            'function': 'meal_plan_service'
+        })
+    }
+'''
+                    
+                    # Create ZIP file with the dummy code
+                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                        # Add the Python file
+                        zipf.writestr('lambda_function.py', lambda_code)
+                        
+                        # Add a simple requirements.txt
+                        zipf.writestr('requirements.txt', '')
+                    
+                    logger.info(f"[DEPLOY] Created {filename} ({os.path.getsize(zip_path)} bytes)")
+                else:
+                    logger.info(f"[DEPLOY] ZIP file already exists: {filename}")
+        
+        if filenames:
+            logger.info(f"[DEPLOY] Processed {len(filenames)} Lambda ZIP files")
+        else:
+            logger.info("[DEPLOY] No Lambda ZIP files required")
+            
+    except Exception as e:
+        logger.warning(f"[DEPLOY] Error creating Lambda ZIP files: {e}")
+        # Don't fail the deployment for this
+
 def deploy_terraform(project_id, user_id=None):
     # Find terraform binary location
     script_dir = os.path.dirname(__file__)
@@ -176,6 +244,9 @@ def deploy_terraform(project_id, user_id=None):
         logger.info(f"[DEPLOY] Created workspace directory: {workspace_dir}")
     else:
         logger.info(f"[DEPLOY] Using existing workspace directory: {workspace_dir}")
+    
+    # Create Lambda ZIP files before deployment
+    create_lambda_zip_files(workspace_dir)
     
     # Get AWS credentials using the credential manager
     try:
@@ -209,7 +280,7 @@ def deploy_terraform(project_id, user_id=None):
             logger.error(f"[DEPLOY] Terraform version check failed: {result.stderr}")
     except Exception as e:
         logger.error(f"[DEPLOY] Terraform binary test failed: {e}")
-    
+
     init_return_code, init_stdout, init_stderr = tf.init(upgrade=True)
     logger.info(f"[DEPLOY] Init stdout:\n{init_stdout}")
     logger.info(f"[DEPLOY] Init stderr:\n{init_stderr}")
@@ -739,4 +810,4 @@ def get_terraform_state(project_id):
             "status": "error",
             "state": {},
             "error": str(e)
-        }
+    }
