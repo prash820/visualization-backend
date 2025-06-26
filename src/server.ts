@@ -76,7 +76,7 @@ app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
 // 🔹 CORS Configuration
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  origin: "*", // Accept traffic from all origins
   credentials: true,
   optionsSuccessStatus: 200,
   maxAge: 86400 // Cache preflight for 24 hours
