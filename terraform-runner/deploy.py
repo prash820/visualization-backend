@@ -236,8 +236,8 @@ def import_existing_resources(project_id, terraform_config):
     # Find IAM roles
     iam_roles = re.findall(r'resource\s+"aws_iam_role"\s+"([^"]+)"\s*{[^}]*name\s*=\s*"([^"]+)"', terraform_config, re.DOTALL)
     
-    # Find DynamoDB tables
-    dynamodb_tables = re.findall(r'resource\s+"aws_dynamodb_table"\s+"([^"]+)"\s*{[^}]*name\s*=\s*"([^"]+)"', terraform_config, re.DOTALL)
+    # Find DynamoDB tables - fix the regex pattern to handle both 'name' and 'table_name' attributes
+    dynamodb_tables = re.findall(r'resource\s+"aws_dynamodb_table"\s+"([^"]+)"\s*{[^}]*(?:name|table_name)\s*=\s*"([^"]+)"', terraform_config, re.DOTALL)
     
     # Find Lambda functions
     lambda_functions = re.findall(r'resource\s+"aws_lambda_function"\s+"([^"]+)"\s*{[^}]*function_name\s*=\s*"([^"]+)"', terraform_config, re.DOTALL)
