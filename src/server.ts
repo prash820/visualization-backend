@@ -140,16 +140,17 @@ app.use(errorHandler);
 
 const startTerraformService = () => {
   console.log("🚀 Starting Terraform FastAPI service...");
-  const terraformServicePath = path.join(__dirname, "..", "terraform-runner", "main.py");
 
   // Memory-optimized Terraform service startup
-  const terraformProcess = spawn("python", [terraformServicePath], {
+  const terraformProcess = spawn("uvicorn", ["main:app", "--host", "0.0.0.0", "--port", "8000"], {
     cwd: path.join(__dirname, "..", "terraform-runner"),
     env: { 
       ...process.env,
       PYTHONUNBUFFERED: "1",
       PYTHONDONTWRITEBYTECODE: "1",  // Reduce memory usage
-      PYTHONOPTIMIZE: "1"            // Optimize Python execution
+      PYTHONOPTIMIZE: "1",           // Optimize Python execution
+      PATH: "/app/bin:" + process.env.PATH, // Ensure Terraform binary is in PATH
+      TERRAFORM_PORT: "8000"
     },
     stdio: ["pipe", "pipe", "pipe"]
   });

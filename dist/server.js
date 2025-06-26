@@ -128,12 +128,10 @@ app.use(errorHandler_1.errorHandler);
 const startTerraformService = () => {
     var _a, _b;
     console.log("🚀 Starting Terraform FastAPI service...");
-    const terraformServicePath = path_1.default.join(__dirname, "..", "terraform-runner", "main.py");
     // Memory-optimized Terraform service startup
-    const terraformProcess = (0, child_process_1.spawn)("python", [terraformServicePath], {
+    const terraformProcess = (0, child_process_1.spawn)("uvicorn", ["main:app", "--host", "0.0.0.0", "--port", "8000"], {
         cwd: path_1.default.join(__dirname, "..", "terraform-runner"),
-        env: Object.assign(Object.assign({}, process.env), { PYTHONUNBUFFERED: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONOPTIMIZE: "1" // Optimize Python execution
-         }),
+        env: Object.assign(Object.assign({}, process.env), { PYTHONUNBUFFERED: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONOPTIMIZE: "1", PATH: "/app/bin:" + process.env.PATH, TERRAFORM_PORT: "8000" }),
         stdio: ["pipe", "pipe", "pipe"]
     });
     (_a = terraformProcess.stdout) === null || _a === void 0 ? void 0 : _a.on("data", (data) => {
