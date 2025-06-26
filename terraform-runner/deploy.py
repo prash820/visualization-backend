@@ -25,8 +25,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Memory optimization: Limit log retention
-logger.handlers[0].setLevel(logging.INFO)
+# Memory optimization: Limit log retention - safely check for handlers
+if logger.handlers:
+    logger.handlers[0].setLevel(logging.INFO)
 
 class AWSCredentialManager:
     """Python implementation of the STS assume role credential manager"""
