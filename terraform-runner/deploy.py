@@ -220,6 +220,123 @@ def handler(event, context):
         logger.warning(f"[DEPLOY] Error creating Lambda ZIP files: {e}")
         # Don't fail the deployment for this
 
+def import_existing_resources(project_id, terraform_config):
+    """Import existing AWS resources into Terraform state to avoid conflicts"""
+    logger.info("[DEPLOY] Checking for existing AWS resources to import...")
+    
+    workspace_dir = os.path.join(os.path.dirname(__file__), "workspace", project_id)
+    tf = Terraform(working_dir=workspace_dir)
+    
+    # Parse terraform config to find resource names
+    import re
+    
+    # Find S3 buckets
+    s3_buckets = re.findall(r'resource\s+"aws_s3_bucket"\s+"([^"]+)"\s*{[^}]*bucket\s*=\s*"([^"]+)"', terraform_config, re.DOTALL)
+    
+    # Find IAM roles
+    iam_roles = re.findall(r'resource\s+"aws_iam_role"\s+"([^"]+)"\s*{[^}]*name\s*=\s*"([^"]+)"', terraform_config, re.DOTALL)
+    
+    # Find DynamoDB tables
+    dynamodb_tables = re.findall(r'resource\s+"aws_dynamodb_table"\s+"([^"]+)"\s*{[^}]*name\s*=\s*"([^"]+)"', terraform_config, re.DOTALL)
+    
+    # Find Lambda functions
+    lambda_functions = re.findall(r'resource\s+"aws_lambda_function"\s+"([^"]+)"\s*{[^}]*function_name\s*=\s*"([^"]+)"', terraform_config, re.DOTALL)
+    
+    import_results = []
+    
+    try:
+        # Get AWS clients to check if resources exist
+        aws_clients = get_aws_clients()
+        if not aws_clients:
+            logger.warning("[DEPLOY] Cannot check existing resources - AWS clients not available")
+            return import_results
+        
+        # Import S3 buckets
+        for resource_name, bucket_name in s3_buckets:
+            try:
+                aws_clients['s3'].head_bucket(Bucket=bucket_name)
+                logger.info(f"[DEPLOY] Found existing S3 bucket: {bucket_name}")
+                
+                # Try to import
+                return_code, stdout, stderr = tf.import_cmd(f"aws_s3_bucket.{resource_name}", bucket_name)
+                if return_code == 0:
+                    logger.info(f"[DEPLOY] Successfully imported S3 bucket: {bucket_name}")
+                    import_results.append(f"Imported S3 bucket: {bucket_name}")
+                else:
+                    logger.warning(f"[DEPLOY] Failed to import S3 bucket {bucket_name}: {stderr}")
+                    
+            except aws_clients['s3'].exceptions.NoSuchBucket:
+                logger.info(f"[DEPLOY] S3 bucket {bucket_name} does not exist - will be created")
+            except Exception as e:
+                logger.warning(f"[DEPLOY] Error checking S3 bucket {bucket_name}: {e}")
+        
+        # Import IAM roles
+        for resource_name, role_name in iam_roles:
+            try:
+                aws_clients['iam'].get_role(RoleName=role_name)
+                logger.info(f"[DEPLOY] Found existing IAM role: {role_name}")
+                
+                # Try to import
+                return_code, stdout, stderr = tf.import_cmd(f"aws_iam_role.{resource_name}", role_name)
+                if return_code == 0:
+                    logger.info(f"[DEPLOY] Successfully imported IAM role: {role_name}")
+                    import_results.append(f"Imported IAM role: {role_name}")
+                else:
+                    logger.warning(f"[DEPLOY] Failed to import IAM role {role_name}: {stderr}")
+                    
+            except aws_clients['iam'].exceptions.NoSuchEntityException:
+                logger.info(f"[DEPLOY] IAM role {role_name} does not exist - will be created")
+            except Exception as e:
+                logger.warning(f"[DEPLOY] Error checking IAM role {role_name}: {e}")
+        
+        # Import DynamoDB tables
+        for resource_name, table_name in dynamodb_tables:
+            try:
+                aws_clients['dynamodb'].describe_table(TableName=table_name)
+                logger.info(f"[DEPLOY] Found existing DynamoDB table: {table_name}")
+                
+                # Try to import
+                return_code, stdout, stderr = tf.import_cmd(f"aws_dynamodb_table.{resource_name}", table_name)
+                if return_code == 0:
+                    logger.info(f"[DEPLOY] Successfully imported DynamoDB table: {table_name}")
+                    import_results.append(f"Imported DynamoDB table: {table_name}")
+                else:
+                    logger.warning(f"[DEPLOY] Failed to import DynamoDB table {table_name}: {stderr}")
+                    
+            except aws_clients['dynamodb'].exceptions.ResourceNotFoundException:
+                logger.info(f"[DEPLOY] DynamoDB table {table_name} does not exist - will be created")
+            except Exception as e:
+                logger.warning(f"[DEPLOY] Error checking DynamoDB table {table_name}: {e}")
+        
+        # Import Lambda functions
+        for resource_name, function_name in lambda_functions:
+            try:
+                aws_clients['lambda'].get_function(FunctionName=function_name)
+                logger.info(f"[DEPLOY] Found existing Lambda function: {function_name}")
+                
+                # Try to import
+                return_code, stdout, stderr = tf.import_cmd(f"aws_lambda_function.{resource_name}", function_name)
+                if return_code == 0:
+                    logger.info(f"[DEPLOY] Successfully imported Lambda function: {function_name}")
+                    import_results.append(f"Imported Lambda function: {function_name}")
+                else:
+                    logger.warning(f"[DEPLOY] Failed to import Lambda function {function_name}: {stderr}")
+                    
+            except aws_clients['lambda'].exceptions.ResourceNotFoundException:
+                logger.info(f"[DEPLOY] Lambda function {function_name} does not exist - will be created")
+            except Exception as e:
+                logger.warning(f"[DEPLOY] Error checking Lambda function {function_name}: {e}")
+        
+        if import_results:
+            logger.info(f"[DEPLOY] Imported {len(import_results)} existing resources")
+        else:
+            logger.info("[DEPLOY] No existing resources found to import")
+            
+    except Exception as e:
+        logger.warning(f"[DEPLOY] Error during resource import: {e}")
+    
+    return import_results
+
 def deploy_terraform(project_id, user_id=None):
     # Find terraform binary location
     script_dir = os.path.dirname(__file__)
@@ -287,6 +404,16 @@ def deploy_terraform(project_id, user_id=None):
     if init_return_code != 0:
         logger.error("[DEPLOY] Terraform init failed")
         return {"status": "error", "logs": init_stderr, "error": "Terraform init failed"}
+    
+    # Import existing resources before applying
+    terraform_file = os.path.join(workspace_dir, "terraform.tf")
+    if os.path.exists(terraform_file):
+        with open(terraform_file, 'r') as f:
+            terraform_config = f.read()
+        import_results = import_existing_resources(project_id, terraform_config)
+    else:
+        import_results = []
+    
     logger.info("[DEPLOY] Running terraform apply...")
     return_code, stdout, stderr = tf.apply(skip_plan=True, capture_output=True)
     logger.info(f"[DEPLOY] Apply stdout:\n{stdout}")
@@ -295,7 +422,12 @@ def deploy_terraform(project_id, user_id=None):
         logger.info("[DEPLOY] Terraform apply succeeded")
     else:
         logger.error("[DEPLOY] Terraform apply failed")
-    return {"status": "success" if return_code == 0 else "error", "stdout": stdout, "stderr": stderr}
+    
+    result = {"status": "success" if return_code == 0 else "error", "stdout": stdout, "stderr": stderr}
+    if import_results:
+        result["import_results"] = import_results
+    
+    return result
 
 def get_aws_clients(user_id=None, project_id=None):
     """Initialize AWS clients with proper error handling"""
