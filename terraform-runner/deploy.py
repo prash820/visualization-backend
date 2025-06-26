@@ -6,6 +6,7 @@ import subprocess
 import boto3
 import zipfile
 import tempfile
+import gc  # Add garbage collection
 from python_terraform import Terraform
 from dotenv import load_dotenv
 from botocore.exceptions import ClientError
@@ -14,9 +15,18 @@ from botocore.exceptions import ClientError
 # ✅ Load .env variables into os.environ
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+# Setup logging with memory-efficient configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
+
+# Memory optimization: Limit log retention
+logger.handlers[0].setLevel(logging.INFO)
 
 class AWSCredentialManager:
     """Python implementation of the STS assume role credential manager"""
@@ -337,6 +347,32 @@ def import_existing_resources(project_id, terraform_config):
     
     return import_results
 
+def cleanup_workspace_memory(workspace_dir):
+    """Clean up temporary files and force garbage collection to free memory"""
+    try:
+        # Clean up temporary terraform files that consume memory
+        temp_files = [
+            ".terraform.lock.hcl",
+            "terraform.tfstate.backup",
+            "terraform.tfstate.*.backup"
+        ]
+        
+        for pattern in temp_files:
+            for file_path in workspace_dir.rglob(pattern) if hasattr(workspace_dir, 'rglob') else []:
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        logger.debug(f"[MEMORY] Cleaned up: {file_path}")
+                except Exception as e:
+                    logger.debug(f"[MEMORY] Could not clean {file_path}: {e}")
+        
+        # Force garbage collection
+        gc.collect()
+        logger.info("[MEMORY] Workspace cleanup completed")
+        
+    except Exception as e:
+        logger.warning(f"[MEMORY] Cleanup warning: {e}")
+
 def deploy_terraform(project_id, user_id=None):
     # Find terraform binary location
     script_dir = os.path.dirname(__file__)
@@ -362,72 +398,93 @@ def deploy_terraform(project_id, user_id=None):
     else:
         logger.info(f"[DEPLOY] Using existing workspace directory: {workspace_dir}")
     
-    # Create Lambda ZIP files before deployment
-    create_lambda_zip_files(workspace_dir)
-    
-    # Get AWS credentials using the credential manager
     try:
-        credentials = aws_credential_manager.get_credentials(user_id, project_id)
-        logger.info("[DEPLOY] Successfully obtained AWS credentials")
-        
-        # Set AWS credentials in environment for Terraform
-        for key, value in credentials.items():
-            if value:  # Only set non-None values
-                os.environ[key.upper()] = value
-                
-    except Exception as e:
-        logger.error(f"[DEPLOY] Failed to get AWS credentials: {e}")
-        return {"status": "error", "logs": str(e), "error": "Failed to get AWS credentials"}
-    
-    print("Deploying to AWS region:", os.getenv("AWS_DEFAULT_REGION", os.getenv("AWS_REGION", "us-east-1")))
-    logger.info("[DEPLOY] Using AWS credentials from credential manager")
-    os.environ["TF_LOG"] = "INFO"
-    state_file = os.path.join(workspace_dir, "terraform.tfstate")
-    if os.path.exists(state_file) and os.stat(state_file).st_size == 0:
-        os.remove(state_file)
-        logger.info(f"[DEPLOY] Removed empty state file: {state_file}")
-    tf = Terraform(working_dir=workspace_dir)
-    logger.info("[DEPLOY] Running terraform init...")
-    
-    # Test if terraform binary is accessible
-    try:
-        result = subprocess.run(["terraform", "version"], capture_output=True, text=True, timeout=10)
-        logger.info(f"[DEPLOY] Terraform version check: {result.stdout}")
-        if result.returncode != 0:
-            logger.error(f"[DEPLOY] Terraform version check failed: {result.stderr}")
-    except Exception as e:
-        logger.error(f"[DEPLOY] Terraform binary test failed: {e}")
+        # Create Lambda ZIP files before deployment
+        create_lambda_zip_files(workspace_dir)
 
-    init_return_code, init_stdout, init_stderr = tf.init(upgrade=True)
-    logger.info(f"[DEPLOY] Init stdout:\n{init_stdout}")
-    logger.info(f"[DEPLOY] Init stderr:\n{init_stderr}")
-    if init_return_code != 0:
-        logger.error("[DEPLOY] Terraform init failed")
-        return {"status": "error", "logs": init_stderr, "error": "Terraform init failed"}
-    
-    # Import existing resources before applying
-    terraform_file = os.path.join(workspace_dir, "terraform.tf")
-    if os.path.exists(terraform_file):
-        with open(terraform_file, 'r') as f:
-            terraform_config = f.read()
-        import_results = import_existing_resources(project_id, terraform_config)
-    else:
-        import_results = []
-    
-    logger.info("[DEPLOY] Running terraform apply...")
-    return_code, stdout, stderr = tf.apply(skip_plan=True, capture_output=True)
-    logger.info(f"[DEPLOY] Apply stdout:\n{stdout}")
-    logger.info(f"[DEPLOY] Apply stderr:\n{stderr}")
-    if return_code == 0:
-        logger.info("[DEPLOY] Terraform apply succeeded")
-    else:
-        logger.error("[DEPLOY] Terraform apply failed")
-    
-    result = {"status": "success" if return_code == 0 else "error", "stdout": stdout, "stderr": stderr}
-    if import_results:
-        result["import_results"] = import_results
-    
-    return result
+        # Get AWS credentials using the credential manager
+        try:
+            credentials = aws_credential_manager.get_credentials(user_id, project_id)
+            logger.info("[DEPLOY] Successfully obtained AWS credentials")
+            
+            # Set AWS credentials in environment for Terraform
+            for key, value in credentials.items():
+                if value:  # Only set non-None values
+                    os.environ[key.upper()] = value
+                    
+        except Exception as e:
+            logger.error(f"[DEPLOY] Failed to get AWS credentials: {e}")
+            return {"status": "error", "logs": str(e), "error": "Failed to get AWS credentials"}
+
+        print("Deploying to AWS region:", os.getenv("AWS_DEFAULT_REGION", os.getenv("AWS_REGION", "us-east-1")))
+        logger.info("[DEPLOY] Using AWS credentials from credential manager")
+        os.environ["TF_LOG"] = "INFO"
+        
+        # Memory optimization: Clean up any existing state files that are empty
+        state_file = os.path.join(workspace_dir, "terraform.tfstate")
+        if os.path.exists(state_file) and os.stat(state_file).st_size == 0:
+            os.remove(state_file)
+            logger.info(f"[DEPLOY] Removed empty state file: {state_file}")
+        
+        tf = Terraform(working_dir=workspace_dir)
+        logger.info("[DEPLOY] Running terraform init...")
+
+        # Test if terraform binary is accessible
+        try:
+            result = subprocess.run(["terraform", "version"], capture_output=True, text=True, timeout=10)
+            logger.info(f"[DEPLOY] Terraform version check: {result.stdout}")
+            if result.returncode != 0:
+                logger.error(f"[DEPLOY] Terraform version check failed: {result.stderr}")
+        except Exception as e:
+            logger.error(f"[DEPLOY] Terraform binary test failed: {e}")
+
+        init_return_code, init_stdout, init_stderr = tf.init(upgrade=True)
+        logger.info(f"[DEPLOY] Init stdout:\n{init_stdout}")
+        logger.info(f"[DEPLOY] Init stderr:\n{init_stderr}")
+        if init_return_code != 0:
+            logger.error("[DEPLOY] Terraform init failed")
+            return {"status": "error", "logs": init_stderr, "error": "Terraform init failed"}
+
+        # Force garbage collection after init
+        gc.collect()
+
+        # Import existing resources before applying
+        terraform_file = os.path.join(workspace_dir, "terraform.tf")
+        if os.path.exists(terraform_file):
+            with open(terraform_file, 'r') as f:
+                terraform_config = f.read()
+            import_results = import_existing_resources(project_id, terraform_config)
+            # Clean up terraform_config from memory
+            del terraform_config
+            gc.collect()
+        else:
+            import_results = []
+
+        logger.info("[DEPLOY] Running terraform apply...")
+        return_code, stdout, stderr = tf.apply(skip_plan=True, capture_output=True)
+        logger.info(f"[DEPLOY] Apply stdout:\n{stdout}")
+        logger.info(f"[DEPLOY] Apply stderr:\n{stderr}")
+        
+        if return_code == 0:
+            logger.info("[DEPLOY] Terraform apply succeeded")
+        else:
+            logger.error("[DEPLOY] Terraform apply failed")
+
+        result = {"status": "success" if return_code == 0 else "error", "stdout": stdout, "stderr": stderr}
+        if import_results:
+            result["import_results"] = import_results
+
+        return result
+        
+    finally:
+        # Memory cleanup regardless of success/failure
+        try:
+            cleanup_workspace_memory(workspace_dir)
+        except Exception as e:
+            logger.warning(f"[DEPLOY] Final cleanup warning: {e}")
+        
+        # Final garbage collection
+        gc.collect()
 
 def get_aws_clients(user_id=None, project_id=None):
     """Initialize AWS clients with proper error handling"""

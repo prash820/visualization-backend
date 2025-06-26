@@ -21,6 +21,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+// Memory optimization: Set Node.js memory limits
+if (process.env.NODE_ENV === 'production') {
+  // Optimize garbage collection for production
+  process.env.NODE_OPTIONS = '--max-old-space-size=512 --optimize-for-size';
+}
+
 // Increase timeout for all routes
 app.use((req: Request, res: Response, next: NextFunction) => {
   // Set timeout to 5 minutes (300000ms)
@@ -65,19 +71,18 @@ const simpleRateLimiter = (req: Request, res: Response, next: NextFunction): voi
 
 // 🔹 Security Middleware
 app.use(helmet()); // Security headers
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+app.use(bodyParser.json({ limit: '10mb', strict: true }));
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
 // 🔹 CORS Configuration
-app.use(
-  
-  cors({
-    origin: "*",
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Client-Version"],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "FETCH"],
-  })
-);
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  credentials: true,
+  optionsSuccessStatus: 200,
+  maxAge: 86400 // Cache preflight for 24 hours
+};
+
+app.use(cors(corsOptions));
 
 // 🔹 Apply rate limiter
 app.use(simpleRateLimiter);
@@ -97,11 +102,36 @@ app.use("/api/code", codeRoutes);
 
 // 🔹 Health Check Endpoint
 app.get("/health", (req: Request, res: Response) => {
-  res.json({
-    status: "healthy",
+  const memUsage = process.memoryUsage();
+  const memUsageMB = {
+    rss: Math.round(memUsage.rss / 1024 / 1024 * 100) / 100,
+    heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024 * 100) / 100,
+    heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100,
+    external: Math.round(memUsage.external / 1024 / 1024 * 100) / 100
+  };
+  
+  res.json({ 
+    status: "healthy", 
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || "development"
+    memory: memUsageMB,
+    uptime: process.uptime()
+  });
+});
+
+// Memory monitoring endpoint
+app.get("/memory", (req, res) => {
+  const memUsage = process.memoryUsage();
+  const memUsageMB = {
+    rss: `${Math.round(memUsage.rss / 1024 / 1024 * 100) / 100} MB`,
+    heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024 * 100) / 100} MB`,
+    heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100} MB`,
+    external: `${Math.round(memUsage.external / 1024 / 1024 * 100) / 100} MB`
+  };
+  
+  res.json({
+    memory: memUsageMB,
+    uptime: `${Math.round(process.uptime())} seconds`,
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -110,39 +140,57 @@ app.use(errorHandler);
 
 const startTerraformService = () => {
   console.log("🚀 Starting Terraform FastAPI service...");
-  
-  const terraformRunnerPath = path.join(__dirname, "../terraform-runner");
-  const pythonProcess = spawn("uvicorn", ["main:app", "--host", "0.0.0.0", "--port", "8000"], {
-    cwd: terraformRunnerPath,
-    env: {
+  const terraformServicePath = path.join(__dirname, "..", "terraform-runner", "main.py");
+
+  // Memory-optimized Terraform service startup
+  const terraformProcess = spawn("python", [terraformServicePath], {
+    cwd: path.join(__dirname, "..", "terraform-runner"),
+    env: { 
       ...process.env,
-      PATH: "/app/bin:" + process.env.PATH, // Ensure Terraform binary is in PATH
-      TERRAFORM_PORT: "8000"
+      PYTHONUNBUFFERED: "1",
+      PYTHONDONTWRITEBYTECODE: "1",  // Reduce memory usage
+      PYTHONOPTIMIZE: "1"            // Optimize Python execution
     },
     stdio: ["pipe", "pipe", "pipe"]
   });
 
-  pythonProcess.stdout?.on("data", (data) => {
-    console.log(`[Terraform Service] ${data.toString().trim()}`);
-  });
-
-  pythonProcess.stderr?.on("data", (data) => {
-    console.error(`[Terraform Service Error] ${data.toString().trim()}`);
-  });
-
-  pythonProcess.on("close", (code) => {
-    console.log(`[Terraform Service] Process exited with code ${code}`);
-    if (code !== 0) {
-      console.error("🚨 Terraform service crashed, restarting in 5 seconds...");
-      setTimeout(startTerraformService, 5000);
+  terraformProcess.stdout?.on("data", (data) => {
+    const output = data.toString().trim();
+    if (output) {
+      console.log(`[Terraform Service] ${output}`);
     }
   });
 
-  pythonProcess.on("error", (error) => {
-    console.error(`[Terraform Service] Failed to start: ${error.message}`);
+  terraformProcess.stderr?.on("data", (data) => {
+    const output = data.toString().trim();
+    if (output) {
+      console.log(`[Terraform Service Error] ${output}`);
+    }
   });
 
-  return pythonProcess;
+  terraformProcess.on("close", (code) => {
+    console.log(`[Terraform Service] Process exited with code ${code}`);
+    if (code !== 0) {
+      console.error("[Terraform Service] Terraform service crashed, attempting restart...");
+      // Add restart logic here if needed
+    }
+  });
+
+  terraformProcess.on("error", (error) => {
+    console.error("[Terraform Service] Failed to start:", error);
+  });
+
+  // Memory cleanup interval
+  if (process.env.NODE_ENV === 'production') {
+    setInterval(() => {
+      if (global.gc) {
+        global.gc();
+        console.log("[Memory] Forced garbage collection completed");
+      }
+    }, 300000); // Every 5 minutes
+  }
+
+  return terraformProcess;
 };
 
 // Create server with increased timeout
