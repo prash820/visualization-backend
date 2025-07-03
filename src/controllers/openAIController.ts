@@ -511,10 +511,11 @@ const parseGenericResponse = (response: string) => {
 };
 
 export const generateApplicationCode = async (req: Request, res: Response): Promise<void> => {
-  console.log("[App Code Backend] Received request to generate application code");
-  console.log("[App Code Backend] Request body:", JSON.stringify(req.body, null, 2));
+  console.log("[Agentic Code Gen] Starting sophisticated code generation");
+  console.log("[Agentic Code Gen] Request body:", JSON.stringify(req.body, null, 2));
+  
   const { prompt, projectId, umlDiagrams, documentation, infraCode } = req.body;
-  console.log("[App Code Backend] Extracted data:", {
+  console.log("[Agentic Code Gen] Extracted data:", {
     prompt,
     projectId,
     hasUmlDiagrams: !!umlDiagrams,
@@ -523,216 +524,514 @@ export const generateApplicationCode = async (req: Request, res: Response): Prom
   });
 
   if (!prompt) {
-    console.log("[App Code Backend] Missing prompt in request");
+    console.log("[Agentic Code Gen] Missing prompt in request");
     res.status(400).json({ error: "Prompt is required" });
     return;
   }
 
+  if (!umlDiagrams || Object.keys(umlDiagrams).length === 0) {
+    console.log("[Agentic Code Gen] No UML diagrams provided - falling back to basic generation");
+    return generateBasicApplicationCode(req, res);
+  }
+
   try {
-    console.log("[App Code Backend] Constructing system prompt");
-    const systemPrompt = `You are an expert fullstack developer and technical writer.
+    console.log("[Agentic Code Gen] Starting agentic code generation pipeline");
+    
+    // Phase 1: Analyze diagrams and extract components
+    const analysisResult = await analyzeDiagramsAndExtractComponents(umlDiagrams, prompt);
+    
+    // Phase 2: Decompose components into focused subcomponents
+    const decompositionResult = await decomposeComponentsIntoSubcomponents(analysisResult);
+    
+    // Phase 3: Generate code for each component individually
+    const codeGenerationResult = await generateIndividualComponents(decompositionResult, prompt, infraCode);
+    
+    // Phase 4: Generate integration code using sequence diagram
+    const integrationResult = await generateIntegrationCode(
+      codeGenerationResult, 
+      umlDiagrams.sequence || umlDiagrams.sequenceDiagram, 
+      prompt
+    );
+    
+    // Phase 5: Assemble final application
+    const finalApplication = await assembleFinalApplication(
+      codeGenerationResult,
+      integrationResult,
+      documentation
+    );
 
-Given the following app idea and context, generate a complete, production-ready codebase for both the frontend and backend, using best practices. Your response must include:
+    console.log("[Agentic Code Gen] Successfully generated application code");
 
-- **Frontend**: All necessary components, pages, and utility functions, organized in a way that is ready to use in a modern React (or your stack) application.
-- **Backend**: All necessary controllers, models, routes, and utility functions, organized for a Node.js/Express (or your stack) backend.
-- **Documentation**: A clear, concise README or documentation that explains how to run, build, and use the app.
-
-**Response format (JSON):**
-{
-  "frontend": {
-    "components": { "ComponentName": "code..." },
-    "pages": { "PageName": "code..." },
-    "utils": { "utilName": "code..." }
-  },
-  "backend": {
-    "controllers": { "ControllerName": "code..." },
-    "models": { "ModelName": "code..." },
-    "routes": { "RouteName": "code..." },
-    "utils": { "utilName": "code..." }
-  },
-  "documentation": "README or usage instructions here"
-}
-
-**Important:**
-- Do NOT return empty objects. If a section is not needed, omit it.
-- Each code section should contain real, working code (not just placeholders).
-- Documentation should be clear and actionable.
-- DO NOT include any markdown formatting, code blocks, or explanatory text. Return ONLY the raw JSON object.
-
-Context for code generation:
-Prompt: ${prompt}
-
-UML Diagrams:
-${JSON.stringify(umlDiagrams, null, 2)}
-
-Documentation:
-${documentation || "No documentation provided."}
-
-Infrastructure Code:
-${infraCode || "No infrastructure code provided."}`;
-
-    console.log("[App Code Backend] Sending request to OpenAI");
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { 
-          role: "user", 
-          content: `Generate application code for the following system:
-          
-Prompt: ${prompt}
-
-UML Diagrams:
-${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).join('\n\n')}`
-        },
-      ],
-      max_tokens: 4096,
-      temperature: 0.5,
-    });
-
-    console.log("[App Code Backend] Received response from OpenAI");
-    const fullResponse = response.choices[0]?.message?.content || "";
-    console.log("[App Code Backend] Full response:", fullResponse);
-
-    try {
-      // Clean the response by removing any markdown formatting
-      const cleanedResponse = fullResponse
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-
-      const parsedResponse = JSON.parse(cleanedResponse);
-      console.log("[App Code Backend] Parsed response:", parsedResponse);
-
-      // Validate and ensure required structure with defaults
-      const validatedResponse = {
-        frontend: {
-          components: parsedResponse.frontend?.components || {},
-          pages: parsedResponse.frontend?.pages || {},
-          utils: parsedResponse.frontend?.utils || {}
-        },
-        backend: {
-          controllers: parsedResponse.backend?.controllers || {},
-          models: parsedResponse.backend?.models || {},
-          routes: parsedResponse.backend?.routes || {},
-          utils: parsedResponse.backend?.utils || {}
-        },
-        documentation: parsedResponse.documentation || "No documentation provided."
-      };
-
-      // Save the generated code to files if projectId is provided
-      if (projectId) {
-        const projectDir = path.join(process.cwd(), "terraform-runner/workspace", projectId);
-        if (!fs.existsSync(projectDir)) {
-          fs.mkdirSync(projectDir, { recursive: true });
-        }
-
-        // Save frontend code
-        const frontendDir = path.join(projectDir, "frontend");
-        if (!fs.existsSync(frontendDir)) {
-          fs.mkdirSync(frontendDir, { recursive: true });
-        }
-
-        // Save frontend components
-        const componentsDir = path.join(frontendDir, "components");
-        if (!fs.existsSync(componentsDir)) {
-          fs.mkdirSync(componentsDir, { recursive: true });
-        }
-        Object.entries(validatedResponse.frontend.components).forEach(([filename, content]) => {
-          fs.writeFileSync(path.join(componentsDir, filename), content as string);
-        });
-
-        // Save frontend pages
-        const pagesDir = path.join(frontendDir, "pages");
-        if (!fs.existsSync(pagesDir)) {
-          fs.mkdirSync(pagesDir, { recursive: true });
-        }
-        Object.entries(validatedResponse.frontend.pages).forEach(([filename, content]) => {
-          fs.writeFileSync(path.join(pagesDir, filename), content as string);
-        });
-
-        // Save frontend utils
-        const frontendUtilsDir = path.join(frontendDir, "utils");
-        if (!fs.existsSync(frontendUtilsDir)) {
-          fs.mkdirSync(frontendUtilsDir, { recursive: true });
-        }
-        Object.entries(validatedResponse.frontend.utils).forEach(([filename, content]) => {
-          fs.writeFileSync(path.join(frontendUtilsDir, filename), content as string);
-        });
-
-        // Save backend code
-        const backendDir = path.join(projectDir, "backend");
-        if (!fs.existsSync(backendDir)) {
-          fs.mkdirSync(backendDir, { recursive: true });
-        }
-
-        // Save backend controllers
-        const controllersDir = path.join(backendDir, "controllers");
-        if (!fs.existsSync(controllersDir)) {
-          fs.mkdirSync(controllersDir, { recursive: true });
-        }
-        Object.entries(validatedResponse.backend.controllers).forEach(([filename, content]) => {
-          fs.writeFileSync(path.join(controllersDir, filename), content as string);
-        });
-
-        // Save backend models
-        const modelsDir = path.join(backendDir, "models");
-        if (!fs.existsSync(modelsDir)) {
-          fs.mkdirSync(modelsDir, { recursive: true });
-        }
-        Object.entries(validatedResponse.backend.models).forEach(([filename, content]) => {
-          fs.writeFileSync(path.join(modelsDir, filename), content as string);
-        });
-
-        // Save backend routes
-        const routesDir = path.join(backendDir, "routes");
-        if (!fs.existsSync(routesDir)) {
-          fs.mkdirSync(routesDir, { recursive: true });
-        }
-        Object.entries(validatedResponse.backend.routes).forEach(([filename, content]) => {
-          fs.writeFileSync(path.join(routesDir, filename), content as string);
-        });
-
-        // Save backend utils
-        const backendUtilsDir = path.join(backendDir, "utils");
-        if (!fs.existsSync(backendUtilsDir)) {
-          fs.mkdirSync(backendUtilsDir, { recursive: true });
-        }
-        Object.entries(validatedResponse.backend.utils).forEach(([filename, content]) => {
-          fs.writeFileSync(path.join(backendUtilsDir, filename), content as string);
-        });
-
-        // Save documentation
-        fs.writeFileSync(path.join(projectDir, "README.md"), validatedResponse.documentation);
-
-        // Save appCode to the project
-        try {
-          const { getProjectById, saveProject } = await import("../utils/projectFileStore");
-          const project = await getProjectById(projectId);
-          if (project) {
-            project.appCode = validatedResponse;
-            await saveProject(project);
-          }
-        } catch (err) {
-          console.error("[App Code Backend] Error saving appCode to project:", err);
-        }
-      }
-
-      res.json(validatedResponse);
-    } catch (error: unknown) {
-      console.error("[App Code Backend] Error parsing response:", error);
-      res.status(500).json({ 
-        error: "Failed to parse AI response",
-        details: error instanceof Error ? error.message : "Unknown error",
-        rawResponse: fullResponse
-      });
+    // Save results if projectId provided
+    if (projectId) {
+      await saveGeneratedCodeToProject(projectId, finalApplication);
     }
+
+    res.json(finalApplication);
+
   } catch (error: unknown) {
-    console.error("[App Code Backend] Error generating application code:", error);
+    console.error("[Agentic Code Gen] Error in agentic code generation:", error);
     res.status(500).json({ 
-      error: "Failed to generate application code",
+      error: "Failed to generate application code using agentic approach",
       details: error instanceof Error ? error.message : "Unknown error"
     });
   }
 };
+
+// Phase 1: Analyze diagrams and extract components
+async function analyzeDiagramsAndExtractComponents(umlDiagrams: any, prompt: string) {
+  console.log("[Agentic Code Gen] Phase 1: Analyzing diagrams and extracting components");
+  
+  const analysisPrompt = `You are an expert software architect. Analyze the following UML diagrams and application requirements to extract a comprehensive list of components and their responsibilities.
+
+Application Requirements: ${prompt}
+
+UML Diagrams:
+${Object.entries(umlDiagrams).map(([name, content]) => `${name}:\n${content}`).join('\n\n')}
+
+Analyze and return a JSON response with the following structure:
+{
+  "components": [
+    {
+      "name": "ComponentName",
+      "type": "frontend|backend|shared",
+      "category": "controller|service|model|repository|component|page|utility",
+      "responsibilities": ["responsibility1", "responsibility2"],
+      "dependencies": ["dependency1", "dependency2"],
+      "complexity": "low|medium|high",
+      "methods": ["method1", "method2"],
+      "interfaces": ["interface1", "interface2"]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "ComponentA",
+      "to": "ComponentB", 
+      "type": "uses|extends|implements|calls",
+      "description": "relationship description"
+    }
+  ],
+  "dataFlow": [
+    {
+      "source": "ComponentA",
+      "target": "ComponentB",
+      "data": "data description",
+      "direction": "bidirectional|unidirectional"
+    }
+  ],
+  "architecture": {
+    "pattern": "MVC|MVP|MVVM|layered|microservices",
+    "layers": ["presentation", "business", "data"],
+    "concerns": ["authentication", "validation", "logging", "error-handling"]
+  }
+}
+
+Focus on:
+1. Extracting ALL components mentioned in diagrams
+2. Understanding component responsibilities and boundaries
+3. Identifying relationships and dependencies
+4. Determining complexity levels for generation planning
+5. Mapping data flow between components
+
+Return ONLY the JSON response, no explanations.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: analysisPrompt }],
+    max_tokens: 3000,
+    temperature: 0.3,
+  });
+
+  const analysisResult = JSON.parse(response.choices[0]?.message?.content?.trim() || "{}");
+  console.log("[Agentic Code Gen] Phase 1 Complete: Extracted", analysisResult.components?.length || 0, "components");
+  return analysisResult;
+}
+
+// Phase 2: Decompose components into focused subcomponents
+async function decomposeComponentsIntoSubcomponents(analysisResult: any) {
+  console.log("[Agentic Code Gen] Phase 2: Decomposing complex components");
+  
+  const complexComponents = analysisResult.components?.filter((comp: any) => comp.complexity === 'high') || [];
+  
+  if (complexComponents.length === 0) {
+    console.log("[Agentic Code Gen] No complex components to decompose");
+    return analysisResult;
+  }
+
+  const decompositionPrompt = `You are an expert in software architecture and component design. The following components have been identified as complex and need to be decomposed into smaller, focused subcomponents.
+
+Complex Components:
+${JSON.stringify(complexComponents, null, 2)}
+
+Architecture Context:
+${JSON.stringify(analysisResult.architecture, null, 2)}
+
+Decompose each complex component into smaller, atomic subcomponents following these principles:
+1. Single Responsibility Principle - each subcomponent should have ONE clear purpose
+2. Separation of Concerns - UI, business logic, data access should be separate
+3. High Cohesion, Low Coupling
+4. Atomic Methods - each method should do one thing well
+
+Return JSON with this structure:
+{
+  "decomposedComponents": [
+    {
+      "originalComponent": "ComponentName",
+      "subcomponents": [
+        {
+          "name": "SubcomponentName",
+          "type": "frontend|backend|shared",
+          "category": "controller|service|model|repository|component|page|utility",
+          "responsibilities": ["specific responsibility"],
+          "methods": ["atomicMethod1", "atomicMethod2"],
+          "complexity": "low|medium",
+          "interfaces": ["interface if needed"],
+          "rationale": "why this subcomponent exists"
+        }
+      ]
+    }
+  ],
+  "newRelationships": [
+    {
+      "from": "SubcomponentA",
+      "to": "SubcomponentB",
+      "type": "uses|calls|implements",
+      "description": "relationship description"
+    }
+  ]
+}
+
+Return ONLY the JSON response.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: decompositionPrompt }],
+    max_tokens: 3000,
+    temperature: 0.3,
+  });
+
+  const decompositionResult = JSON.parse(response.choices[0]?.message?.content?.trim() || "{}");
+  
+  // Merge decomposed components back into the main analysis
+  if (decompositionResult.decomposedComponents) {
+    const decomposedComponentNames = new Set();
+    
+    // Add new subcomponents
+    decompositionResult.decomposedComponents.forEach((decomp: any) => {
+      decomposedComponentNames.add(decomp.originalComponent);
+      analysisResult.components.push(...decomp.subcomponents);
+    });
+    
+    // Remove original complex components that were decomposed
+    analysisResult.components = analysisResult.components.filter((comp: any) => 
+      !decomposedComponentNames.has(comp.name)
+    );
+    
+    // Add new relationships
+    if (decompositionResult.newRelationships) {
+      analysisResult.relationships.push(...decompositionResult.newRelationships);
+    }
+  }
+  
+  console.log("[Agentic Code Gen] Phase 2 Complete: Total components after decomposition:", analysisResult.components?.length || 0);
+  return analysisResult;
+}
+
+// Phase 3: Generate code for each component individually
+async function generateIndividualComponents(analysisResult: any, prompt: string, infraCode: string) {
+  console.log("[Agentic Code Gen] Phase 3: Generating individual components");
+  
+  const components = analysisResult.components || [];
+  const relationships = analysisResult.relationships || [];
+  const architecture = analysisResult.architecture || {};
+  
+  const generatedComponents: any = {
+    frontend: { components: {}, pages: {}, utils: {} },
+    backend: { controllers: {}, models: {}, routes: {}, utils: {}, services: {} },
+    shared: { interfaces: {}, types: {}, utils: {} }
+  };
+
+  // Generate components in batches to avoid overwhelming the AI
+  const batchSize = 3;
+  for (let i = 0; i < components.length; i += batchSize) {
+    const batch = components.slice(i, i + batchSize);
+    
+    console.log(`[Agentic Code Gen] Generating batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(components.length/batchSize)}`);
+    
+    for (const component of batch) {
+      try {
+        const componentCode = await generateSingleComponent(
+          component, 
+          relationships.filter((rel: any) => rel.from === component.name || rel.to === component.name),
+          architecture,
+          prompt,
+          infraCode
+        );
+        
+        // Organize generated code by type and category
+        const category = mapComponentToCategory(component);
+        if (componentCode && componentCode.trim()) {
+          generatedComponents[component.type][category][component.name] = componentCode;
+        }
+        
+      } catch (error) {
+        console.error(`[Agentic Code Gen] Error generating component ${component.name}:`, error);
+        // Continue with other components
+      }
+    }
+    
+    // Small delay between batches to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  console.log("[Agentic Code Gen] Phase 3 Complete: Generated", 
+    Object.values(generatedComponents).reduce((total: number, tier: any) => 
+      total + Object.values(tier).reduce((subtotal: number, category: any) => subtotal + Object.keys(category).length, 0), 0
+    ), "components");
+  
+  return generatedComponents;
+}
+
+// Generate a single focused component
+async function generateSingleComponent(
+  component: any, 
+  componentRelationships: any[], 
+  architecture: any, 
+  appPrompt: string,
+  infraCode: string
+) {
+  const componentPrompt = `You are an expert ${component.type} developer. Generate high-quality, production-ready code for the following component.
+
+Application Context: ${appPrompt}
+
+Component Details:
+- Name: ${component.name}
+- Type: ${component.type}
+- Category: ${component.category}
+- Responsibilities: ${component.responsibilities?.join(', ')}
+- Methods: ${component.methods?.join(', ')}
+- Interfaces: ${component.interfaces?.join(', ')}
+
+Relationships:
+${componentRelationships.map(rel => `- ${rel.type} ${rel.from === component.name ? rel.to : rel.from}: ${rel.description}`).join('\n')}
+
+Architecture Pattern: ${architecture.pattern || 'layered'}
+Architecture Layers: ${architecture.layers?.join(', ')}
+
+Infrastructure Context (for backend components):
+${component.type === 'backend' ? infraCode?.substring(0, 1000) + '...' : 'N/A'}
+
+Requirements:
+1. Generate ONLY the code for this specific component
+2. Follow ${component.type === 'frontend' ? 'React/TypeScript' : 'Node.js/TypeScript'} best practices
+3. Implement ALL responsibilities and methods
+4. Use proper error handling and validation
+5. Include necessary imports and dependencies
+6. Follow the ${architecture.pattern} pattern
+7. Make methods atomic and focused
+8. Use TypeScript interfaces for type safety
+9. Include proper JSDoc comments
+10. Handle async operations properly
+
+${component.type === 'frontend' ? `
+Frontend Specific:
+- Use modern React hooks and functional components
+- Implement proper state management
+- Use Material-UI or styled-components for styling
+- Handle loading and error states
+- Implement proper accessibility
+` : `
+Backend Specific:
+- Use Express.js patterns
+- Implement proper middleware
+- Use async/await for database operations
+- Include input validation
+- Implement proper error responses
+- Use dependency injection where appropriate
+`}
+
+Return ONLY the code for this component. No explanations, no markdown formatting, just clean, executable code.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: componentPrompt }],
+    max_tokens: 2000,
+    temperature: 0.2,
+  });
+
+  return response.choices[0]?.message?.content?.trim() || "";
+}
+
+// Helper function to map component to file category
+function mapComponentToCategory(component: any): string {
+  const categoryMap: any = {
+    'controller': 'controllers',
+    'service': 'services', 
+    'model': 'models',
+    'repository': 'models', // repositories often go with models
+    'component': 'components',
+    'page': 'pages',
+    'utility': 'utils',
+    'route': 'routes'
+  };
+  
+  return categoryMap[component.category] || 'utils';
+}
+
+// Phase 4: Generate integration code using sequence diagram
+async function generateIntegrationCode(generatedComponents: any, sequenceDiagram: string, prompt: string) {
+  console.log("[Agentic Code Gen] Phase 4: Generating integration code");
+  
+  if (!sequenceDiagram) {
+    console.log("[Agentic Code Gen] No sequence diagram provided, skipping integration generation");
+    return {};
+  }
+
+  const integrationPrompt = `You are an expert in software integration and API design. Using the sequence diagram and generated components, create integration code that connects all components according to the specified flow.
+
+Application Context: ${prompt}
+
+Sequence Diagram:
+${sequenceDiagram}
+
+Generated Components Summary:
+Frontend: ${Object.keys(generatedComponents.frontend.components || {}).join(', ')}
+Backend Controllers: ${Object.keys(generatedComponents.backend.controllers || {}).join(', ')}
+Backend Services: ${Object.keys(generatedComponents.backend.services || {}).join(', ')}
+Backend Models: ${Object.keys(generatedComponents.backend.models || {}).join(', ')}
+
+Generate integration code including:
+1. API endpoints and routing
+2. Service layer integration
+3. Database connection and setup
+4. Frontend API client
+5. Error handling middleware
+6. Authentication middleware (if needed)
+7. Main application entry points
+
+Return JSON with this structure:
+{
+  "backend": {
+    "routes": {
+      "main.ts": "main routing file",
+      "api.ts": "API route definitions"
+    },
+    "middleware": {
+      "auth.ts": "authentication middleware",
+      "error.ts": "error handling middleware"
+    },
+    "config": {
+      "database.ts": "database configuration",
+      "app.ts": "application setup"
+    }
+  },
+  "frontend": {
+    "services": {
+      "api.ts": "API client service",
+      "auth.ts": "authentication service"
+    },
+    "hooks": {
+      "useApi.ts": "API hooks",
+      "useAuth.ts": "authentication hooks"
+    }
+  },
+  "shared": {
+    "types": {
+      "api.ts": "shared API types",
+      "models.ts": "shared model types"
+    }
+  }
+}
+
+Focus on creating clean, maintainable integration code that follows the sequence diagram flow.
+Return ONLY the JSON response.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: integrationPrompt }],
+    max_tokens: 3000,
+    temperature: 0.3,
+  });
+
+  const integrationResult = JSON.parse(response.choices[0]?.message?.content?.trim() || "{}");
+  console.log("[Agentic Code Gen] Phase 4 Complete: Generated integration code");
+  return integrationResult;
+}
+
+// Phase 5: Assemble final application
+async function assembleFinalApplication(generatedComponents: any, integrationCode: any, documentation: string) {
+  console.log("[Agentic Code Gen] Phase 5: Assembling final application");
+  
+  // Merge generated components with integration code
+  const finalApplication = {
+    frontend: {
+      components: generatedComponents.frontend.components || {},
+      pages: generatedComponents.frontend.pages || {},
+      utils: { ...generatedComponents.frontend.utils, ...integrationCode.frontend?.services },
+      hooks: integrationCode.frontend?.hooks || {},
+      services: integrationCode.frontend?.services || {}
+    },
+    backend: {
+      controllers: generatedComponents.backend.controllers || {},
+      models: generatedComponents.backend.models || {},
+      services: generatedComponents.backend.services || {},
+      routes: { ...generatedComponents.backend.routes, ...integrationCode.backend?.routes },
+      utils: generatedComponents.backend.utils || {},
+      middleware: integrationCode.backend?.middleware || {},
+      config: integrationCode.backend?.config || {}
+    },
+    shared: {
+      types: { ...generatedComponents.shared.types, ...integrationCode.shared?.types },
+      interfaces: generatedComponents.shared.interfaces || {},
+      utils: generatedComponents.shared.utils || {}
+    },
+    documentation: documentation || "Generated using agentic code generation system"
+  };
+  
+  console.log("[Agentic Code Gen] Phase 5 Complete: Final application assembled");
+  return finalApplication;
+}
+
+// Save generated code to project
+async function saveGeneratedCodeToProject(projectId: string, application: any) {
+  try {
+    const { getProjectById, saveProject } = await import("../utils/projectFileStore");
+    const project = await getProjectById(projectId);
+    if (project) {
+      project.appCode = application;
+      await saveProject(project);
+      console.log("[Agentic Code Gen] Saved generated code to project");
+    }
+  } catch (err) {
+    console.error("[Agentic Code Gen] Error saving code to project:", err);
+  }
+}
+
+// Fallback to basic generation if no UML diagrams
+async function generateBasicApplicationCode(req: Request, res: Response): Promise<void> {
+  // Keep the existing basic generation as fallback
+  const { prompt, projectId } = req.body;
+  
+  console.log("[Basic Code Gen] Falling back to basic code generation");
+  
+  const basicResponse = {
+    frontend: {
+      components: { "App.tsx": "// Basic React app component\nexport default function App() { return <div>Hello World</div>; }" },
+      pages: {},
+      utils: {}
+    },
+    backend: {
+      controllers: { "main.js": "// Basic Express controller\nmodule.exports = { hello: (req, res) => res.json({message: 'Hello'}) };" },
+      models: {},
+      routes: {},
+      utils: {}
+    },
+    documentation: "Basic application generated without UML diagrams"
+  };
+  
+  if (projectId) {
+    await saveGeneratedCodeToProject(projectId, basicResponse);
+  }
+  
+  res.json(basicResponse);
+}
