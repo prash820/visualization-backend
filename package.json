@@ -31,6 +31,7 @@
     "@types/body-parser": "^1.19.5",
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.1",
+    "@types/node-fetch": "^2.6.12",
     "@types/react-router-dom": "^5.3.3",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
@@ -43,6 +44,7 @@
     "he": "^1.2.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2",
     "openai": "^4.98.0",
     "puppeteer-core": "^23.11.1",
     "qs": "^6.11.2",
@@ -58,7 +60,7 @@
     "@types/he": "^1.2.3",
     "@types/helmet": "^0.0.48",
     "@types/jsonwebtoken": "^9.0.9",
-    "@types/node": "^18.x"
+    "@types/node": "^18.19.115"
   },
   "engines": {
     "node": ">=18.19.0 <19 || >=20",

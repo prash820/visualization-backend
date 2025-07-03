@@ -14,6 +14,7 @@ import deployRoutes from "./routes/deployRoutes";
 import umlRoutes from "./routes/uml";
 import codeRoutes from "./routes/appCode";
 import documentationRoutes from "./routes/documentation";
+import magicRoutes from "./routes/magicRoutes";
 import { spawn } from "child_process";
 import path from "path";
 
@@ -38,9 +39,17 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Simple in-memory rate limiter
 const requestCounts = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS = 100; // 100 requests per minute
+// Increase for testing Magic Flow POC (polling every 2-3 seconds)
+const MAX_REQUESTS = process.env.NODE_ENV === 'production' ? 100 : 300; // 300 requests per minute for dev/testing
 
 const simpleRateLimiter = (req: Request, res: Response, next: NextFunction): void => {
+  // Skip rate limiting for magic status endpoints in development
+  if (process.env.NODE_ENV !== 'production' && 
+      (req.path.includes('/api/magic/concept-status') || req.path.includes('/api/magic/build-status'))) {
+    next();
+    return;
+  }
+  
   const ip = req.ip || 'unknown';
   const now = Date.now();
   
@@ -99,6 +108,7 @@ app.use("/api/deploy", deployRoutes);
 app.use("/api/uml", umlRoutes);
 app.use("/api/documentation", documentationRoutes);
 app.use("/api/code", codeRoutes);
+app.use("/api/magic", magicRoutes); // 🚀 NEW: Magic one-step app creation
 
 // 🔹 Health Check Endpoint
 app.get("/health", (req: Request, res: Response) => {
@@ -138,11 +148,74 @@ app.get("/memory", (req, res) => {
 // 🔹 Global Error Handler
 app.use(errorHandler);
 
-const startTerraformService = () => {
+// Helper function to kill process using a specific port
+const killProcessOnPort = async (port: number): Promise<void> => {
+  return new Promise((resolve) => {
+    const { exec } = require('child_process');
+    
+    // Find process using the port
+    exec(`lsof -ti :${port}`, (error: any, stdout: string) => {
+      if (error) {
+        // No process found on port, which is fine
+        resolve();
+        return;
+      }
+      
+      const pid = stdout.trim();
+      if (pid) {
+        console.log(`[Terraform Service] Killing existing process ${pid} on port ${port}`);
+        exec(`kill -9 ${pid}`, (killError: any) => {
+          if (killError) {
+            console.error(`[Terraform Service] Failed to kill process ${pid}:`, killError);
+          } else {
+            console.log(`[Terraform Service] Successfully killed process ${pid}`);
+          }
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    });
+  });
+};
+
+// Helper function to check if port is available
+const isPortAvailable = async (port: number): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const { exec } = require('child_process');
+    
+    exec(`lsof -ti :${port}`, (error: any, stdout: string) => {
+      if (error) {
+        // No process found on port, it's available
+        resolve(true);
+      } else {
+        // Process found on port, it's not available
+        resolve(false);
+      }
+    });
+  });
+};
+
+let terraformProcess: any = null;
+
+const startTerraformService = async () => {
   console.log("🚀 Starting Terraform FastAPI service...");
 
+  // First, kill any existing process on port 8000
+  await killProcessOnPort(8000);
+  
+  // Wait a moment for the port to be freed
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Verify port is available
+  const portAvailable = await isPortAvailable(8000);
+  if (!portAvailable) {
+    console.error("[Terraform Service] Port 8000 is still in use after cleanup attempt");
+    return;
+  }
+
   // Memory-optimized Terraform service startup
-  const terraformProcess = spawn("uvicorn", ["main:app", "--host", "0.0.0.0", "--port", "8000"], {
+  terraformProcess = spawn("uvicorn", ["main:app", "--host", "0.0.0.0", "--port", "8000"], {
     cwd: path.join(__dirname, "..", "terraform-runner"),
     env: { 
       ...process.env,
@@ -155,29 +228,32 @@ const startTerraformService = () => {
     stdio: ["pipe", "pipe", "pipe"]
   });
 
-  terraformProcess.stdout?.on("data", (data) => {
+  terraformProcess.stdout?.on("data", (data: Buffer) => {
     const output = data.toString().trim();
     if (output) {
       console.log(`[Terraform Service] ${output}`);
     }
   });
 
-  terraformProcess.stderr?.on("data", (data) => {
+  terraformProcess.stderr?.on("data", (data: Buffer) => {
     const output = data.toString().trim();
     if (output) {
       console.log(`[Terraform Service Error] ${output}`);
     }
   });
 
-  terraformProcess.on("close", (code) => {
+  terraformProcess.on("close", (code: number | null) => {
     console.log(`[Terraform Service] Process exited with code ${code}`);
     if (code !== 0) {
       console.error("[Terraform Service] Terraform service crashed, attempting restart...");
-      // Add restart logic here if needed
+      // Restart after a delay
+      setTimeout(() => {
+        startTerraformService();
+      }, 5000);
     }
   });
 
-  terraformProcess.on("error", (error) => {
+  terraformProcess.on("error", (error: Error) => {
     console.error("[Terraform Service] Failed to start:", error);
   });
 
@@ -194,10 +270,41 @@ const startTerraformService = () => {
   return terraformProcess;
 };
 
+// Graceful shutdown handler
+const gracefulShutdown = async (signal: string) => {
+  console.log(`[Server] Received ${signal}, shutting down gracefully...`);
+  
+  // Kill Terraform service if it's running
+  if (terraformProcess) {
+    console.log("[Terraform Service] Terminating Terraform service...");
+    terraformProcess.kill('SIGTERM');
+    
+    // Wait for it to terminate, then force kill if needed
+    setTimeout(() => {
+      if (terraformProcess && !terraformProcess.killed) {
+        console.log("[Terraform Service] Force killing Terraform service...");
+        terraformProcess.kill('SIGKILL');
+      }
+    }, 5000);
+  }
+  
+  // Close the server
+  server.close(() => {
+    console.log("[Server] Server closed");
+    process.exit(0);
+  });
+};
+
+// Register graceful shutdown handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
+
 // Create server with increased timeout
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`🔧 Testing automatic Terraform service management...`); // Testing comment
   
   // Set server timeout to 5 minutes
   server.timeout = 300000;

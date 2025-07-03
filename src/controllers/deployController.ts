@@ -92,7 +92,7 @@ async function processDeploymentJob(jobId: string, projectId: string, iacCode: s
       body: JSON.stringify({ projectId }),
     });
 
-    const result = await response.json();
+    const result = await response.json() as any;
     
     infrastructureDeploymentJobs[jobId].progress = 80;
 
@@ -106,7 +106,7 @@ async function processDeploymentJob(jobId: string, projectId: string, iacCode: s
         });
         
         if (outputsResponse.ok) {
-          const outputsResult = await outputsResponse.json();
+          const outputsResult = await outputsResponse.json() as any;
           infrastructureDeploymentJobs[jobId].terraformOutputs = outputsResult.outputs;
         }
       } catch (outputsError) {
@@ -283,7 +283,7 @@ async function processDestructionJob(jobId: string, projectId: string) {
       body: JSON.stringify({ projectId }),
     });
 
-    const result = await response.json();
+    const result = await response.json() as any;
     
     infrastructureDeploymentJobs[jobId].progress = 80;
 
@@ -480,7 +480,7 @@ export const getInfrastructureStatus = async (req: Request, res: Response): Prom
       });
       
       if (stateResponse.ok) {
-        const stateResult = await stateResponse.json();
+        const stateResult = await stateResponse.json() as any;
         terraformState = stateResult.state;
         
         // Check if we should reset status: failed/destroyed status but no actual resources
