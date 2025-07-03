@@ -36,6 +36,16 @@ export interface TerraformState {
   resources: any[];
 }
 
+// Terraform runner response interfaces
+export interface TerraformRunnerResponse {
+  status: 'success' | 'error' | 'failed';
+  stdout?: string;
+  stderr?: string;
+  error?: string;
+  outputs?: any;
+  state?: any;
+}
+
 export class InfrastructureService {
   private static readonly TERRAFORM_RUNNER_URL = "http://localhost:8000";
 
@@ -58,7 +68,7 @@ export class InfrastructureService {
         throw new Error(`Terraform runner responded with status: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as TerraformRunnerResponse;
       
       if (result.status === "success") {
         return {
@@ -89,7 +99,7 @@ export class InfrastructureService {
         throw new Error(`Terraform runner responded with status: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as TerraformRunnerResponse;
       
       if (result.status === "success") {
         return {
@@ -120,7 +130,7 @@ export class InfrastructureService {
         throw new Error(`Terraform runner responded with status: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as TerraformRunnerResponse;
       
       if (result.status === "success") {
         return result.outputs || {};
@@ -147,7 +157,7 @@ export class InfrastructureService {
         throw new Error(`Terraform runner responded with status: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as TerraformRunnerResponse;
       
       if (result.status === "success") {
         return result.state || null;

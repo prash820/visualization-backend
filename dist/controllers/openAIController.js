@@ -162,6 +162,7 @@ You are an expert in generating production-ready Terraform code for AWS.
 8. The code must be ready to pass basic validation for required blocks.
 9. **Do NOT reference S3 objects, S3 keys, or Lambda deployment packages that are not provisioned in this Terraform code. Do not assume any pre-existing S3 buckets or files. If you create a Lambda function, use local file references only if the file is included in the same Terraform directory.**
 10. This is a greenfield AWS environment: provision everything needed from scratch, and do not assume any pre-existing infrastructure unless absolutely necessary for a minimal working example.
+11. **CRITICAL: For AWS Lambda functions, ONLY use supported Node.js runtimes: "nodejs18.x", "nodejs20.x", or "nodejs22.x". NEVER use "nodejs14.x" or "nodejs16.x" as they are deprecated.**
 
 **Example structure:**
 terraform {
@@ -176,6 +177,14 @@ terraform {
 
 provider "aws" {
   region = "us-east-1"
+}
+
+resource "aws_lambda_function" "example_function" {
+  function_name = "ExampleFunction"
+  handler       = "index.handler"
+  runtime       = "nodejs18.x"
+  role          = aws_iam_role.lambda_role.arn
+  filename      = "lambda.zip"
 }
 
 resource "aws_instance" "app_server" {
