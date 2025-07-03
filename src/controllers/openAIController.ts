@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import Anthropic from '@anthropic-ai/sdk';
 import path from "path";
 import fs from "fs";
+import { memoryManager, type MemoryOptimizedJob } from "../utils/memoryManager";
 dotenv.config();
 const router = express.Router();
 export default router;
@@ -44,8 +45,33 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_SECRET_KEY, // defaults to process.env["ANTHROPIC_API_KEY"]
 });
 
-// In-memory job store for diagram jobs
-const diagramJobs: Record<string, { status: string; progress: number; result?: any; error?: string }> = {};
+// In-memory job store for diagram jobs - now with memory management
+interface DiagramJob extends MemoryOptimizedJob {
+  status: string;
+  progress: number;
+  result?: any;
+  error?: string;
+  startTime?: Date;
+  endTime?: Date;
+  lastAccessed?: Date;
+}
+
+interface IaCJob extends MemoryOptimizedJob {
+  status: string;
+  progress: number;
+  result?: any;
+  error?: string;
+  startTime?: Date;
+  endTime?: Date;
+  lastAccessed?: Date;
+}
+
+const diagramJobs: Record<string, DiagramJob> = {};
+const iacJobs: Record<string, IaCJob> = {};
+
+// Set up memory management for job stores
+memoryManager.setupJobStoreCleanup(diagramJobs, "diagramJobs", 20 * 60 * 1000, 50); // 20 min, max 50 jobs
+memoryManager.setupJobStoreCleanup(iacJobs, "iacJobs", 30 * 60 * 1000, 50); // 30 min, max 50 jobs
 
 export const generateVisualization = async (req: Request, res: Response) => {
   const { prompt, diagramType } = req.body;
@@ -53,14 +79,24 @@ export const generateVisualization = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Missing required parameters." });
   }
   const jobId = generateJobId();
-  diagramJobs[jobId] = { status: "pending", progress: 0 };
+  diagramJobs[jobId] = { 
+    status: "pending", 
+    progress: 0,
+    startTime: new Date(),
+    lastAccessed: new Date()
+  };
   processDiagramJob(jobId, prompt, diagramType);
   res.json({ jobId, status: "accepted" });
 };
 
 async function processDiagramJob(jobId: string, prompt: string, diagramType: string) {
   try {
-    diagramJobs[jobId] = { status: "processing", progress: 10 };
+    diagramJobs[jobId] = { 
+      ...diagramJobs[jobId],
+      status: "processing", 
+      progress: 10,
+      lastAccessed: new Date()
+    };
     type DiagramType = "flowchart" | "architecture" | "sequence" | "uml";
     const systemPrompt: Record<DiagramType, string> = {
       flowchart: `You are an AI assistant specialized in generating flowcharts based on user prompts.\nReturn only valid JSON with two arrays: \"nodes\" and \"edges\".\nEach node should have an \"id\", \"label\", \"role\", and a default position.\nEach edge should connect nodes using \"sourceLabel\", \"targetLabel\" and edge label that says what is happening between steps.\nRole means the type of node, like start/end, process, decision, input output, etc\nDo not include any extra text.`,
@@ -86,9 +122,23 @@ async function processDiagramJob(jobId: string, prompt: string, diagramType: str
     } else {
       parsedData = parseGenericResponse(fullResponse);
     }
-    diagramJobs[jobId] = { status: "completed", progress: 100, result: parsedData };
+    diagramJobs[jobId] = { 
+      ...diagramJobs[jobId],
+      status: "completed", 
+      progress: 100, 
+      result: parsedData,
+      endTime: new Date(),
+      lastAccessed: new Date()
+    };
   } catch (error: any) {
-    diagramJobs[jobId] = { status: "failed", progress: 100, error: error.message || "Unknown error" };
+    diagramJobs[jobId] = { 
+      ...diagramJobs[jobId],
+      status: "failed", 
+      progress: 100, 
+      error: error.message || "Unknown error",
+      endTime: new Date(),
+      lastAccessed: new Date()
+    };
   }
 }
 
@@ -98,11 +148,12 @@ export const getDiagramJobStatus = async (req: Request, res: Response): Promise<
     res.status(404).json({ error: "Job not found" });
     return;
   }
+  
+  // Update access time for memory management
+  memoryManager.touchJob(diagramJobs[jobId]);
+  
   res.json(diagramJobs[jobId]);
 };
-
-// In-memory job store for IaC jobs
-const iacJobs: Record<string, { status: string; progress: number; result?: any; error?: string }> = {};
 
 function generateJobId() {
   return `iac-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -115,7 +166,12 @@ export const generateIaC = async (req: Request, res: Response): Promise<void> =>
     return;
   }
   const jobId = generateJobId();
-  iacJobs[jobId] = { status: "pending", progress: 0 };
+  iacJobs[jobId] = { 
+    status: "pending", 
+    progress: 0,
+    startTime: new Date(),
+    lastAccessed: new Date()
+  };
   // Start background job
   processIaCJob(jobId, prompt, projectId, umlDiagrams);
   res.json({ jobId, status: "accepted" });
@@ -125,7 +181,12 @@ async function processIaCJob(jobId: string, prompt: string, projectId: string, u
   try {
     console.log(`[IaC] Job started: jobId=${jobId}, projectId=${projectId}`);
     console.log(`[IaC] Prompt: ${prompt}`);
-    iacJobs[jobId] = { status: "processing", progress: 10 };
+    iacJobs[jobId] = { 
+      ...iacJobs[jobId],
+      status: "processing", 
+      progress: 10,
+      lastAccessed: new Date()
+    };
     const systemPrompt = `
 You are a senior cloud architect and Terraform expert specializing in AWS infrastructure design for modern applications.
 
@@ -310,7 +371,11 @@ output "main_url" {
 
 RESPOND WITH ONLY RAW TERRAFORM HCL CODE. Start immediately with "terraform {" - no markdown, no explanations, no formatting.
 `;
-    iacJobs[jobId].progress = 20;
+    iacJobs[jobId] = {
+      ...iacJobs[jobId],
+      progress: 20,
+      lastAccessed: new Date()
+    };
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -323,7 +388,11 @@ RESPOND WITH ONLY RAW TERRAFORM HCL CODE. Start immediately with "terraform {" -
       max_tokens: 4096,
       temperature: 0.5,
     });
-    iacJobs[jobId].progress = 60;
+    iacJobs[jobId] = {
+      ...iacJobs[jobId],
+      progress: 60,
+      lastAccessed: new Date()
+    };
     const terraformCode = response.choices[0]?.message?.content?.trim() || "";
     console.log(`[IaC] OpenAI raw response for jobId=${jobId}:`, response.choices[0]?.message?.content);
     
@@ -359,10 +428,24 @@ RESPOND WITH ONLY RAW TERRAFORM HCL CODE. Start immediately with "terraform {" -
         console.error("[IaC Backend] Error saving infraCode to project:", err);
       }
     }
-    iacJobs[jobId] = { status: "completed", progress: 100, result: { code: cleanTerraformCode } };
+    iacJobs[jobId] = { 
+      ...iacJobs[jobId],
+      status: "completed", 
+      progress: 100, 
+      result: { code: cleanTerraformCode },
+      endTime: new Date(),
+      lastAccessed: new Date()
+    };
   } catch (error: any) {
     console.error(`[IaC] Error in processIaCJob for jobId=${jobId}, projectId=${projectId}:`, error);
-    iacJobs[jobId] = { status: "failed", progress: 100, error: error.message || "Unknown error" };
+    iacJobs[jobId] = { 
+      ...iacJobs[jobId],
+      status: "failed", 
+      progress: 100, 
+      error: error.message || "Unknown error",
+      endTime: new Date(),
+      lastAccessed: new Date()
+    };
   }
 }
 
@@ -372,6 +455,10 @@ export const getIaCJobStatus = async (req: Request, res: Response): Promise<void
     res.status(404).json({ error: "Job not found" });
     return;
   }
+  
+  // Update access time for memory management
+  memoryManager.touchJob(iacJobs[jobId]);
+  
   res.json(iacJobs[jobId]);
 };
 

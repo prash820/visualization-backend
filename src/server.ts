@@ -17,6 +17,8 @@ import documentationRoutes from "./routes/documentation";
 import magicRoutes from "./routes/magicRoutes";
 import { spawn } from "child_process";
 import path from "path";
+import fs from "fs";
+import { memoryManager } from "./utils/memoryManager";
 
 dotenv.config();
 const app = express();
@@ -197,6 +199,7 @@ const isPortAvailable = async (port: number): Promise<boolean> => {
 };
 
 let terraformProcess: any = null;
+let server: any = null;
 
 const startTerraformService = async () => {
   console.log("🚀 Starting Terraform FastAPI service...");
@@ -274,6 +277,9 @@ const startTerraformService = async () => {
 const gracefulShutdown = async (signal: string) => {
   console.log(`[Server] Received ${signal}, shutting down gracefully...`);
   
+  // Shutdown memory manager
+  memoryManager.shutdown();
+  
   // Kill Terraform service if it's running
   if (terraformProcess) {
     console.log("[Terraform Service] Terminating Terraform service...");
@@ -289,10 +295,14 @@ const gracefulShutdown = async (signal: string) => {
   }
   
   // Close the server
-  server.close(() => {
-    console.log("[Server] Server closed");
+  if (server) {
+    server.close(() => {
+      console.log("[Server] Server closed");
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
+  }
 };
 
 // Register graceful shutdown handlers
@@ -300,15 +310,28 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
 
-// Create server with increased timeout
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`🔧 Testing automatic Terraform service management...`); // Testing comment
+const startServer = () => {
+  console.log("🚀 Starting Chart AI Visualization Backend...");
   
-  // Set server timeout to 5 minutes
-  server.timeout = 300000;
+  // Initialize memory management
+  console.log("🧠 Initializing memory management...");
+  memoryManager.setupMemoryMonitoring();
+  memoryManager.logMemoryUsage("Startup");
 
-  // Start Terraform service as a subprocess
-  startTerraformService();
-});
+  // Create server with increased timeout
+  server = app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    
+    // Log initial memory usage
+    memoryManager.logMemoryUsage("Server Started");
+
+    // Set server timeout to 5 minutes
+    server.timeout = 300000;
+
+    // Start Terraform service as a subprocess
+    startTerraformService();
+  });
+};
+
+startServer();

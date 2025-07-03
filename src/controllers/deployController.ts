@@ -2,9 +2,10 @@ import { Request, Response } from "express";
 import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
+import { memoryManager, type MemoryOptimizedJob } from "../utils/memoryManager";
 
 // SEPARATE job stores for infrastructure and application deployment
-const infrastructureDeploymentJobs: Record<string, { 
+interface InfrastructureJob extends MemoryOptimizedJob {
   status: string; 
   progress: number; 
   result?: any; 
@@ -13,9 +14,10 @@ const infrastructureDeploymentJobs: Record<string, {
   endTime?: Date;
   terraformOutputs?: any;
   logs: string[];
-}> = {};
+  lastAccessed?: Date;
+}
 
-const applicationDeploymentJobs: Record<string, { 
+interface ApplicationJob extends MemoryOptimizedJob {
   status: string; 
   progress: number; 
   result?: any; 
@@ -23,7 +25,15 @@ const applicationDeploymentJobs: Record<string, {
   startTime?: Date;
   endTime?: Date;
   deploymentOutputs?: any;
-}> = {};
+  lastAccessed?: Date;
+}
+
+const infrastructureDeploymentJobs: Record<string, InfrastructureJob> = {};
+const applicationDeploymentJobs: Record<string, ApplicationJob> = {};
+
+// Set up memory management for job stores
+memoryManager.setupJobStoreCleanup(infrastructureDeploymentJobs, "infrastructureJobs", 45 * 60 * 1000, 30); // 45 min, max 30 jobs
+memoryManager.setupJobStoreCleanup(applicationDeploymentJobs, "applicationJobs", 30 * 60 * 1000, 30); // 30 min, max 30 jobs
 
 function generateInfrastructureJobId() {
   return `infra-deploy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -45,29 +55,40 @@ const saveIaCToFile = (projectId: string, iacCode: string): string => {
 };
 
 // ✅ Export this function
-export const deployInfrastructure = async (req: Request, res: Response) => {
+export const deployInfrastructure = async (req: Request, res: Response): Promise<void> => {
   const { projectId, iacCode } = req.body;
 
   if (!projectId || !iacCode) {
-    return res.status(400).json({ error: "Missing projectId or iacCode." });
+    res.status(400).json({ error: "Missing projectId or iacCode." });
+    return;
   }
 
-  const jobId = generateInfrastructureJobId();
-  infrastructureDeploymentJobs[jobId] = { 
-    status: "pending", 
-    progress: 0,
-    startTime: new Date(),
-    logs: ["🚀 Starting infrastructure deployment..."]
-  };
+  try {
+    const jobId = generateInfrastructureJobId();
+    infrastructureDeploymentJobs[jobId] = { 
+      status: "pending", 
+      progress: 0,
+      startTime: new Date(),
+      lastAccessed: new Date(),
+      logs: ["🚀 Infrastructure deployment request received..."]
+    };
 
-  // Start background deployment job
-  processDeploymentJob(jobId, projectId, iacCode);
+    // Start background deployment job
+    processDeploymentJob(jobId, projectId, iacCode);
 
-  res.json({ 
-    jobId, 
-    status: "accepted",
-    message: "Infrastructure deployment started"
-  });
+    res.json({ 
+      jobId, 
+      status: "accepted",
+      message: "Infrastructure deployment started"
+    });
+
+  } catch (error: any) {
+    console.error("[Deployment] Error:", error);
+    res.status(500).json({ 
+      error: "Failed to start deployment",
+      details: error.message 
+    });
+  }
 };
 
 async function processDeploymentJob(jobId: string, projectId: string, iacCode: string) {
@@ -178,25 +199,18 @@ async function processDeploymentJob(jobId: string, projectId: string, iacCode: s
   }
 }
 
-export const getDeploymentJobStatus = async (req: Request, res: Response): Promise<void> => {
+export const getInfrastructureDeploymentStatus = async (req: Request, res: Response): Promise<void> => {
   const { jobId } = req.params;
-  
+
   if (!jobId || !infrastructureDeploymentJobs[jobId]) {
-    res.status(404).json({ error: "Deployment job not found" });
+    res.status(404).json({ error: "Job not found" });
     return;
   }
-  
-  const job = infrastructureDeploymentJobs[jobId];
-  res.json({
-    jobId,
-    status: job.status,
-    progress: job.progress,
-    result: job.result,
-    error: job.error,
-    startTime: job.startTime,
-    endTime: job.endTime,
-    terraformOutputs: job.terraformOutputs
-  });
+
+  // Update access time for memory management
+  memoryManager.touchJob(infrastructureDeploymentJobs[jobId]);
+
+  res.json(infrastructureDeploymentJobs[jobId]);
 };
 
 export const destroyInfrastructure = async (req: Request, res: Response): Promise<void> => {
@@ -1382,54 +1396,17 @@ export const getApplicationDeploymentJobStatus = async (req: Request, res: Respo
 };
 
 export const getApplicationDeploymentStatus = async (req: Request, res: Response): Promise<void> => {
-  const { projectId } = req.params;
+  const { jobId } = req.params;
 
-  if (!projectId) {
-    res.status(400).json({ error: "Missing projectId." });
+  if (!jobId || !applicationDeploymentJobs[jobId]) {
+    res.status(404).json({ error: "Job not found" });
     return;
   }
 
-  try {
-    // Get project details
-    const { getProjectById } = await import("../utils/projectFileStore");
-    const project = await getProjectById(projectId);
-    
-    if (!project) {
-      res.status(404).json({ error: "Project not found" });
-      return;
-    }
+  // Update access time for memory management
+  memoryManager.touchJob(applicationDeploymentJobs[jobId]);
 
-    // Check if there's an active job
-    let jobStatus = null;
-    if (project.appDeploymentJobId && applicationDeploymentJobs[project.appDeploymentJobId]) {
-      const job = applicationDeploymentJobs[project.appDeploymentJobId];
-      jobStatus = {
-        jobId: project.appDeploymentJobId,
-        status: job.status,
-        progress: job.progress,
-        error: job.error,
-        result: job.result,
-        startTime: job.startTime,
-        endTime: job.endTime
-      };
-    }
-
-    res.json({
-      projectId,
-      appDeploymentStatus: project.appDeploymentStatus || "not_deployed",
-      appDeploymentJobId: project.appDeploymentJobId || null,
-      appDeploymentOutputs: project.appDeploymentOutputs || null,
-      infrastructureStatus: project.deploymentStatus,
-      infrastructureOutputs: project.deploymentOutputs,
-      jobStatus // Real-time job progress
-    });
-
-  } catch (error) {
-    console.error("Error getting application deployment status:", error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : "Failed to get application deployment status" 
-    });
-  }
+  res.json(applicationDeploymentJobs[jobId]);
 };
 
 export const retryApplicationDeployment = async (req: Request, res: Response): Promise<void> => {
@@ -1594,4 +1571,10 @@ export const purgeApplicationResources = async (req: Request, res: Response): Pr
       details: error instanceof Error ? error.message : String(error)
     });
   }
+};
+
+// Add the missing function that might be expected
+export const getDeploymentJobStatus = async (req: Request, res: Response): Promise<void> => {
+  // Redirect to the new function name for backward compatibility
+  return getInfrastructureDeploymentStatus(req, res);
 };

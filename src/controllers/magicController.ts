@@ -1,12 +1,13 @@
 import { Request, Response } from "express";
 import OpenAI from "openai";
+import { memoryManager, type MemoryOptimizedJob } from "../utils/memoryManager";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
 // Job tracking for concept generation
-const conceptJobs: Record<string, {
+interface ConceptJob extends MemoryOptimizedJob {
   status: 'processing' | 'completed' | 'failed';
   progress: number;
   currentStep: string;
@@ -21,10 +22,11 @@ const conceptJobs: Record<string, {
   error?: string;
   startTime: Date;
   endTime?: Date;
-}> = {};
+  lastAccessed?: Date;
+}
 
 // Job tracking for app building (after approval)
-const appCreationJobs: Record<string, {
+interface AppCreationJob extends MemoryOptimizedJob {
   status: 'processing' | 'completed' | 'failed';
   progress: number;
   currentStep: string;
@@ -36,7 +38,15 @@ const appCreationJobs: Record<string, {
   error?: string;
   startTime: Date;
   endTime?: Date;
-}> = {};
+  lastAccessed?: Date;
+}
+
+const conceptJobs: Record<string, ConceptJob> = {};
+const appCreationJobs: Record<string, AppCreationJob> = {};
+
+// Set up memory management for job stores
+memoryManager.setupJobStoreCleanup(conceptJobs, "conceptJobs", 40 * 60 * 1000, 25); // 40 min, max 25 jobs
+memoryManager.setupJobStoreCleanup(appCreationJobs, "appCreationJobs", 60 * 60 * 1000, 20); // 60 min, max 20 jobs
 
 function generateJobId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -128,6 +138,10 @@ export const getConceptStatus = async (req: Request, res: Response): Promise<voi
   }
 
   const job = conceptJobs[jobId];
+  
+  // Update access time for memory management
+  memoryManager.touchJob(job);
+  
   res.json({
     jobId,
     status: job.status,
@@ -151,6 +165,10 @@ export const getAppCreationStatus = async (req: Request, res: Response): Promise
   }
 
   const job = appCreationJobs[jobId];
+  
+  // Update access time for memory management
+  memoryManager.touchJob(job);
+  
   res.json({
     jobId,
     status: job.status,
