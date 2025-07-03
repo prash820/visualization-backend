@@ -87,13 +87,41 @@ app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
 // 🔹 CORS Configuration
 const corsOptions = {
-  origin: "*", // Accept traffic from all origins
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In development mode, be more permissive
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[CORS] Allowing origin in development: ${origin}`);
+      return callback(null, true);
+    }
+    
+    // Define allowed origins for production
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001', 
+      'https://v0-image-analysis-gp-omega.vercel.app',
+      'https://chartai-backend-697f80778bd2.herokuapp.com'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log(`[CORS] Allowing known origin: ${origin}`);
+      callback(null, true);
+    } else {
+      console.log(`[CORS] Rejecting unknown origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200,
   maxAge: 86400 // Cache preflight for 24 hours
 };
 
 app.use(cors(corsOptions));
+
+// 🔹 Serve static files from public directory
+app.use('/public', express.static(path.join(__dirname, '../public')));
 
 // 🔹 Apply rate limiter
 app.use(simpleRateLimiter);
@@ -112,6 +140,46 @@ app.use("/api/documentation", documentationRoutes);
 app.use("/api/code", codeRoutes);
 app.use("/api/magic", magicRoutes); // 🚀 NEW: Magic one-step app creation
 
+// 🔹 Configuration endpoint for frontend
+app.get("/api/config", (req: Request, res: Response) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const backendUrl = isProduction 
+    ? 'https://chartai-backend-697f80778bd2.herokuapp.com'
+    : 'http://localhost:5001';
+  
+  console.log(`[CONFIG] Serving config - Environment: ${process.env.NODE_ENV}, Backend URL: ${backendUrl}`);
+  
+  res.json({
+    backendUrl,
+    environment: process.env.NODE_ENV || 'development',
+    isProduction,
+    corsAllowed: true,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 🔹 JavaScript config endpoint for frontend
+app.get("/config.js", (req: Request, res: Response) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const backendUrl = isProduction 
+    ? 'https://chartai-backend-697f80778bd2.herokuapp.com'
+    : 'http://localhost:5001';
+  
+  const configScript = `
+window.CONFIG = {
+  BACKEND_URL: '${backendUrl}',
+  ENVIRONMENT: '${process.env.NODE_ENV || 'development'}',
+  IS_PRODUCTION: ${isProduction},
+  API_BASE_URL: '${backendUrl}/api',
+  TIMESTAMP: '${new Date().toISOString()}'
+};
+console.log('🔧 Backend Config Loaded:', window.CONFIG);
+`;
+  
+  res.setHeader('Content-Type', 'application/javascript');
+  res.send(configScript);
+});
+
 // 🔹 Health Check Endpoint
 app.get("/health", (req: Request, res: Response) => {
   const memUsage = process.memoryUsage();
@@ -126,7 +194,9 @@ app.get("/health", (req: Request, res: Response) => {
     status: "healthy", 
     timestamp: new Date().toISOString(),
     memory: memUsageMB,
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT
   });
 });
 
