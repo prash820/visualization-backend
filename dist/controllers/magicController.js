@@ -414,11 +414,22 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.2"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.1"
+    }
   }
+  required_version = ">= 1.5.0"
 }
 
 provider "aws" {
   region = "us-east-1"
+}
+
+resource "random_string" "suffix" {
+  length  = 8
+  special = false
+  upper   = false
 }
 
 # Create a minimal Lambda function code file
@@ -474,7 +485,7 @@ resource "local_file" "package_json" {
 # Create deployment package
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  output_path = "\${path.module}/lambda-deployment.zip"
+  output_path = "\${path.module}/lambda.zip"
   
   source {
     content  = local_file.lambda_code.content
@@ -491,29 +502,25 @@ data "archive_file" "lambda_zip" {
 
 # S3 bucket for frontend hosting
 resource "aws_s3_bucket" "app_frontend" {
-  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-frontend-\${random_string.bucket_suffix.result}"
-}
-
-resource "aws_s3_bucket_website_configuration" "app_frontend_website" {
-  bucket = aws_s3_bucket.app_frontend.id
-
-  index_document {
-    suffix = "index.html"
-  }
-
-  error_document {
-    key = "index.html"
+  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-frontend-\${random_string.suffix.result}"
+  
+  tags = {
+    Name = "${concept.name}Frontend"
+    Environment = "Production"
   }
 }
 
+# S3 bucket public access block
 resource "aws_s3_bucket_public_access_block" "app_frontend_pab" {
   bucket = aws_s3_bucket.app_frontend.id
+  
   block_public_acls       = false
   block_public_policy     = false
   ignore_public_acls      = false
   restrict_public_buckets = false
 }
 
+# S3 bucket policy for public read access
 resource "aws_s3_bucket_policy" "app_frontend_policy" {
   bucket = aws_s3_bucket.app_frontend.id
   depends_on = [aws_s3_bucket_public_access_block.app_frontend_pab]
@@ -527,14 +534,27 @@ resource "aws_s3_bucket_policy" "app_frontend_policy" {
         Principal = "*"
         Action    = "s3:GetObject"
         Resource  = "\${aws_s3_bucket.app_frontend.arn}/*"
-      },
+      }
     ]
   })
 }
 
+# S3 bucket website configuration
+resource "aws_s3_bucket_website_configuration" "app_frontend_website" {
+  bucket = aws_s3_bucket.app_frontend.id
+
+  index_document {
+    suffix = "index.html"
+  }
+
+  error_document {
+    key = "index.html"
+  }
+}
+
 # Lambda function for backend
 resource "aws_lambda_function" "app_backend" {
-  function_name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}Backend"
+  function_name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}Backend-\${random_string.suffix.result}"
   handler       = "index.handler"
   runtime       = "nodejs18.x"
   role          = aws_iam_role.lambda_exec.arn
@@ -542,67 +562,64 @@ resource "aws_lambda_function" "app_backend" {
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   timeout       = 30
   memory_size   = 128
+  
+  tags = {
+    Name = "${concept.name}Backend"
+    Environment = "Production"
+  }
 }
 
 # API Gateway for Lambda function
 resource "aws_api_gateway_rest_api" "app_api" {
-  name        = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API"
+  name        = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-\${random_string.suffix.result}"
   description = "API for ${concept.name}"
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
 }
 
-resource "aws_api_gateway_resource" "proxy" {
+# API Gateway resource
+resource "aws_api_gateway_resource" "app_resource" {
   rest_api_id = aws_api_gateway_rest_api.app_api.id
   parent_id   = aws_api_gateway_rest_api.app_api.root_resource_id
   path_part   = "{proxy+}"
 }
 
-resource "aws_api_gateway_method" "proxy" {
+# API Gateway method
+resource "aws_api_gateway_method" "app_method" {
   rest_api_id   = aws_api_gateway_rest_api.app_api.id
-  resource_id   = aws_api_gateway_resource.proxy.id
+  resource_id   = aws_api_gateway_resource.app_resource.id
   http_method   = "ANY"
   authorization = "NONE"
 }
 
-resource "aws_api_gateway_integration" "lambda" {
+# API Gateway integration
+resource "aws_api_gateway_integration" "app_integration" {
   rest_api_id = aws_api_gateway_rest_api.app_api.id
-  resource_id = aws_api_gateway_method.proxy.resource_id
-  http_method = aws_api_gateway_method.proxy.http_method
+  resource_id = aws_api_gateway_resource.app_resource.id
+  http_method = aws_api_gateway_method.app_method.http_method
 
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.app_backend.invoke_arn
 }
 
-resource "aws_api_gateway_method" "proxy_root" {
-  rest_api_id   = aws_api_gateway_rest_api.app_api.id
-  resource_id   = aws_api_gateway_rest_api.app_api.root_resource_id
-  http_method   = "ANY"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "lambda_root" {
-  rest_api_id = aws_api_gateway_rest_api.app_api.id
-  resource_id = aws_api_gateway_method.proxy_root.resource_id
-  http_method = aws_api_gateway_method.proxy_root.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.app_backend.invoke_arn
-}
-
+# API Gateway deployment
 resource "aws_api_gateway_deployment" "app_deployment" {
   depends_on = [
-    aws_api_gateway_integration.lambda,
-    aws_api_gateway_integration.lambda_root,
+    aws_api_gateway_method.app_method,
+    aws_api_gateway_integration.app_integration
   ]
 
   rest_api_id = aws_api_gateway_rest_api.app_api.id
   stage_name  = "prod"
 }
 
-# IAM role for Lambda
+# IAM role for Lambda function
 resource "aws_iam_role" "lambda_exec" {
-  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}LambdaRole"
+  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}LambdaRole-\${random_string.suffix.result}"
+  
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -625,12 +642,6 @@ resource "aws_lambda_permission" "api_gw" {
   function_name = aws_lambda_function.app_backend.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "\${aws_api_gateway_rest_api.app_api.execution_arn}/*/*"
-}
-
-resource "random_string" "bucket_suffix" {
-  length  = 8
-  special = false
-  upper   = false
 }
 
 output "s3_bucket_name" {

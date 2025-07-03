@@ -163,13 +163,20 @@ You are an expert in generating production-ready Terraform code for AWS.
 9. **Do NOT reference S3 objects, S3 keys, or Lambda deployment packages that are not provisioned in this Terraform code. Do not assume any pre-existing S3 buckets or files. If you create a Lambda function, use local file references only if the file is included in the same Terraform directory.**
 10. This is a greenfield AWS environment: provision everything needed from scratch, and do not assume any pre-existing infrastructure unless absolutely necessary for a minimal working example.
 11. **CRITICAL: For AWS Lambda functions, ONLY use supported Node.js runtimes: "nodejs18.x", "nodejs20.x", or "nodejs22.x". NEVER use "nodejs14.x" or "nodejs16.x" as they are deprecated.**
+12. **CRITICAL: NEVER use 'acl' parameter in aws_s3_bucket resources. AWS has disabled ACLs by default for security. Use aws_s3_bucket_policy for access control instead.**
+13. **CRITICAL: Always add random suffixes to resource names to prevent naming conflicts. Use random_string or random_id resources for this purpose.**
+14. **CRITICAL: For public S3 buckets, use aws_s3_bucket_public_access_block and aws_s3_bucket_policy instead of ACLs.**
 
-**Example structure:**
+**Example structure with modern S3 configuration:**
 terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.1"
     }
   }
   required_version = ">= 1.5.0"
@@ -179,20 +186,89 @@ provider "aws" {
   region = "us-east-1"
 }
 
+resource "random_string" "suffix" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
+resource "aws_s3_bucket" "example_bucket" {
+  bucket = "example-bucket-\${random_string.suffix.result}"
+  
+  tags = {
+    Name = "ExampleBucket"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "example_bucket" {
+  bucket = aws_s3_bucket.example_bucket.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_policy" "example_bucket" {
+  bucket = aws_s3_bucket.example_bucket.id
+  depends_on = [aws_s3_bucket_public_access_block.example_bucket]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "\${aws_s3_bucket.example_bucket.arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_dynamodb_table" "example_table" {
+  name           = "ExampleTable-\${random_string.suffix.result}"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+  
+  tags = {
+    Name = "ExampleTable"
+  }
+}
+
 resource "aws_lambda_function" "example_function" {
-  function_name = "ExampleFunction"
+  function_name = "ExampleFunction-\${random_string.suffix.result}"
   handler       = "index.handler"
   runtime       = "nodejs18.x"
   role          = aws_iam_role.lambda_role.arn
   filename      = "lambda.zip"
+  
+  tags = {
+    Name = "ExampleFunction"
+  }
 }
 
-resource "aws_instance" "app_server" {
-  ami           = "ami-0abcdef1234567890"
-  instance_type = "t2.micro"
-  tags = {
-    Name = "ExampleAppServerInstance"
-  }
+resource "aws_iam_role" "lambda_role" {
+  name = "lambda-role-\${random_string.suffix.result}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
 }
 
 variable "region" {
@@ -201,12 +277,17 @@ variable "region" {
   default     = "us-east-1"
 }
 
-output "instance_ip" {
-  value       = aws_instance.app_server.public_ip
-  description = "Public IP of the EC2 instance."
+output "bucket_name" {
+  value       = aws_s3_bucket.example_bucket.bucket
+  description = "Name of the S3 bucket."
 }
 
-**Your output must follow this structure and include all required blocks.**
+output "dynamodb_table_name" {
+  value       = aws_dynamodb_table.example_table.name
+  description = "Name of the DynamoDB table."
+}
+
+**Your output must follow this structure and include all required blocks with proper resource naming.**
 `;
             iacJobs[jobId].progress = 20;
             const response = yield openai.chat.completions.create({
