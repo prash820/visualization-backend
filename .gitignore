@@ -2,4 +2,5 @@
 terraform*
 __pycache__/
 node_modules/
-visualization-backend/node_modules
+visualization-backend/node_modulesnode_modules/
+dist/
