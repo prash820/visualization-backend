@@ -578,6 +578,83 @@ export const generateApplicationCode = async (req: Request, res: Response): Prom
   }
 };
 
+// Rate limiting and retry logic for AI requests
+async function makeAIRequestWithRetry(prompt: string, model: string = "gpt-4o", maxRetries: number = 3): Promise<any> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Agentic Code Gen] AI request attempt ${attempt}/${maxRetries}`);
+      
+      // Try OpenAI first
+      if (process.env.OPENAI_API_KEY) {
+        try {
+          const response = await openai.chat.completions.create({
+            model: model,
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 3000,
+            temperature: 0.3,
+          });
+          
+          console.log(`[Agentic Code Gen] OpenAI request successful on attempt ${attempt}`);
+          return response.choices[0]?.message?.content?.trim() || "{}";
+        } catch (error: any) {
+          console.log(`[Agentic Code Gen] OpenAI failed on attempt ${attempt}:`, error.message);
+          
+          // If it's a rate limit error, try Anthropic immediately
+          if (error.message?.includes('429') || error.message?.includes('quota')) {
+            console.log(`[Agentic Code Gen] Rate limit detected, trying Anthropic...`);
+            return await makeAnthropicRequestForCodeGen(prompt);
+          }
+          
+          lastError = error;
+        }
+      }
+      
+      // Fallback to Anthropic
+      if (process.env.ANTHROPIC_SECRET_KEY) {
+        try {
+          const response = await makeAnthropicRequestForCodeGen(prompt);
+          console.log(`[Agentic Code Gen] Anthropic request successful on attempt ${attempt}`);
+          return response;
+        } catch (error: any) {
+          console.log(`[Agentic Code Gen] Anthropic failed on attempt ${attempt}:`, error.message);
+          lastError = error;
+        }
+      }
+      
+      // Wait before retry (exponential backoff)
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+        console.log(`[Agentic Code Gen] Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+    } catch (error: any) {
+      console.error(`[Agentic Code Gen] Unexpected error on attempt ${attempt}:`, error);
+      lastError = error;
+    }
+  }
+  
+  throw lastError || new Error("All AI providers failed after retries");
+}
+
+async function makeAnthropicRequestForCodeGen(prompt: string): Promise<string> {
+  const response = await anthropic.messages.create({
+    model: "claude-3-5-sonnet-20241022",
+    max_tokens: 4000,
+    temperature: 0.3,
+    messages: [{ role: "user", content: prompt }]
+  });
+
+  const content = response.content[0];
+  if (content.type === 'text') {
+    return content.text;
+  }
+  
+  throw new Error("Invalid response format from Anthropic");
+}
+
 // Phase 1: Analyze diagrams and extract components
 async function analyzeDiagramsAndExtractComponents(umlDiagrams: any, prompt: string) {
   console.log("[Agentic Code Gen] Phase 1: Analyzing diagrams and extracting components");
@@ -635,14 +712,8 @@ Focus on:
 
 Return ONLY the JSON response, no explanations.`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: analysisPrompt }],
-    max_tokens: 3000,
-    temperature: 0.3,
-  });
-
-  const analysisResult = JSON.parse(response.choices[0]?.message?.content?.trim() || "{}");
+  const responseContent = await makeAIRequestWithRetry(analysisPrompt);
+  const analysisResult = JSON.parse(responseContent);
   console.log("[Agentic Code Gen] Phase 1 Complete: Extracted", analysisResult.components?.length || 0, "components");
   return analysisResult;
 }
@@ -703,14 +774,8 @@ Return JSON with this structure:
 
 Return ONLY the JSON response.`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: decompositionPrompt }],
-    max_tokens: 3000,
-    temperature: 0.3,
-  });
-
-  const decompositionResult = JSON.parse(response.choices[0]?.message?.content?.trim() || "{}");
+  const responseContent = await makeAIRequestWithRetry(decompositionPrompt);
+  const decompositionResult = JSON.parse(responseContent);
   
   // Merge decomposed components back into the main analysis
   if (decompositionResult.decomposedComponents) {
@@ -852,14 +917,7 @@ Backend Specific:
 
 Return ONLY the code for this component. No explanations, no markdown formatting, just clean, executable code.`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: componentPrompt }],
-    max_tokens: 2000,
-    temperature: 0.2,
-  });
-
-  return response.choices[0]?.message?.content?.trim() || "";
+  return await makeAIRequestWithRetry(componentPrompt, "gpt-4o", 2); // Reduced retries for individual components
 }
 
 // Helper function to map component to file category
@@ -946,14 +1004,8 @@ Return JSON with this structure:
 Focus on creating clean, maintainable integration code that follows the sequence diagram flow.
 Return ONLY the JSON response.`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: integrationPrompt }],
-    max_tokens: 3000,
-    temperature: 0.3,
-  });
-
-  const integrationResult = JSON.parse(response.choices[0]?.message?.content?.trim() || "{}");
+  const responseContent = await makeAIRequestWithRetry(integrationPrompt);
+  const integrationResult = JSON.parse(responseContent);
   console.log("[Agentic Code Gen] Phase 4 Complete: Generated integration code");
   return integrationResult;
 }
