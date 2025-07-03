@@ -17,7 +17,7 @@ exports.createUser = createUser;
 exports.validateUser = validateUser;
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
-const bcrypt_1 = __importDefault(require("bcrypt"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const uuid_1 = require("uuid");
 const DATA_FILE = path_1.default.join(__dirname, "../../users.json");
 function readAll() {
@@ -48,7 +48,7 @@ function createUser(email, password) {
         if (users.find(u => u.email === email)) {
             throw new Error("User already exists");
         }
-        const passwordHash = yield bcrypt_1.default.hash(password, 10);
+        const passwordHash = yield bcryptjs_1.default.hash(password, 10);
         const user = {
             _id: (0, uuid_1.v4)(),
             email,
@@ -65,7 +65,7 @@ function validateUser(email, password) {
         const user = yield findUserByEmail(email);
         if (!user)
             return null;
-        const valid = yield bcrypt_1.default.compare(password, user.passwordHash);
+        const valid = yield bcryptjs_1.default.compare(password, user.passwordHash);
         return valid ? user : null;
     });
 }

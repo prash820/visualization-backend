@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 
 const DATA_FILE = path.join(__dirname, "../../users.json");
