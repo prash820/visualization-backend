@@ -276,6 +276,15 @@ async function buildApprovedAppAsync(jobId: string, concept: any, modifications?
   }
 }
 
+// Post-process any AI-generated infrastructure code to remove markdown formatting
+function cleanTerraformCode(code: string): string {
+  return code
+    .replace(/^```hcl\s*/gm, '')     // Remove opening code fences
+    .replace(/^```\s*$/gm, '')       // Remove closing code fences  
+    .replace(/^\s*```.*$/gm, '')     // Remove any other code fence variants
+    .trim();
+}
+
 // Generate optimized concept for indie hackers
 async function generateOptimizedConcept(idea: string, userType: string): Promise<any> {
   const prompt = `You are an expert at creating MVP apps for ${userType}s.
@@ -994,6 +1003,9 @@ button:hover { background: #45a049; }
 async function deployInfrastructure(projectId: string, infraCode: string): Promise<any> {
   const fetch = (await import('node-fetch')).default;
   
+  // Clean any markdown formatting from infrastructure code
+  const cleanInfraCode = cleanTerraformCode(infraCode);
+  
   // Save infrastructure code
   const fs = await import('fs');
   const path = await import('path');
@@ -1003,7 +1015,7 @@ async function deployInfrastructure(projectId: string, infraCode: string): Promi
     fs.mkdirSync(workspaceDir, { recursive: true });
   }
   
-  fs.writeFileSync(path.join(workspaceDir, "main.tf"), infraCode);
+  fs.writeFileSync(path.join(workspaceDir, "main.tf"), cleanInfraCode);
   
   // Call terraform service
   const response = await fetch("http://localhost:8000/deploy", {

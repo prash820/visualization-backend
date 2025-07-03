@@ -149,6 +149,26 @@ function processIaCJob(jobId, prompt, projectId, umlDiagrams) {
             const systemPrompt = `
 You are a senior cloud architect and Terraform expert specializing in AWS infrastructure design for modern applications.
 
+**CRITICAL OUTPUT FORMAT: You must respond with ONLY pure Terraform HCL code. NO markdown formatting, NO code fences, NO explanations, NO backticks, NO text blocks. Just raw .tf file content that can be directly saved and executed.**
+
+**EXAMPLE OF WHAT NOT TO DO:**
+Do not wrap in code fences like this:
+\`\`\`hcl
+terraform {
+  # DON'T include these backticks or code fences
+}
+\`\`\`
+
+**EXAMPLE OF CORRECT OUTPUT:**
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 **CRITICAL: Analyze the user's prompt first to understand their application needs, then generate ONLY the infrastructure required for that specific application.**
 
 **INFRASTRUCTURE ANALYSIS STEPS:**
@@ -195,8 +215,13 @@ You are a senior cloud architect and Terraform expert specializing in AWS infras
 - DynamoDB with streams
 - SNS/SQS for messaging
 
+**AI/ML App:**
+- SageMaker for model hosting
+- Lambda for API layer
+- S3 for model artifacts
+- Cognito for authentication
+
 **REQUIRED TERRAFORM STRUCTURE:**
-\`\`\`hcl
 terraform {
   required_providers {
     aws = {
@@ -222,59 +247,18 @@ resource "random_string" "suffix" {
 }
 
 # Generate ONLY resources needed for the specific application
-# Example resources based on analysis:
+# Example resources based on analysis
 
-# For web apps - S3 + CloudFront
-resource "aws_s3_bucket" "app_bucket" {
-  bucket = "app-bucket-\${random_string.suffix.result}"
-}
-
-# For APIs - Lambda + API Gateway
-resource "aws_lambda_function" "api_function" {
-  function_name = "api-function-\${random_string.suffix.result}"
-  runtime       = "nodejs18.x"
-  handler       = "index.handler"
-  role          = aws_iam_role.lambda_role.arn
-  filename      = "function.zip"
-}
-
-# For databases - choose appropriate type
-resource "aws_dynamodb_table" "app_table" {
-  name           = "app-table-\${random_string.suffix.result}"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
-  
-  attribute {
-    name = "id"
-    type = "S"
-  }
-}
-
-# OR for relational data:
-resource "aws_db_instance" "app_db" {
-  identifier             = "app-db-\${random_string.suffix.result}"
-  engine                 = "postgres"
-  engine_version         = "15.7"
-  instance_class         = "db.t3.micro"
-  allocated_storage      = 20
-  db_name                = "appdb"
-  username               = "dbadmin"
-  password               = "change-me-\${random_string.suffix.result}"
-  skip_final_snapshot    = true
-}
-
-# Variables for configuration
 variable "aws_region" {
   description = "AWS region for resources"
   type        = string
   default     = "us-east-1"
 }
 
-# Outputs for important values
-output "app_url" {
+output "main_url" {
   value = # appropriate URL based on infrastructure
+  description = "Main application URL"
 }
-\`\`\`
 
 **CRITICAL REQUIREMENTS:**
 - NEVER use deprecated aws_s3_bucket acl parameter
@@ -284,22 +268,26 @@ output "app_url" {
 - Use appropriate database type (DynamoDB for NoSQL, RDS for relational)
 - Include proper IAM roles with minimal permissions
 - Add meaningful outputs for application URLs and endpoints
+- NEVER wrap output in markdown code fences or backticks
 
 **ANALYSIS EXAMPLES:**
 
 "Todo app with user authentication"
-→ Generate: API Gateway + Lambda + DynamoDB + S3 (minimal web app stack)
+→ Generate: Cognito + API Gateway + Lambda + DynamoDB + S3 (full web app stack)
 
 "Real-time chat application" 
-→ Generate: WebSocket API + Lambda + DynamoDB with streams + SNS
+→ Generate: Cognito + WebSocket API + Lambda + DynamoDB with streams + SNS
+
+"AI meal planning app"
+→ Generate: Cognito + SageMaker + Lambda + DynamoDB + S3 + API Gateway
 
 "File processing service"
 → Generate: S3 + Lambda + SQS + DynamoDB for job tracking
 
 "E-commerce platform"
-→ Generate: API Gateway + Lambda + RDS + S3 + CloudFront + SES
+→ Generate: Cognito + API Gateway + Lambda + RDS + S3 + CloudFront + SES
 
-RESPOND WITH ONLY VALID TERRAFORM HCL CODE. NO explanations, no markdown formatting, just the complete .tf file content.
+RESPOND WITH ONLY RAW TERRAFORM HCL CODE. Start immediately with "terraform {" - no markdown, no explanations, no formatting.
 `;
             iacJobs[jobId].progress = 20;
             const response = yield openai.chat.completions.create({
@@ -317,8 +305,14 @@ RESPOND WITH ONLY VALID TERRAFORM HCL CODE. NO explanations, no markdown formatt
             iacJobs[jobId].progress = 60;
             const terraformCode = ((_c = (_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c.trim()) || "";
             console.log(`[IaC] OpenAI raw response for jobId=${jobId}:`, (_e = (_d = response.choices[0]) === null || _d === void 0 ? void 0 : _d.message) === null || _e === void 0 ? void 0 : _e.content);
-            console.log(`[IaC] Extracted terraformCode length: ${terraformCode.length}`);
-            if (!terraformCode) {
+            // Post-process to ensure clean Terraform code (remove any markdown formatting)
+            const cleanTerraformCode = terraformCode
+                .replace(/^```hcl\s*/gm, '') // Remove opening code fences
+                .replace(/^```\s*$/gm, '') // Remove closing code fences
+                .replace(/^\s*```.*$/gm, '') // Remove any other code fence variants
+                .trim();
+            console.log(`[IaC] Cleaned terraformCode length: ${cleanTerraformCode.length}`);
+            if (!cleanTerraformCode) {
                 console.error(`[IaC] No Terraform code generated for jobId=${jobId}, projectId=${projectId}`);
             }
             // Save the generated code to a file if projectId is provided
@@ -328,13 +322,13 @@ RESPOND WITH ONLY VALID TERRAFORM HCL CODE. NO explanations, no markdown formatt
                     fs_1.default.mkdirSync(projectDir, { recursive: true });
                     console.log(`[IaC] Created project directory: ${projectDir}`);
                 }
-                fs_1.default.writeFileSync(path_1.default.join(projectDir, "terraform.tf"), terraformCode);
+                fs_1.default.writeFileSync(path_1.default.join(projectDir, "terraform.tf"), cleanTerraformCode);
                 console.log(`[IaC] Saved terraform.tf for projectId=${projectId} at ${projectDir}`);
                 try {
                     const { getProjectById, saveProject } = yield Promise.resolve().then(() => __importStar(require("../utils/projectFileStore")));
                     const project = yield getProjectById(projectId);
                     if (project) {
-                        project.infraCode = terraformCode;
+                        project.infraCode = cleanTerraformCode;
                         yield saveProject(project);
                     }
                 }
@@ -342,7 +336,7 @@ RESPOND WITH ONLY VALID TERRAFORM HCL CODE. NO explanations, no markdown formatt
                     console.error("[IaC Backend] Error saving infraCode to project:", err);
                 }
             }
-            iacJobs[jobId] = { status: "completed", progress: 100, result: { code: terraformCode } };
+            iacJobs[jobId] = { status: "completed", progress: 100, result: { code: cleanTerraformCode } };
         }
         catch (error) {
             console.error(`[IaC] Error in processIaCJob for jobId=${jobId}, projectId=${projectId}:`, error);

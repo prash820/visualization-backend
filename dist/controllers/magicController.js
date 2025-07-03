@@ -245,6 +245,14 @@ function buildApprovedAppAsync(jobId, concept, modifications) {
         }
     });
 }
+// Post-process any AI-generated infrastructure code to remove markdown formatting
+function cleanTerraformCode(code) {
+    return code
+        .replace(/^```hcl\s*/gm, '') // Remove opening code fences
+        .replace(/^```\s*$/gm, '') // Remove closing code fences  
+        .replace(/^\s*```.*$/gm, '') // Remove any other code fence variants
+        .trim();
+}
 // Generate optimized concept for indie hackers
 function generateOptimizedConcept(idea, userType) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -942,6 +950,8 @@ button:hover { background: #45a049; }
 function deployInfrastructure(projectId, infraCode) {
     return __awaiter(this, void 0, void 0, function* () {
         const fetch = (yield Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
+        // Clean any markdown formatting from infrastructure code
+        const cleanInfraCode = cleanTerraformCode(infraCode);
         // Save infrastructure code
         const fs = yield Promise.resolve().then(() => __importStar(require('fs')));
         const path = yield Promise.resolve().then(() => __importStar(require('path')));
@@ -949,7 +959,7 @@ function deployInfrastructure(projectId, infraCode) {
         if (!fs.existsSync(workspaceDir)) {
             fs.mkdirSync(workspaceDir, { recursive: true });
         }
-        fs.writeFileSync(path.join(workspaceDir, "main.tf"), infraCode);
+        fs.writeFileSync(path.join(workspaceDir, "main.tf"), cleanInfraCode);
         // Call terraform service
         const response = yield fetch("http://localhost:8000/deploy", {
             method: "POST",
