@@ -480,6 +480,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.1"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
   }
   required_version = ">= 1.5.0"
 }
@@ -506,11 +510,15 @@ variable "aws_region" {
   infrastructureCode += `
 # Lambda function for ${concept.name} API
 resource "aws_lambda_function" "app_api" {
-  function_name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-\${random_string.suffix.result}"
+  function_name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-$\{random_string.suffix.result}"
   handler       = "index.handler"
   runtime       = "nodejs18.x"
   role          = aws_iam_role.lambda_exec.arn
-  filename      = "api.zip"
+  
+  # Placeholder deployment package
+  filename      = "placeholder.zip"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  
   timeout       = 30
   memory_size   = 256
   
@@ -529,9 +537,19 @@ ${needsFileUpload ? '      S3_BUCKET = aws_s3_bucket.app_storage.bucket' : ''}
   }
 }
 
+# Create placeholder zip file for Lambda
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  output_path = "placeholder.zip"
+  source {
+    content  = "exports.handler = async (event) => ({ statusCode: 200, body: JSON.stringify({ message: 'Hello from ${concept.name}!' }) });"
+    filename = "index.js"
+  }
+}
+
 # IAM role for Lambda
 resource "aws_iam_role" "lambda_exec" {
-  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}LambdaRole-\${random_string.suffix.result}"
+  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}LambdaRole-$\{random_string.suffix.result}"
   
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -554,7 +572,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
     infrastructureCode += `
 # DynamoDB table for app data
 resource "aws_dynamodb_table" "app_data" {
-  name           = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}Data-\${random_string.suffix.result}"
+  name           = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}Data-$\{random_string.suffix.result}"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "id"
   
@@ -600,7 +618,7 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
     infrastructureCode += `
 # S3 bucket for file storage
 resource "aws_s3_bucket" "app_storage" {
-  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-storage-\${random_string.suffix.result}"
+  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-storage-$\{random_string.suffix.result}"
   
   tags = {
     Name = "${concept.name}Storage"
@@ -632,7 +650,7 @@ resource "aws_iam_role_policy" "lambda_s3" {
           "s3:PutObject",
           "s3:DeleteObject"
         ]
-        Resource = "\${aws_s3_bucket.app_storage.arn}/*"
+        Resource = "$\{aws_s3_bucket.app_storage.arn}/*"
       }
     ]
   })
@@ -645,7 +663,7 @@ resource "aws_iam_role_policy" "lambda_s3" {
     infrastructureCode += `
 # S3 bucket for frontend hosting
 resource "aws_s3_bucket" "app_frontend" {
-  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-frontend-\${random_string.suffix.result}"
+  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-frontend-$\{random_string.suffix.result}"
   
   tags = {
     Name = "${concept.name}Frontend"
@@ -674,7 +692,7 @@ resource "aws_s3_bucket_policy" "app_frontend" {
         Effect    = "Allow"
         Principal = "*"
         Action    = "s3:GetObject"
-        Resource  = "\${aws_s3_bucket.app_frontend.arn}/*"
+        Resource  = "$\{aws_s3_bucket.app_frontend.arn}/*"
       }
     ]
   })
@@ -701,7 +719,7 @@ resource "aws_s3_bucket_website_configuration" "app_frontend" {
     infrastructureCode += `
 # WebSocket API Gateway for real-time features
 resource "aws_apigatewayv2_api" "app_websocket" {
-  name                       = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}WebSocket-\${random_string.suffix.result}"
+  name                       = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}WebSocket-$\{random_string.suffix.result}"
   protocol_type              = "WEBSOCKET"
   route_selection_expression = "$request.body.action"
   
@@ -720,14 +738,14 @@ resource "aws_lambda_permission" "websocket_lambda" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.app_api.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "\${aws_apigatewayv2_api.app_websocket.execution_arn}/*/*"
+  source_arn    = "$\{aws_apigatewayv2_api.app_websocket.execution_arn}/*/*"
 }
 `;
   } else {
     infrastructureCode += `
 # REST API Gateway
 resource "aws_api_gateway_rest_api" "app_api" {
-  name        = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-\${random_string.suffix.result}"
+  name        = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-$\{random_string.suffix.result}"
   description = "API for ${concept.name}"
 
   endpoint_configuration {
@@ -777,7 +795,7 @@ resource "aws_lambda_permission" "api_gw" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.app_api.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "\${aws_api_gateway_rest_api.app_api.execution_arn}/*/*"
+  source_arn    = "$\{aws_api_gateway_rest_api.app_api.execution_arn}/*/*"
 }
 `;
   }
@@ -797,7 +815,7 @@ output "api_gateway_url" {
   if (!isApiOnly) {
     infrastructureCode += `
 output "frontend_url" {
-  value = "http://\${aws_s3_bucket.app_frontend.bucket}.s3-website-\${var.aws_region}.amazonaws.com"
+  value = "http://$\{aws_s3_bucket.app_frontend.bucket}.s3-website-$\{var.aws_region}.amazonaws.com"
   description = "Frontend website URL"
 }
 `;

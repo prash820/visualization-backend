@@ -149,26 +149,62 @@ terraform {
   }
 }
 
-**CRITICAL: Analyze the user's prompt first to understand their application needs, then generate ONLY the infrastructure required for that specific application.**
+**CRITICAL: This is BARE-BONES INFRASTRUCTURE PROVISIONING ONLY. Do not assume any application code, zip files, or deployment packages exist.**
 
 **INFRASTRUCTURE ANALYSIS STEPS:**
 1. Determine application type (web app, API, data processing, mobile backend, etc.)
 2. Identify required services (compute, storage, database, messaging, etc.)
 3. Assess scale requirements (simple prototype vs production-ready)
-4. Generate minimal but complete infrastructure
+4. Generate minimal but complete infrastructure with placeholder deployment packages
 
 **MODERN TERRAFORM REQUIREMENTS:**
 1. Use Terraform 1.5+ syntax with proper required_providers block
 2. AWS Provider version "~> 5.0" with all modern resource configurations
 3. Use random_string for unique resource naming to prevent conflicts
 4. Include proper dependencies and resource ordering
+5. For Lambda functions, use placeholder deployment packages or dummy zip files
 
 **AWS PROVIDER BEST PRACTICES:**
+- **Lambda Functions**: Use placeholder deployment packages with proper configuration
+  - Use \`filename\` parameter with a dummy zip file path or inline code
+  - Use nodejs18.x, nodejs20.x, or nodejs22.x runtime only
+  - Include proper IAM roles and policies
+  - DO NOT use invalid "code" blocks - they don't exist in Terraform
 - **RDS**: Use aws_db_instance for simple databases, aws_rds_cluster + aws_rds_cluster_instance for Aurora (both require engine parameter)
 - **S3**: Use separate resources for aws_s3_bucket_public_access_block and aws_s3_bucket_policy (NO acl parameter)
-- **Lambda**: Use nodejs18.x, nodejs20.x, or nodejs22.x runtime only
 - **IAM**: Use least-privilege policies with specific resource ARNs
 - **API Gateway**: Use REGIONAL endpoints with proper CORS configuration
+
+**LAMBDA FUNCTION CORRECT SYNTAX:**
+resource "aws_lambda_function" "example" {
+  function_name = "example-function-$\{random_string.suffix.result}"
+  handler       = "index.handler"
+  runtime       = "nodejs18.x"
+  role          = aws_iam_role.lambda_exec.arn
+  
+  # Use inline code for placeholder deployment
+  filename      = "placeholder.zip"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  
+  timeout     = 30
+  memory_size = 256
+  
+  environment {
+    variables = {
+      NODE_ENV = "production"
+    }
+  }
+}
+
+# Create placeholder zip file
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  output_path = "placeholder.zip"
+  source {
+    content  = "exports.handler = async (event) => ({ statusCode: 200, body: JSON.stringify({ message: 'Hello from Lambda!' }) });"
+    filename = "index.js"
+  }
+}
 
 **INFRASTRUCTURE PATTERNS BY APPLICATION TYPE:**
 
@@ -176,28 +212,29 @@ terraform {
 - S3 bucket for frontend hosting + CloudFront
 - Lambda for API + API Gateway
 - DynamoDB for data storage
+- All with placeholder deployment packages
 
 **REST API:**
-- Lambda functions for endpoints
+- Lambda functions for endpoints with placeholder code
 - API Gateway with proper resources/methods
 - RDS or DynamoDB based on data needs
 - S3 for file storage if needed
 
 **Data Processing App:**
-- Lambda for processing
+- Lambda for processing with placeholder code
 - SQS for queuing
 - S3 for data storage
 - DynamoDB for metadata
 
 **Real-time App:**
 - WebSocket API Gateway
-- Lambda for real-time processing
+- Lambda for real-time processing with placeholder code
 - DynamoDB with streams
 - SNS/SQS for messaging
 
 **AI/ML App:**
 - SageMaker for model hosting
-- Lambda for API layer
+- Lambda for API layer with placeholder code
 - S3 for model artifacts
 - Cognito for authentication
 
@@ -211,6 +248,10 @@ terraform {
     random = {
       source  = "hashicorp/random"
       version = "~> 3.1"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
     }
   }
   required_version = ">= 1.5.0"
@@ -227,7 +268,7 @@ resource "random_string" "suffix" {
 }
 
 # Generate ONLY resources needed for the specific application
-# Example resources based on analysis
+# Include placeholder deployment packages for Lambda functions
 
 variable "aws_region" {
   description = "AWS region for resources"
@@ -249,23 +290,23 @@ output "main_url" {
 - Include proper IAM roles with minimal permissions
 - Add meaningful outputs for application URLs and endpoints
 - NEVER wrap output in markdown code fences or backticks
+- For Lambda functions, always include placeholder deployment packages
+- NEVER use invalid "code" blocks in Lambda functions
+- This is infrastructure provisioning only - no application deployment assumptions
 
 **ANALYSIS EXAMPLES:**
 
-"Todo app with user authentication"
-→ Generate: Cognito + API Gateway + Lambda + DynamoDB + S3 (full web app stack)
+"AI meal planning app"
+→ Generate: Cognito + Lambda (with placeholder code) + DynamoDB + S3 + API Gateway
 
 "Real-time chat application" 
-→ Generate: Cognito + WebSocket API + Lambda + DynamoDB with streams + SNS
+→ Generate: Cognito + WebSocket API + Lambda (with placeholder code) + DynamoDB with streams + SNS
 
-"AI meal planning app"
-→ Generate: Cognito + SageMaker + Lambda + DynamoDB + S3 + API Gateway
+"Todo app with user authentication"
+→ Generate: Cognito + API Gateway + Lambda (with placeholder code) + DynamoDB + S3 (full web app stack)
 
 "File processing service"
-→ Generate: S3 + Lambda + SQS + DynamoDB for job tracking
-
-"E-commerce platform"
-→ Generate: Cognito + API Gateway + Lambda + RDS + S3 + CloudFront + SES
+→ Generate: S3 + Lambda (with placeholder code) + SQS + DynamoDB for job tracking
 
 RESPOND WITH ONLY RAW TERRAFORM HCL CODE. Start immediately with "terraform {" - no markdown, no explanations, no formatting.
 `;
