@@ -432,19 +432,40 @@ Return the updated concept as JSON, incorporating the user's feedback while keep
   }
 }
 
-// Generate infrastructure code (simplified)
+// Generate infrastructure code based on app concept analysis
 async function generateInfrastructureCode(concept: any): Promise<string> {
-  // Use a simplified template optimized for indie hackers
-  return `
+  // Analyze the concept to determine infrastructure needs
+  const needsDatabase = concept.simpleFeatures?.some((feature: string) => 
+    feature.toLowerCase().includes('stor') || 
+    feature.toLowerCase().includes('data') || 
+    feature.toLowerCase().includes('user') ||
+    feature.toLowerCase().includes('save')
+  ) || concept.coreFeature?.toLowerCase().includes('stor');
+
+  const needsRealtime = concept.simpleFeatures?.some((feature: string) => 
+    feature.toLowerCase().includes('real-time') || 
+    feature.toLowerCase().includes('live') ||
+    feature.toLowerCase().includes('chat') ||
+    feature.toLowerCase().includes('notification')
+  ) || concept.coreFeature?.toLowerCase().includes('real-time');
+
+  const needsFileUpload = concept.simpleFeatures?.some((feature: string) => 
+    feature.toLowerCase().includes('upload') || 
+    feature.toLowerCase().includes('file') ||
+    feature.toLowerCase().includes('image') ||
+    feature.toLowerCase().includes('photo')
+  );
+
+  const isApiOnly = concept.description?.toLowerCase().includes('api') && 
+                   !concept.description?.toLowerCase().includes('frontend');
+
+  // Generate infrastructure based on analysis
+  let infrastructureCode = `
 terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
-    }
-    archive = {
-      source  = "hashicorp/archive"
-      version = "~> 2.2"
     }
     random = {
       source  = "hashicorp/random"
@@ -455,7 +476,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
 }
 
 resource "random_string" "suffix" {
@@ -464,191 +485,42 @@ resource "random_string" "suffix" {
   upper   = false
 }
 
-# Create a minimal Lambda function code file
-resource "local_file" "lambda_code" {
-  content = <<-EOT
-const express = require('express');
-const serverless = require('serverless-http');
-const app = express();
-
-app.use(express.json());
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Welcome to ${concept.name}',
-    description: '${concept.description}',
-    coreFeature: '${concept.coreFeature}'
-  });
-});
-
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'healthy', app: '${concept.name}' });
-});
-
-module.exports.handler = serverless(app);
-EOT
-  filename = "\${path.module}/index.js"
+# Variables
+variable "aws_region" {
+  description = "AWS region for deployment"
+  type        = string
+  default     = "us-east-1"
 }
+`;
 
-# Create package.json for Lambda
-resource "local_file" "package_json" {
-  content = jsonencode({
-    name = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}"
-    version = "1.0.0"
-    main = "index.js"
-    dependencies = {
-      express = "^4.18.2"
-      "serverless-http" = "^3.2.0"
-    }
-  })
-  filename = "\${path.module}/package.json"
-}
-
-# Create deployment package
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  output_path = "\${path.module}/lambda.zip"
-  
-  source {
-    content  = local_file.lambda_code.content
-    filename = "index.js"
-  }
-  
-  source {
-    content  = local_file.package_json.content
-    filename = "package.json"
-  }
-  
-  depends_on = [local_file.lambda_code, local_file.package_json]
-}
-
-# S3 bucket for frontend hosting
-resource "aws_s3_bucket" "app_frontend" {
-  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-frontend-\${random_string.suffix.result}"
-  
-  tags = {
-    Name = "${concept.name}Frontend"
-    Environment = "Production"
-  }
-}
-
-# S3 bucket public access block
-resource "aws_s3_bucket_public_access_block" "app_frontend_pab" {
-  bucket = aws_s3_bucket.app_frontend.id
-  
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-# S3 bucket policy for public read access
-resource "aws_s3_bucket_policy" "app_frontend_policy" {
-  bucket = aws_s3_bucket.app_frontend.id
-  depends_on = [aws_s3_bucket_public_access_block.app_frontend_pab]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "PublicReadGetObject"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:GetObject"
-        Resource  = "\${aws_s3_bucket.app_frontend.arn}/*"
-      }
-    ]
-  })
-}
-
-# S3 bucket website configuration
-resource "aws_s3_bucket_website_configuration" "app_frontend_website" {
-  bucket = aws_s3_bucket.app_frontend.id
-
-  index_document {
-    suffix = "index.html"
-  }
-
-  error_document {
-    key = "index.html"
-  }
-}
-
-# Lambda function for backend
-resource "aws_lambda_function" "app_backend" {
-  function_name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}Backend-\${random_string.suffix.result}"
+  // Add Lambda function for API
+  infrastructureCode += `
+# Lambda function for ${concept.name} API
+resource "aws_lambda_function" "app_api" {
+  function_name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-\${random_string.suffix.result}"
   handler       = "index.handler"
   runtime       = "nodejs18.x"
   role          = aws_iam_role.lambda_exec.arn
-  filename      = data.archive_file.lambda_zip.output_path
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  filename      = "api.zip"
   timeout       = 30
-  memory_size   = 128
+  memory_size   = 256
+  
+  environment {
+    variables = {
+      APP_NAME = "${concept.name}"
+      CORE_FEATURE = "${concept.coreFeature}"
+${needsDatabase ? '      DYNAMODB_TABLE = aws_dynamodb_table.app_data.name' : ''}
+${needsFileUpload ? '      S3_BUCKET = aws_s3_bucket.app_storage.bucket' : ''}
+    }
+  }
   
   tags = {
-    Name = "${concept.name}Backend"
+    Name = "${concept.name}API"
     Environment = "Production"
   }
 }
 
-# API Gateway for Lambda function
-resource "aws_api_gateway_rest_api" "app_api" {
-  name        = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-\${random_string.suffix.result}"
-  description = "API for ${concept.name}"
-
-  endpoint_configuration {
-    types = ["REGIONAL"]
-  }
-}
-
-# API Gateway resource
-resource "aws_api_gateway_resource" "app_resource" {
-  rest_api_id = aws_api_gateway_rest_api.app_api.id
-  parent_id   = aws_api_gateway_rest_api.app_api.root_resource_id
-  path_part   = "{proxy+}"
-}
-
-# API Gateway method
-resource "aws_api_gateway_method" "app_method" {
-  rest_api_id   = aws_api_gateway_rest_api.app_api.id
-  resource_id   = aws_api_gateway_resource.app_resource.id
-  http_method   = "ANY"
-  authorization = "NONE"
-}
-
-# API Gateway integration
-resource "aws_api_gateway_integration" "app_integration" {
-  rest_api_id = aws_api_gateway_rest_api.app_api.id
-  resource_id = aws_api_gateway_resource.app_resource.id
-  http_method = aws_api_gateway_method.app_method.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.app_backend.invoke_arn
-}
-
-# API Gateway deployment
-resource "aws_api_gateway_deployment" "app_deployment" {
-  depends_on = [
-    aws_api_gateway_method.app_method,
-    aws_api_gateway_integration.app_integration
-  ]
-
-  rest_api_id = aws_api_gateway_rest_api.app_api.id
-  stage_name  = "prod"
-}
-
-# IAM role for Lambda function
+# IAM role for Lambda
 resource "aws_iam_role" "lambda_exec" {
   name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}LambdaRole-\${random_string.suffix.result}"
   
@@ -666,32 +538,281 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
+`;
 
-# Lambda permission for API Gateway
+  // Add database if needed
+  if (needsDatabase) {
+    infrastructureCode += `
+# DynamoDB table for app data
+resource "aws_dynamodb_table" "app_data" {
+  name           = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}Data-\${random_string.suffix.result}"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "id"
+  
+  attribute {
+    name = "id"
+    type = "S"
+  }
+  
+  tags = {
+    Name = "${concept.name}Data"
+    Environment = "Production"
+  }
+}
+
+# IAM policy for DynamoDB access
+resource "aws_iam_role_policy" "lambda_dynamodb" {
+  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}DynamoDBPolicy"
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = aws_dynamodb_table.app_data.arn
+      }
+    ]
+  })
+}
+`;
+  }
+
+  // Add file storage if needed
+  if (needsFileUpload) {
+    infrastructureCode += `
+# S3 bucket for file storage
+resource "aws_s3_bucket" "app_storage" {
+  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-storage-\${random_string.suffix.result}"
+  
+  tags = {
+    Name = "${concept.name}Storage"
+    Environment = "Production"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "app_storage" {
+  bucket = aws_s3_bucket.app_storage.id
+  
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# IAM policy for S3 access
+resource "aws_iam_role_policy" "lambda_s3" {
+  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}S3Policy"
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "\${aws_s3_bucket.app_storage.arn}/*"
+      }
+    ]
+  })
+}
+`;
+  }
+
+  // Add frontend hosting if not API-only
+  if (!isApiOnly) {
+    infrastructureCode += `
+# S3 bucket for frontend hosting
+resource "aws_s3_bucket" "app_frontend" {
+  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-frontend-\${random_string.suffix.result}"
+  
+  tags = {
+    Name = "${concept.name}Frontend"
+    Environment = "Production"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "app_frontend" {
+  bucket = aws_s3_bucket.app_frontend.id
+  
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_policy" "app_frontend" {
+  bucket = aws_s3_bucket.app_frontend.id
+  depends_on = [aws_s3_bucket_public_access_block.app_frontend]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "\${aws_s3_bucket.app_frontend.arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_website_configuration" "app_frontend" {
+  bucket = aws_s3_bucket.app_frontend.id
+
+  index_document {
+    suffix = "index.html"
+  }
+
+  error_document {
+    key = "index.html"
+  }
+}
+`;
+  }
+
+  // Add API Gateway
+  const apiType = needsRealtime ? 'websocket' : 'rest';
+  
+  if (apiType === 'websocket') {
+    infrastructureCode += `
+# WebSocket API Gateway for real-time features
+resource "aws_apigatewayv2_api" "app_websocket" {
+  name                       = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}WebSocket-\${random_string.suffix.result}"
+  protocol_type              = "WEBSOCKET"
+  route_selection_expression = "$request.body.action"
+  
+  tags = {
+    Name = "${concept.name}WebSocket"
+  }
+}
+
+resource "aws_apigatewayv2_stage" "app_websocket" {
+  api_id = aws_apigatewayv2_api.app_websocket.id
+  name   = "prod"
+}
+
+resource "aws_lambda_permission" "websocket_lambda" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.app_api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "\${aws_apigatewayv2_api.app_websocket.execution_arn}/*/*"
+}
+`;
+  } else {
+    infrastructureCode += `
+# REST API Gateway
+resource "aws_api_gateway_rest_api" "app_api" {
+  name        = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-\${random_string.suffix.result}"
+  description = "API for ${concept.name}"
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+  
+  tags = {
+    Name = "${concept.name}API"
+  }
+}
+
+resource "aws_api_gateway_resource" "app_resource" {
+  rest_api_id = aws_api_gateway_rest_api.app_api.id
+  parent_id   = aws_api_gateway_rest_api.app_api.root_resource_id
+  path_part   = "{proxy+}"
+}
+
+resource "aws_api_gateway_method" "app_method" {
+  rest_api_id   = aws_api_gateway_rest_api.app_api.id
+  resource_id   = aws_api_gateway_resource.app_resource.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "app_integration" {
+  rest_api_id = aws_api_gateway_rest_api.app_api.id
+  resource_id = aws_api_gateway_resource.app_resource.id
+  http_method = aws_api_gateway_method.app_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.app_api.invoke_arn
+}
+
+resource "aws_api_gateway_deployment" "app_deployment" {
+  depends_on = [
+    aws_api_gateway_method.app_method,
+    aws_api_gateway_integration.app_integration
+  ]
+
+  rest_api_id = aws_api_gateway_rest_api.app_api.id
+  stage_name  = "prod"
+}
+
 resource "aws_lambda_permission" "api_gw" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.app_backend.function_name
+  function_name = aws_lambda_function.app_api.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "\${aws_api_gateway_rest_api.app_api.execution_arn}/*/*"
 }
+`;
+  }
 
-output "s3_bucket_name" {
-  value = aws_s3_bucket.app_frontend.id
-}
-
-output "s3_website_url" {
-  value = "http://\${aws_s3_bucket.app_frontend.id}.s3-website-us-east-1.amazonaws.com"
-}
-
+  // Add outputs
+  infrastructureCode += `
+# Outputs
 output "api_gateway_url" {
-  value = aws_api_gateway_deployment.app_deployment.invoke_url
-}
-
-output "lambda_function_name" {
-  value = aws_lambda_function.app_backend.function_name
+  value = ${needsRealtime ? 
+    'aws_apigatewayv2_stage.app_websocket.invoke_url' : 
+    'aws_api_gateway_deployment.app_deployment.invoke_url'
+  }
+  description = "API Gateway URL"
 }
 `;
+
+  if (!isApiOnly) {
+    infrastructureCode += `
+output "frontend_url" {
+  value = "http://\${aws_s3_bucket.app_frontend.bucket}.s3-website-\${var.aws_region}.amazonaws.com"
+  description = "Frontend website URL"
+}
+`;
+  }
+
+  if (needsDatabase) {
+    infrastructureCode += `
+output "database_name" {
+  value = aws_dynamodb_table.app_data.name
+  description = "DynamoDB table name"
+}
+`;
+  }
+
+  if (needsFileUpload) {
+    infrastructureCode += `
+output "storage_bucket" {
+  value = aws_s3_bucket.app_storage.bucket
+  description = "S3 storage bucket name"
+}
+`;
+  }
+
+  return infrastructureCode;
 }
 
 // Generate application code (simplified)
