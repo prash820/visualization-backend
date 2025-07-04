@@ -175,6 +175,10 @@ export interface Project {
     frontendUrl: string;
     lambdaFunctionName: string;
   };
+  // Magic workflow properties
+  magicAnalysis?: any;
+  userPrompt?: string;
+  targetCustomers?: string;
 }
 
 async function readAll(): Promise<Project[]> {

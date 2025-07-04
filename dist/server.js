@@ -30,6 +30,7 @@ const documentation_1 = __importDefault(require("./routes/documentation"));
 const magicRoutes_1 = __importDefault(require("./routes/magicRoutes"));
 const child_process_1 = require("child_process");
 const path_1 = __importDefault(require("path"));
+const memoryManager_1 = require("./utils/memoryManager");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5001;
@@ -90,12 +91,38 @@ app.use(body_parser_1.default.json({ limit: '10mb', strict: true }));
 app.use(body_parser_1.default.urlencoded({ limit: '10mb', extended: true }));
 // 🔹 CORS Configuration
 const corsOptions = {
-    origin: "*", // Accept traffic from all origins
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
+            return callback(null, true);
+        // In development mode, be more permissive
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[CORS] Allowing origin in development: ${origin}`);
+            return callback(null, true);
+        }
+        // Define allowed origins for production
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'https://v0-image-analysis-gp-omega.vercel.app',
+            'https://chartai-backend-697f80778bd2.herokuapp.com'
+        ];
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            console.log(`[CORS] Allowing known origin: ${origin}`);
+            callback(null, true);
+        }
+        else {
+            console.log(`[CORS] Rejecting unknown origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     optionsSuccessStatus: 200,
     maxAge: 86400 // Cache preflight for 24 hours
 };
 app.use((0, cors_1.default)(corsOptions));
+// 🔹 Serve static files from public directory
+app.use('/public', express_1.default.static(path_1.default.join(__dirname, '../public')));
 // 🔹 Apply rate limiter
 app.use(simpleRateLimiter);
 // 🔹 Connect to Database
@@ -110,6 +137,40 @@ app.use("/api/uml", uml_1.default);
 app.use("/api/documentation", documentation_1.default);
 app.use("/api/code", appCode_1.default);
 app.use("/api/magic", magicRoutes_1.default); // 🚀 NEW: Magic one-step app creation
+// 🔹 Configuration endpoint for frontend
+app.get("/api/config", (req, res) => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const backendUrl = isProduction
+        ? 'https://chartai-backend-697f80778bd2.herokuapp.com'
+        : 'http://localhost:5001';
+    console.log(`[CONFIG] Serving config - Environment: ${process.env.NODE_ENV}, Backend URL: ${backendUrl}`);
+    res.json({
+        backendUrl,
+        environment: process.env.NODE_ENV || 'development',
+        isProduction,
+        corsAllowed: true,
+        timestamp: new Date().toISOString()
+    });
+});
+// 🔹 JavaScript config endpoint for frontend
+app.get("/config.js", (req, res) => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const backendUrl = isProduction
+        ? 'https://chartai-backend-697f80778bd2.herokuapp.com'
+        : 'http://localhost:5001';
+    const configScript = `
+window.CONFIG = {
+  BACKEND_URL: '${backendUrl}',
+  ENVIRONMENT: '${process.env.NODE_ENV || 'development'}',
+  IS_PRODUCTION: ${isProduction},
+  API_BASE_URL: '${backendUrl}/api',
+  TIMESTAMP: '${new Date().toISOString()}'
+};
+console.log('🔧 Backend Config Loaded:', window.CONFIG);
+`;
+    res.setHeader('Content-Type', 'application/javascript');
+    res.send(configScript);
+});
 // 🔹 Health Check Endpoint
 app.get("/health", (req, res) => {
     const memUsage = process.memoryUsage();
@@ -123,7 +184,9 @@ app.get("/health", (req, res) => {
         status: "healthy",
         timestamp: new Date().toISOString(),
         memory: memUsageMB,
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+        port: PORT
     });
 });
 // Memory monitoring endpoint
@@ -190,6 +253,7 @@ const isPortAvailable = (port) => __awaiter(void 0, void 0, void 0, function* ()
     });
 });
 let terraformProcess = null;
+let server = null;
 const startTerraformService = () => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     console.log("🚀 Starting Terraform FastAPI service...");
@@ -248,6 +312,8 @@ const startTerraformService = () => __awaiter(void 0, void 0, void 0, function* 
 // Graceful shutdown handler
 const gracefulShutdown = (signal) => __awaiter(void 0, void 0, void 0, function* () {
     console.log(`[Server] Received ${signal}, shutting down gracefully...`);
+    // Shutdown memory manager
+    memoryManager_1.memoryManager.shutdown();
     // Kill Terraform service if it's running
     if (terraformProcess) {
         console.log("[Terraform Service] Terminating Terraform service...");
@@ -261,22 +327,36 @@ const gracefulShutdown = (signal) => __awaiter(void 0, void 0, void 0, function*
         }, 5000);
     }
     // Close the server
-    server.close(() => {
-        console.log("[Server] Server closed");
+    if (server) {
+        server.close(() => {
+            console.log("[Server] Server closed");
+            process.exit(0);
+        });
+    }
+    else {
         process.exit(0);
-    });
+    }
 });
 // Register graceful shutdown handlers
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
-// Create server with increased timeout
-const server = app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-    console.log(`🔧 Testing automatic Terraform service management...`); // Testing comment
-    // Set server timeout to 5 minutes
-    server.timeout = 300000;
-    // Start Terraform service as a subprocess
-    startTerraformService();
-});
+const startServer = () => {
+    console.log("🚀 Starting Chart AI Visualization Backend...");
+    // Initialize memory management
+    console.log("🧠 Initializing memory management...");
+    memoryManager_1.memoryManager.setupMemoryMonitoring();
+    memoryManager_1.memoryManager.logMemoryUsage("Startup");
+    // Create server with increased timeout
+    server = app.listen(PORT, () => {
+        console.log(`✅ Server running on port ${PORT}`);
+        console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+        // Log initial memory usage
+        memoryManager_1.memoryManager.logMemoryUsage("Server Started");
+        // Set server timeout to 5 minutes
+        server.timeout = 300000;
+        // Start Terraform service as a subprocess
+        startTerraformService();
+    });
+};
+startServer();

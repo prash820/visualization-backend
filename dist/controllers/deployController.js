@@ -45,13 +45,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.purgeApplicationResources = exports.retryApplicationDeployment = exports.getApplicationDeploymentStatus = exports.getApplicationDeploymentJobStatus = exports.deployApplicationCode = exports.retryInfrastructureDeployment = exports.getTerraformState = exports.getTerraformOutputs = exports.estimateInfrastructureCosts = exports.validateTerraformConfig = exports.getInfrastructureStatus = exports.destroyInfrastructure = exports.getDeploymentJobStatus = exports.deployInfrastructure = void 0;
+exports.getDeploymentJobStatus = exports.purgeApplicationResources = exports.retryApplicationDeployment = exports.getApplicationDeploymentStatus = exports.getApplicationDeploymentJobStatus = exports.deployApplicationCode = exports.retryInfrastructureDeployment = exports.getTerraformState = exports.getTerraformOutputs = exports.estimateInfrastructureCosts = exports.validateTerraformConfig = exports.getInfrastructureStatus = exports.destroyInfrastructure = exports.getInfrastructureDeploymentStatus = exports.deployInfrastructure = void 0;
 const node_fetch_1 = __importDefault(require("node-fetch"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-// SEPARATE job stores for infrastructure and application deployment
+const memoryManager_1 = require("../utils/memoryManager");
 const infrastructureDeploymentJobs = {};
 const applicationDeploymentJobs = {};
+// Set up memory management for job stores
+memoryManager_1.memoryManager.setupJobStoreCleanup(infrastructureDeploymentJobs, "infrastructureJobs", 45 * 60 * 1000, 30); // 45 min, max 30 jobs
+memoryManager_1.memoryManager.setupJobStoreCleanup(applicationDeploymentJobs, "applicationJobs", 30 * 60 * 1000, 30); // 30 min, max 30 jobs
 function generateInfrastructureJobId() {
     return `infra-deploy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 }
@@ -72,22 +75,33 @@ const saveIaCToFile = (projectId, iacCode) => {
 const deployInfrastructure = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { projectId, iacCode } = req.body;
     if (!projectId || !iacCode) {
-        return res.status(400).json({ error: "Missing projectId or iacCode." });
+        res.status(400).json({ error: "Missing projectId or iacCode." });
+        return;
     }
-    const jobId = generateInfrastructureJobId();
-    infrastructureDeploymentJobs[jobId] = {
-        status: "pending",
-        progress: 0,
-        startTime: new Date(),
-        logs: ["🚀 Starting infrastructure deployment..."]
-    };
-    // Start background deployment job
-    processDeploymentJob(jobId, projectId, iacCode);
-    res.json({
-        jobId,
-        status: "accepted",
-        message: "Infrastructure deployment started"
-    });
+    try {
+        const jobId = generateInfrastructureJobId();
+        infrastructureDeploymentJobs[jobId] = {
+            status: "pending",
+            progress: 0,
+            startTime: new Date(),
+            lastAccessed: new Date(),
+            logs: ["🚀 Infrastructure deployment request received..."]
+        };
+        // Start background deployment job
+        processDeploymentJob(jobId, projectId, iacCode);
+        res.json({
+            jobId,
+            status: "accepted",
+            message: "Infrastructure deployment started"
+        });
+    }
+    catch (error) {
+        console.error("[Deployment] Error:", error);
+        res.status(500).json({
+            error: "Failed to start deployment",
+            details: error.message
+        });
+    }
 });
 exports.deployInfrastructure = deployInfrastructure;
 function processDeploymentJob(jobId, projectId, iacCode) {
@@ -169,25 +183,17 @@ function processDeploymentJob(jobId, projectId, iacCode) {
         }
     });
 }
-const getDeploymentJobStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getInfrastructureDeploymentStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { jobId } = req.params;
     if (!jobId || !infrastructureDeploymentJobs[jobId]) {
-        res.status(404).json({ error: "Deployment job not found" });
+        res.status(404).json({ error: "Job not found" });
         return;
     }
-    const job = infrastructureDeploymentJobs[jobId];
-    res.json({
-        jobId,
-        status: job.status,
-        progress: job.progress,
-        result: job.result,
-        error: job.error,
-        startTime: job.startTime,
-        endTime: job.endTime,
-        terraformOutputs: job.terraformOutputs
-    });
+    // Update access time for memory management
+    memoryManager_1.memoryManager.touchJob(infrastructureDeploymentJobs[jobId]);
+    res.json(infrastructureDeploymentJobs[jobId]);
 });
-exports.getDeploymentJobStatus = getDeploymentJobStatus;
+exports.getInfrastructureDeploymentStatus = getInfrastructureDeploymentStatus;
 const destroyInfrastructure = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const { projectId, force = false } = req.body;
@@ -1213,49 +1219,14 @@ const getApplicationDeploymentJobStatus = (req, res) => __awaiter(void 0, void 0
 });
 exports.getApplicationDeploymentJobStatus = getApplicationDeploymentJobStatus;
 const getApplicationDeploymentStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { projectId } = req.params;
-    if (!projectId) {
-        res.status(400).json({ error: "Missing projectId." });
+    const { jobId } = req.params;
+    if (!jobId || !applicationDeploymentJobs[jobId]) {
+        res.status(404).json({ error: "Job not found" });
         return;
     }
-    try {
-        // Get project details
-        const { getProjectById } = yield Promise.resolve().then(() => __importStar(require("../utils/projectFileStore")));
-        const project = yield getProjectById(projectId);
-        if (!project) {
-            res.status(404).json({ error: "Project not found" });
-            return;
-        }
-        // Check if there's an active job
-        let jobStatus = null;
-        if (project.appDeploymentJobId && applicationDeploymentJobs[project.appDeploymentJobId]) {
-            const job = applicationDeploymentJobs[project.appDeploymentJobId];
-            jobStatus = {
-                jobId: project.appDeploymentJobId,
-                status: job.status,
-                progress: job.progress,
-                error: job.error,
-                result: job.result,
-                startTime: job.startTime,
-                endTime: job.endTime
-            };
-        }
-        res.json({
-            projectId,
-            appDeploymentStatus: project.appDeploymentStatus || "not_deployed",
-            appDeploymentJobId: project.appDeploymentJobId || null,
-            appDeploymentOutputs: project.appDeploymentOutputs || null,
-            infrastructureStatus: project.deploymentStatus,
-            infrastructureOutputs: project.deploymentOutputs,
-            jobStatus // Real-time job progress
-        });
-    }
-    catch (error) {
-        console.error("Error getting application deployment status:", error);
-        res.status(500).json({
-            error: error instanceof Error ? error.message : "Failed to get application deployment status"
-        });
-    }
+    // Update access time for memory management
+    memoryManager_1.memoryManager.touchJob(applicationDeploymentJobs[jobId]);
+    res.json(applicationDeploymentJobs[jobId]);
 });
 exports.getApplicationDeploymentStatus = getApplicationDeploymentStatus;
 const retryApplicationDeployment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -1400,3 +1371,9 @@ const purgeApplicationResources = (req, res) => __awaiter(void 0, void 0, void 0
     }
 });
 exports.purgeApplicationResources = purgeApplicationResources;
+// Add the missing function that might be expected
+const getDeploymentJobStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    // Redirect to the new function name for backward compatibility
+    return (0, exports.getInfrastructureDeploymentStatus)(req, res);
+});
+exports.getDeploymentJobStatus = getDeploymentJobStatus;

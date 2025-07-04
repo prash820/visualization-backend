@@ -45,1703 +45,564 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getResourcesByCategory = exports.getResourcesOverview = exports.getWorkspaceDetails = exports.cleanupAllOrphanedResources = exports.cleanupOrphanedResource = exports.listOrphanedResources = exports.getAppCreationStatus = exports.getConceptStatus = exports.approveConceptAndBuild = exports.generateConceptForValidation = void 0;
+exports.getMagicHealth = exports.getBuildStatus = exports.getConceptStatus = exports.provisionInfrastructure = exports.handleUserConfirmation = exports.startMagicFlow = void 0;
 const openai_1 = __importDefault(require("openai"));
+const memoryManager_1 = require("../utils/memoryManager");
+const projectFileStore_1 = require("../utils/projectFileStore");
+const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
 const openai = new openai_1.default({
-    apiKey: process.env.OPENAI_API_KEY
+    apiKey: process.env.OPENAI_API_KEY || "",
 });
-// Job tracking for concept generation
+const anthropic = new sdk_1.default({
+    apiKey: process.env.ANTHROPIC_SECRET_KEY,
+});
 const conceptJobs = {};
-// Job tracking for app building (after approval)
 const appCreationJobs = {};
-function generateJobId(prefix) {
+// Set up memory management for job stores
+memoryManager_1.memoryManager.setupJobStoreCleanup(conceptJobs, "conceptJobs", 40 * 60 * 1000, 25); // 40 min, max 25 jobs
+memoryManager_1.memoryManager.setupJobStoreCleanup(appCreationJobs, "appCreationJobs", 60 * 60 * 1000, 20); // 60 min, max 20 jobs
+function generateJobId(prefix = 'magic') {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 }
-// 🔍 Step 1: Generate concept and diagrams for validation
-const generateConceptForValidation = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { idea, userType = "indie_hacker" } = req.body;
-    if (!idea) {
-        res.status(400).json({
-            error: "Missing app idea",
-            message: "Please describe your app idea"
+// AI request wrapper with retry logic
+function makeAIRequest(prompt_1, systemPrompt_1) {
+    return __awaiter(this, arguments, void 0, function* (prompt, systemPrompt, maxRetries = 3) {
+        var _a, _b, _c, _d, _e;
+        let lastError = null;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Try OpenAI first
+                if (process.env.OPENAI_API_KEY) {
+                    try {
+                        const messages = systemPrompt
+                            ? [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }]
+                            : [{ role: "user", content: prompt }];
+                        const response = yield openai.chat.completions.create({
+                            model: "gpt-4o",
+                            messages,
+                            max_tokens: 4000,
+                            temperature: 0.3,
+                        });
+                        return ((_c = (_b = (_a = response.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c.trim()) || "";
+                    }
+                    catch (error) {
+                        if (((_d = error.message) === null || _d === void 0 ? void 0 : _d.includes('429')) || ((_e = error.message) === null || _e === void 0 ? void 0 : _e.includes('quota'))) {
+                            console.log(`[Magic Flow] OpenAI rate limit, trying Anthropic...`);
+                            return yield makeAnthropicRequest(prompt, systemPrompt);
+                        }
+                        lastError = error;
+                    }
+                }
+                // Fallback to Anthropic
+                if (process.env.ANTHROPIC_SECRET_KEY) {
+                    return yield makeAnthropicRequest(prompt, systemPrompt);
+                }
+                // Wait before retry
+                if (attempt < maxRetries) {
+                    yield new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+                }
+            }
+            catch (error) {
+                lastError = error;
+            }
+        }
+        throw lastError || new Error("All AI providers failed");
+    });
+}
+function makeAnthropicRequest(prompt, systemPrompt) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const messages = [{ role: "user", content: prompt }];
+        const response = yield anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 4000,
+            temperature: 0.3,
+            system: systemPrompt,
+            messages
         });
+        const content = response.content[0];
+        if (content.type === 'text') {
+            return content.text;
+        }
+        throw new Error("Invalid response format from Anthropic");
+    });
+}
+/**
+ * PHASE 1: Start Magic Flow - Idea Analysis
+ * User provides app idea + target customers, AI analyzes and creates detailed summary
+ */
+const startMagicFlow = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { prompt, targetCustomers, projectId } = req.body;
+    if (!prompt) {
+        res.status(400).json({ error: "App idea prompt is required" });
         return;
     }
     const jobId = generateJobId('concept');
-    // Initialize concept job tracking
+    console.log(`[Magic Flow] Starting comprehensive analysis for job ${jobId}`);
     conceptJobs[jobId] = {
-        status: 'processing',
-        progress: 0,
-        currentStep: 'Analyzing your idea...',
-        startTime: new Date()
+        status: "processing",
+        phase: "analysis",
+        progress: 10,
+        startTime: new Date(),
+        lastAccessed: new Date(),
+        userPrompt: prompt,
+        targetCustomers: targetCustomers || "General users"
     };
-    // Start async concept generation
-    generateConceptAsync(jobId, idea, userType);
+    // Start analysis in background
+    analyzeAppIdea(jobId, prompt, targetCustomers, projectId);
     res.json({
         jobId,
-        message: "Generating app concept for your review...",
-        status: 'processing'
+        status: "accepted",
+        phase: "analysis",
+        message: "Starting comprehensive app idea analysis..."
     });
 });
-exports.generateConceptForValidation = generateConceptForValidation;
-// 🚀 Step 2: User approves concept, build the actual app
-const approveConceptAndBuild = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { conceptJobId, approvedConcept, modifications } = req.body;
-    if (!conceptJobId || !conceptJobs[conceptJobId]) {
-        res.status(400).json({
-            error: "Invalid concept job ID",
-            message: "Please generate a concept first"
-        });
-        return;
-    }
-    const conceptJob = conceptJobs[conceptJobId];
-    if (conceptJob.status !== 'completed') {
-        res.status(400).json({
-            error: "Concept not ready",
-            message: "Please wait for concept generation to complete"
-        });
-        return;
-    }
-    const buildJobId = generateJobId('build');
-    // Initialize build job tracking
-    appCreationJobs[buildJobId] = {
-        status: 'processing',
-        progress: 0,
-        currentStep: 'Starting app development...',
-        startTime: new Date()
-    };
-    // Use approved concept or original concept
-    const finalConcept = approvedConcept || ((_a = conceptJob.result) === null || _a === void 0 ? void 0 : _a.concept);
-    // Start async app building
-    buildApprovedAppAsync(buildJobId, finalConcept, modifications);
-    res.json({
-        buildJobId,
-        message: "Building your approved app... This usually takes 60-90 seconds",
-        status: 'processing'
+exports.startMagicFlow = startMagicFlow;
+/**
+ * Phase 1 Implementation: Comprehensive App Idea Analysis
+ */
+function analyzeAppIdea(jobId, prompt, targetCustomers, projectId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            console.log(`[Magic Flow] Phase 1: Analyzing app idea for job ${jobId}`);
+            conceptJobs[jobId].progress = 20;
+            conceptJobs[jobId].lastAccessed = new Date();
+            const analysisPrompt = `You are an expert product analyst and software architect. Analyze the following app idea comprehensively and provide a detailed summary.
+
+App Idea: ${prompt}
+Target Customers/Users (ICP): ${targetCustomers}
+
+Provide a comprehensive analysis in the following JSON format:
+{
+  "appSummary": {
+    "name": "Suggested app name",
+    "description": "Clear, detailed description of what the app does",
+    "coreValue": "Main value proposition for users",
+    "keyFeatures": ["feature1", "feature2", "feature3"],
+    "userJourney": "How users will interact with the app step-by-step"
+  },
+  "targetAudience": {
+    "primaryUsers": "Who will use this app primarily",
+    "userPersonas": ["persona1", "persona2"],
+    "painPoints": ["pain1", "pain2"],
+    "useCases": ["usecase1", "usecase2"]
+  },
+  "technicalOverview": {
+    "appType": "web app|mobile app|desktop app|api service",
+    "architecture": "monolithic|microservices|serverless",
+    "estimatedComplexity": "simple|medium|complex",
+    "keyTechnologies": ["tech1", "tech2"],
+    "dataRequirements": "What data the app will handle",
+    "integrations": ["integration1", "integration2"]
+  },
+  "businessModel": {
+    "revenueModel": "freemium|subscription|one-time|advertising",
+    "marketSize": "estimated market opportunity",
+    "competitiveAdvantage": "what makes this app unique",
+    "mvpFeatures": ["core feature for MVP"]
+  },
+  "implementationPlan": {
+    "estimatedTimeline": "development time estimate",
+    "developmentPhases": ["phase1", "phase2"],
+    "riskFactors": ["risk1", "risk2"],
+    "successMetrics": ["metric1", "metric2"]
+  },
+  "recommendation": {
+    "viability": "high|medium|low",
+    "reasoning": "why this app idea is/isn't viable",
+    "suggestedImprovements": ["improvement1", "improvement2"],
+    "nextSteps": "what to do next"
+  }
+}
+
+Be thorough, realistic, and provide actionable insights. Focus on creating a clear picture of what will be built.
+Return ONLY the JSON response, no explanations.`;
+            const analysisResponse = yield makeAIRequest(analysisPrompt);
+            const analysisResult = JSON.parse(analysisResponse);
+            conceptJobs[jobId] = Object.assign(Object.assign({}, conceptJobs[jobId]), { status: "completed", phase: "user_confirmation", progress: 100, analysisResult, endTime: new Date(), lastAccessed: new Date() });
+            // Save to project if provided
+            if (projectId) {
+                try {
+                    const project = yield (0, projectFileStore_1.getProjectById)(projectId);
+                    if (project) {
+                        project.magicAnalysis = analysisResult;
+                        project.userPrompt = prompt;
+                        project.targetCustomers = targetCustomers;
+                        yield (0, projectFileStore_1.saveProject)(project);
+                    }
+                }
+                catch (error) {
+                    console.error(`[Magic Flow] Error saving analysis to project ${projectId}:`, error);
+                }
+            }
+            console.log(`[Magic Flow] Phase 1 Complete: Analysis ready for user confirmation`);
+        }
+        catch (error) {
+            console.error(`[Magic Flow] Phase 1 failed for job ${jobId}:`, error);
+            conceptJobs[jobId] = Object.assign(Object.assign({}, conceptJobs[jobId]), { status: "failed", phase: "analysis", progress: 100, error: error.message || "Analysis failed", endTime: new Date(), lastAccessed: new Date() });
+        }
     });
-});
-exports.approveConceptAndBuild = approveConceptAndBuild;
-// 📊 Get concept generation status
-const getConceptStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { jobId } = req.params;
-    if (!conceptJobs[jobId]) {
+}
+/**
+ * PHASE 2: User Confirmation/Rejection
+ * User reviews the analysis and either confirms to proceed or rejects to restart
+ */
+const handleUserConfirmation = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { jobId, confirmed, rejectionReason, updatedPrompt, updatedTargetCustomers } = req.body;
+    if (!jobId || !conceptJobs[jobId]) {
         res.status(404).json({ error: "Concept job not found" });
         return;
     }
     const job = conceptJobs[jobId];
-    res.json({
-        jobId,
-        status: job.status,
-        progress: job.progress,
-        currentStep: job.currentStep,
-        result: job.result,
-        error: job.error,
-        duration: job.endTime ?
-            Math.round((job.endTime.getTime() - job.startTime.getTime()) / 1000) :
-            Math.round((new Date().getTime() - job.startTime.getTime()) / 1000)
-    });
+    memoryManager_1.memoryManager.touchJob(job);
+    if (job.phase !== 'user_confirmation') {
+        res.status(400).json({ error: "Job is not ready for user confirmation" });
+        return;
+    }
+    if (confirmed) {
+        // User confirmed - proceed to UML generation
+        console.log(`[Magic Flow] User confirmed concept for job ${jobId}, starting UML generation`);
+        const buildJobId = generateJobId('build');
+        appCreationJobs[buildJobId] = {
+            status: "processing",
+            phase: "uml_generation",
+            progress: 10,
+            startTime: new Date(),
+            lastAccessed: new Date(),
+            userPrompt: job.userPrompt,
+            targetCustomers: job.targetCustomers,
+            analysisResult: job.analysisResult,
+            userConfirmed: true
+        };
+        // Start UML generation in background
+        generateUMLDiagrams(buildJobId);
+        res.json({
+            conceptJobId: jobId,
+            buildJobId,
+            status: "confirmed",
+            phase: "uml_generation",
+            message: "Concept confirmed! Starting UML diagram generation..."
+        });
+    }
+    else {
+        // User rejected - restart with updated prompt if provided
+        console.log(`[Magic Flow] User rejected concept for job ${jobId}`);
+        job.userConfirmed = false;
+        job.rejectionReason = rejectionReason || "User requested changes";
+        job.lastAccessed = new Date();
+        if (updatedPrompt) {
+            // Start new analysis with updated prompt
+            const newJobId = generateJobId('concept');
+            console.log(`[Magic Flow] Starting new analysis with updated prompt for job ${newJobId}`);
+            conceptJobs[newJobId] = {
+                status: "processing",
+                phase: "analysis",
+                progress: 10,
+                startTime: new Date(),
+                lastAccessed: new Date(),
+                userPrompt: updatedPrompt,
+                targetCustomers: updatedTargetCustomers || job.targetCustomers
+            };
+            analyzeAppIdea(newJobId, updatedPrompt, updatedTargetCustomers || job.targetCustomers || "");
+            res.json({
+                originalJobId: jobId,
+                newJobId,
+                status: "restarted",
+                phase: "analysis",
+                message: "Starting new analysis with updated prompt..."
+            });
+        }
+        else {
+            res.json({
+                jobId,
+                status: "rejected",
+                phase: "user_confirmation",
+                message: "Concept rejected. Please provide an updated prompt to restart."
+            });
+        }
+    }
 });
-exports.getConceptStatus = getConceptStatus;
-// 📊 Get app creation status
-const getAppCreationStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.handleUserConfirmation = handleUserConfirmation;
+/**
+ * PHASE 3: UML Diagram Generation
+ * Generate comprehensive UML diagrams (class, sequence, component, architecture)
+ */
+function generateUMLDiagrams(jobId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            console.log(`[Magic Flow] Phase 3: Generating UML diagrams for job ${jobId}`);
+            const job = appCreationJobs[jobId];
+            job.progress = 20;
+            job.lastAccessed = new Date();
+            const { analysisResult, userPrompt, targetCustomers } = job;
+            const umlPrompt = `Based on the comprehensive app analysis, generate detailed UML diagrams.
+
+App Summary: ${JSON.stringify(analysisResult.appSummary, null, 2)}
+Technical Overview: ${JSON.stringify(analysisResult.technicalOverview, null, 2)}
+Original Prompt: ${userPrompt}
+Target Customers: ${targetCustomers}
+
+Generate comprehensive UML diagrams in PlantUML format:
+
+{
+  "componentDiagram": "PlantUML component diagram showing system architecture and component relationships",
+  "classDiagram": "PlantUML class diagram with detailed classes, attributes, methods, and relationships", 
+  "sequenceDiagram": "PlantUML sequence diagram showing key user interactions and system flows",
+  "architectureDiagram": "PlantUML deployment diagram showing infrastructure components and deployment architecture"
+}
+
+Requirements:
+1. Component diagram should show all major system components and their dependencies
+2. Class diagram should include detailed business logic classes with methods and attributes
+3. Sequence diagram should cover main user flows and system interactions
+4. Architecture diagram should show deployment components (databases, servers, APIs, etc.)
+5. Use proper PlantUML syntax with @startuml/@enduml blocks
+6. Include meaningful component and class names based on the app functionality
+7. Show clear relationships and data flow
+
+Return ONLY the JSON response with PlantUML code.`;
+            const umlResponse = yield makeAIRequest(umlPrompt);
+            const umlDiagrams = JSON.parse(umlResponse);
+            job.progress = 50;
+            job.umlDiagrams = umlDiagrams;
+            job.phase = 'infra_generation';
+            job.lastAccessed = new Date();
+            console.log(`[Magic Flow] Phase 3 Complete: UML diagrams generated, starting infrastructure generation`);
+            // Automatically proceed to infrastructure generation
+            generateInfrastructureCode(jobId);
+        }
+        catch (error) {
+            console.error(`[Magic Flow] Phase 3 failed for job ${jobId}:`, error);
+            appCreationJobs[jobId] = Object.assign(Object.assign({}, appCreationJobs[jobId]), { status: "failed", phase: "uml_generation", progress: 100, error: error.message || "UML generation failed", endTime: new Date(), lastAccessed: new Date() });
+        }
+    });
+}
+/**
+ * PHASE 4: Infrastructure Code Generation
+ * Generate Terraform infrastructure code based on architecture diagram
+ */
+function generateInfrastructureCode(jobId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            console.log(`[Magic Flow] Phase 4: Generating infrastructure code for job ${jobId}`);
+            const job = appCreationJobs[jobId];
+            job.progress = 60;
+            job.phase = 'infra_generation';
+            job.lastAccessed = new Date();
+            const { analysisResult, umlDiagrams, userPrompt } = job;
+            const infraPrompt = `Generate production-ready Terraform infrastructure code based on the app analysis and architecture diagram.
+
+App Analysis: ${JSON.stringify(analysisResult, null, 2)}
+Architecture Diagram: ${umlDiagrams.architectureDiagram}
+Component Diagram: ${umlDiagrams.componentDiagram}
+Original Prompt: ${userPrompt}
+
+Generate complete Terraform infrastructure code that includes:
+1. All necessary AWS resources based on the architecture
+2. Proper resource naming and organization
+3. Security best practices and IAM roles
+4. Scalability considerations
+5. Cost optimization
+6. Monitoring and logging setup
+
+Return ONLY raw Terraform HCL code (no markdown, no code fences, just plain .tf content).`;
+            const infraCode = yield makeAIRequest(infraPrompt);
+            job.progress = 70;
+            job.infraCode = infraCode;
+            job.phase = 'app_generation';
+            job.lastAccessed = new Date();
+            console.log(`[Magic Flow] Phase 4 Complete: Infrastructure code generated, starting app code generation`);
+            // Automatically proceed to app code generation
+            generateApplicationCode(jobId);
+        }
+        catch (error) {
+            console.error(`[Magic Flow] Phase 4 failed for job ${jobId}:`, error);
+            appCreationJobs[jobId] = Object.assign(Object.assign({}, appCreationJobs[jobId]), { status: "failed", phase: "infra_generation", progress: 100, error: error.message || "Infrastructure generation failed", endTime: new Date(), lastAccessed: new Date() });
+        }
+    });
+}
+/**
+ * PHASE 5: Application Code Generation
+ * Generate application code using the agentic system based on component diagrams
+ */
+function generateApplicationCode(jobId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            console.log(`[Magic Flow] Phase 5: Generating application code for job ${jobId}`);
+            const job = appCreationJobs[jobId];
+            job.progress = 80;
+            job.phase = 'app_generation';
+            job.lastAccessed = new Date();
+            const { analysisResult, umlDiagrams, infraCode, userPrompt } = job;
+            // Use the agentic code generation system from openAIController
+            const { generateApplicationCode } = yield Promise.resolve().then(() => __importStar(require('./openAIController')));
+            // Create a mock request for the agentic system
+            const mockReq = {
+                body: {
+                    prompt: userPrompt,
+                    umlDiagrams,
+                    documentation: JSON.stringify(analysisResult),
+                    infraCode
+                }
+            };
+            const mockRes = {
+                json: (data) => {
+                    job.appCode = data;
+                    job.progress = 90;
+                    job.phase = 'infra_provision';
+                    job.lastAccessed = new Date();
+                    console.log(`[Magic Flow] Phase 5 Complete: Application code generated, ready for infrastructure provisioning`);
+                    // Ready for manual provisioning trigger
+                    job.status = "ready_for_provision";
+                },
+                status: (code) => ({
+                    json: (data) => {
+                        throw new Error(`App generation failed: ${JSON.stringify(data)}`);
+                    }
+                })
+            };
+            yield generateApplicationCode(mockReq, mockRes);
+        }
+        catch (error) {
+            console.error(`[Magic Flow] Phase 5 failed for job ${jobId}:`, error);
+            appCreationJobs[jobId] = Object.assign(Object.assign({}, appCreationJobs[jobId]), { status: "failed", phase: "app_generation", progress: 100, error: error.message || "Application code generation failed", endTime: new Date(), lastAccessed: new Date() });
+        }
+    });
+}
+/**
+ * PHASE 6: Infrastructure Provisioning (Manual Trigger)
+ * Provision infrastructure using generated Terraform code
+ */
+const provisionInfrastructure = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { jobId } = req.params;
-    if (!appCreationJobs[jobId]) {
-        res.status(404).json({ error: "App creation job not found" });
+    if (!jobId || !appCreationJobs[jobId]) {
+        res.status(404).json({ error: "Build job not found" });
         return;
     }
     const job = appCreationJobs[jobId];
-    res.json({
-        jobId,
-        status: job.status,
-        progress: job.progress,
-        currentStep: job.currentStep,
-        result: job.result,
-        error: job.error,
-        duration: job.endTime ?
-            Math.round((job.endTime.getTime() - job.startTime.getTime()) / 1000) :
-            Math.round((new Date().getTime() - job.startTime.getTime()) / 1000)
-    });
-});
-exports.getAppCreationStatus = getAppCreationStatus;
-// 🔥 Generate concept and diagrams for validation
-function generateConceptAsync(jobId, idea, userType) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const job = conceptJobs[jobId];
-            // Step 1: Generate app concept (30%)
-            job.currentStep = "Designing app concept...";
-            job.progress = 30;
-            const appConcept = yield generateOptimizedConcept(idea, userType);
-            // Step 2: Generate all diagrams for validation (90%)
-            job.currentStep = "Creating architecture diagrams...";
-            job.progress = 60;
-            const diagrams = yield generateValidationDiagrams(appConcept);
-            // Step 3: Complete concept generation (100%)
-            job.currentStep = "Concept ready for review!";
-            job.progress = 100;
-            job.status = 'completed';
-            job.endTime = new Date();
-            job.result = {
-                concept: appConcept,
-                diagrams
-            };
-            console.log(`✅ Concept generated successfully for job ${jobId}`);
-        }
-        catch (error) {
-            console.error(`❌ Concept generation failed for job ${jobId}:`, error);
-            conceptJobs[jobId] = Object.assign(Object.assign({}, conceptJobs[jobId]), { status: 'failed', progress: 100, currentStep: 'Concept generation failed', error: error.message, endTime: new Date() });
-        }
-    });
-}
-// 🔥 Build the app after user approval
-function buildApprovedAppAsync(jobId, concept, modifications) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const job = appCreationJobs[jobId];
-            // Apply any user modifications to the concept
-            const finalConcept = modifications ?
-                yield applyUserModifications(concept, modifications) :
-                concept;
-            // Step 1: Generate all code simultaneously (30%)
-            job.currentStep = "Writing your app code...";
-            job.progress = 30;
-            const codeResults = yield Promise.all([
-                generateInfrastructureCode(finalConcept),
-                generateApplicationCode(finalConcept),
-                generateFrontendCode(finalConcept)
-            ]);
-            const [infraCode, backendCode, frontendCode] = codeResults;
-            // Step 2: Deploy infrastructure (60%)
-            job.currentStep = "Provisioning cloud infrastructure...";
-            job.progress = 60;
-            const projectId = `magic-${Date.now()}`;
-            const deploymentResult = yield deployInfrastructure(projectId, infraCode);
-            if (deploymentResult.status !== 'success') {
-                throw new Error(`Infrastructure deployment failed: ${deploymentResult.error}`);
-            }
-            // Step 3: Deploy application (80%)
-            job.currentStep = "Deploying your application...";
-            job.progress = 80;
-            const appDeployResult = yield deployApplication(projectId, {
-                frontend: frontendCode,
-                backend: backendCode
-            }, deploymentResult.outputs);
-            // Step 4: Complete (100%)
-            job.currentStep = "Your app is ready!";
-            job.progress = 100;
-            job.status = 'completed';
-            job.endTime = new Date();
-            job.result = {
-                appUrl: appDeployResult.appUrl,
-                adminUrl: appDeployResult.adminUrl,
-                projectId
-            };
-            console.log(`✅ App created successfully for job ${jobId}: ${appDeployResult.appUrl}`);
-        }
-        catch (error) {
-            console.error(`❌ App creation failed for job ${jobId}:`, error);
-            appCreationJobs[jobId] = Object.assign(Object.assign({}, appCreationJobs[jobId]), { status: 'failed', progress: 100, currentStep: 'App creation failed', error: error.message, endTime: new Date() });
-        }
-    });
-}
-// Post-process any AI-generated infrastructure code to remove markdown formatting
-function cleanTerraformCode(code) {
-    return code
-        .replace(/^```hcl\s*/gm, '') // Remove opening code fences
-        .replace(/^```\s*$/gm, '') // Remove closing code fences  
-        .replace(/^\s*```.*$/gm, '') // Remove any other code fence variants
-        .trim();
-}
-// Generate optimized concept for indie hackers
-function generateOptimizedConcept(idea, userType) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const prompt = `You are an expert at creating MVP apps for ${userType}s.
-
-App Idea: "${idea}"
-
-Create a SIMPLE, focused app concept that:
-1. Has ONE core feature that solves the main problem
-2. Uses standard web technologies (React frontend, Node.js backend)
-3. Can be built and deployed in under 2 hours
-4. Has clear monetization potential
-
-Return a JSON object with:
-{
-  "name": "App Name (max 3 words)",
-  "description": "One sentence description",
-  "coreFeature": "The main thing this app does",
-  "problemSolved": "What problem does this solve for users",
-  "targetUser": "Who is this for specifically",
-  "valueProposition": "Why would someone pay for this",
-  "techStack": {
-    "frontend": "React",
-    "backend": "Node.js + Express", 
-    "database": "DynamoDB",
-    "hosting": "AWS Lambda + S3"
-  },
-  "simpleFeatures": ["core feature", "secondary feature", "nice-to-have feature"],
-  "userJourney": ["user does X", "app helps with Y", "user gets Z result"]
-}
-
-Keep it SIMPLE and FOCUSED. No authentication, no complex workflows, just the core value.`;
-        const response = yield openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.3,
-        });
-        return JSON.parse(response.choices[0].message.content || "{}");
-    });
-}
-// Generate diagrams for user validation
-function generateValidationDiagrams(concept) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c;
-        const architecturePrompt = `Create a simple architecture diagram for: ${concept.name}
-
-Core feature: ${concept.coreFeature}
-Tech stack: React frontend, Node.js backend, DynamoDB, AWS Lambda + S3
-
-Return ONLY a Mermaid architecture diagram using this format:
-\`\`\`mermaid
-architecture-beta
-    group frontend(logos:react)[Frontend]
-        service webapp(logos:react)[${concept.name} Web App] in frontend
-        
-    group backend(logos:aws-lambda)[Backend]
-        service api(logos:aws-lambda)[API Service] in backend
-        service data(logos:aws-dynamodb)[Data Storage] in backend
-        
-    webapp:R --> L:api
-    api:R --> L:data
-\`\`\``;
-        const sequencePrompt = `Create a simple sequence diagram for: ${concept.name}
-
-User journey: ${concept.userJourney.join(' → ')}
-
-Return ONLY a Mermaid sequence diagram showing the main user flow:
-\`\`\`mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant API
-    participant Database
-    
-    User->>Frontend: [describe main action]
-    Frontend->>API: [api call]
-    API->>Database: [data operation]
-    Database-->>API: [response]
-    API-->>Frontend: [result]
-    Frontend-->>User: [final result]
-\`\`\``;
-        const componentPrompt = `Create a simple component diagram for: ${concept.name}
-
-Features: ${concept.simpleFeatures.join(', ')}
-
-Return ONLY a Mermaid flowchart showing main components:
-\`\`\`mermaid
-flowchart TB
-    A[User Interface]
-    B[${concept.coreFeature}]
-    C[Data Management]
-    D[External Services]
-    
-    A --> B
-    B --> C
-    B --> D
-\`\`\``;
-        try {
-            const [archResponse, seqResponse, compResponse] = yield Promise.all([
-                openai.chat.completions.create({
-                    model: "gpt-4",
-                    messages: [{ role: "user", content: architecturePrompt }],
-                    temperature: 0.1,
-                }),
-                openai.chat.completions.create({
-                    model: "gpt-4",
-                    messages: [{ role: "user", content: sequencePrompt }],
-                    temperature: 0.1,
-                }),
-                openai.chat.completions.create({
-                    model: "gpt-4",
-                    messages: [{ role: "user", content: componentPrompt }],
-                    temperature: 0.1,
-                })
-            ]);
-            return {
-                architecture: ((_a = archResponse.choices[0].message.content) === null || _a === void 0 ? void 0 : _a.replace(/```mermaid\n|```/g, '')) || '',
-                sequence: ((_b = seqResponse.choices[0].message.content) === null || _b === void 0 ? void 0 : _b.replace(/```mermaid\n|```/g, '')) || '',
-                component: ((_c = compResponse.choices[0].message.content) === null || _c === void 0 ? void 0 : _c.replace(/```mermaid\n|```/g, '')) || ''
-            };
-        }
-        catch (error) {
-            console.error('Error generating diagrams:', error);
-            return {
-                architecture: `architecture-beta\n    group frontend[Frontend]\n        service webapp[${concept.name}] in frontend`,
-                sequence: `sequenceDiagram\n    User->>App: Use ${concept.coreFeature}\n    App-->>User: Result`,
-                component: `flowchart TB\n    A[${concept.name}]\n    B[${concept.coreFeature}]`
-            };
-        }
-    });
-}
-// Apply user modifications to concept
-function applyUserModifications(concept, modifications) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const prompt = `The user wants to modify this app concept:
-
-Original concept: ${JSON.stringify(concept, null, 2)}
-
-User modifications: "${modifications}"
-
-Return the updated concept as JSON, incorporating the user's feedback while keeping it simple and focused.`;
-        const response = yield openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.2,
-        });
-        try {
-            return JSON.parse(response.choices[0].message.content || "{}");
-        }
-        catch (_a) {
-            return concept; // Return original if parsing fails
-        }
-    });
-}
-// Generate infrastructure code based on app concept analysis
-function generateInfrastructureCode(concept) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d, _e, _f, _g;
-        // Analyze the concept to determine infrastructure needs
-        const needsDatabase = ((_a = concept.simpleFeatures) === null || _a === void 0 ? void 0 : _a.some((feature) => feature.toLowerCase().includes('stor') ||
-            feature.toLowerCase().includes('data') ||
-            feature.toLowerCase().includes('user') ||
-            feature.toLowerCase().includes('save'))) || ((_b = concept.coreFeature) === null || _b === void 0 ? void 0 : _b.toLowerCase().includes('stor'));
-        const needsRealtime = ((_c = concept.simpleFeatures) === null || _c === void 0 ? void 0 : _c.some((feature) => feature.toLowerCase().includes('real-time') ||
-            feature.toLowerCase().includes('live') ||
-            feature.toLowerCase().includes('chat') ||
-            feature.toLowerCase().includes('notification'))) || ((_d = concept.coreFeature) === null || _d === void 0 ? void 0 : _d.toLowerCase().includes('real-time'));
-        const needsFileUpload = (_e = concept.simpleFeatures) === null || _e === void 0 ? void 0 : _e.some((feature) => feature.toLowerCase().includes('upload') ||
-            feature.toLowerCase().includes('file') ||
-            feature.toLowerCase().includes('image') ||
-            feature.toLowerCase().includes('photo'));
-        const isApiOnly = ((_f = concept.description) === null || _f === void 0 ? void 0 : _f.toLowerCase().includes('api')) &&
-            !((_g = concept.description) === null || _g === void 0 ? void 0 : _g.toLowerCase().includes('frontend'));
-        // Generate infrastructure based on analysis
-        let infrastructureCode = `
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
+    memoryManager_1.memoryManager.touchJob(job);
+    if (job.status !== 'ready_for_provision') {
+        res.status(400).json({ error: "Job is not ready for infrastructure provisioning" });
+        return;
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.1"
-    }
-  }
-  required_version = ">= 1.5.0"
-}
-
-provider "aws" {
-  region = var.aws_region
-}
-
-resource "random_string" "suffix" {
-  length  = 8
-  special = false
-  upper   = false
-}
-
-# Variables
-variable "aws_region" {
-  description = "AWS region for deployment"
-  type        = string
-  default     = "us-east-1"
-}
-`;
-        // Add Lambda function for API
-        infrastructureCode += `
-# Lambda function for ${concept.name} API
-resource "aws_lambda_function" "app_api" {
-  function_name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-\${random_string.suffix.result}"
-  handler       = "index.handler"
-  runtime       = "nodejs18.x"
-  role          = aws_iam_role.lambda_exec.arn
-  filename      = "api.zip"
-  timeout       = 30
-  memory_size   = 256
-  
-  environment {
-    variables = {
-      APP_NAME = "${concept.name}"
-      CORE_FEATURE = "${concept.coreFeature}"
-${needsDatabase ? '      DYNAMODB_TABLE = aws_dynamodb_table.app_data.name' : ''}
-${needsFileUpload ? '      S3_BUCKET = aws_s3_bucket.app_storage.bucket' : ''}
-    }
-  }
-  
-  tags = {
-    Name = "${concept.name}API"
-    Environment = "Production"
-  }
-}
-
-# IAM role for Lambda
-resource "aws_iam_role" "lambda_exec" {
-  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}LambdaRole-\${random_string.suffix.result}"
-  
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-`;
-        // Add database if needed
-        if (needsDatabase) {
-            infrastructureCode += `
-# DynamoDB table for app data
-resource "aws_dynamodb_table" "app_data" {
-  name           = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}Data-\${random_string.suffix.result}"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
-  
-  attribute {
-    name = "id"
-    type = "S"
-  }
-  
-  tags = {
-    Name = "${concept.name}Data"
-    Environment = "Production"
-  }
-}
-
-# IAM policy for DynamoDB access
-resource "aws_iam_role_policy" "lambda_dynamodb" {
-  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}DynamoDBPolicy"
-  role = aws_iam_role.lambda_exec.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:PutItem",
-          "dynamodb:GetItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:DeleteItem",
-          "dynamodb:Query",
-          "dynamodb:Scan"
-        ]
-        Resource = aws_dynamodb_table.app_data.arn
-      }
-    ]
-  })
-}
-`;
-        }
-        // Add file storage if needed
-        if (needsFileUpload) {
-            infrastructureCode += `
-# S3 bucket for file storage
-resource "aws_s3_bucket" "app_storage" {
-  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-storage-\${random_string.suffix.result}"
-  
-  tags = {
-    Name = "${concept.name}Storage"
-    Environment = "Production"
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "app_storage" {
-  bucket = aws_s3_bucket.app_storage.id
-  
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-# IAM policy for S3 access
-resource "aws_iam_role_policy" "lambda_s3" {
-  name = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}S3Policy"
-  role = aws_iam_role.lambda_exec.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject"
-        ]
-        Resource = "\${aws_s3_bucket.app_storage.arn}/*"
-      }
-    ]
-  })
-}
-`;
-        }
-        // Add frontend hosting if not API-only
-        if (!isApiOnly) {
-            infrastructureCode += `
-# S3 bucket for frontend hosting
-resource "aws_s3_bucket" "app_frontend" {
-  bucket = "${concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-frontend-\${random_string.suffix.result}"
-  
-  tags = {
-    Name = "${concept.name}Frontend"
-    Environment = "Production"
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "app_frontend" {
-  bucket = aws_s3_bucket.app_frontend.id
-  
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-resource "aws_s3_bucket_policy" "app_frontend" {
-  bucket = aws_s3_bucket.app_frontend.id
-  depends_on = [aws_s3_bucket_public_access_block.app_frontend]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "PublicReadGetObject"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:GetObject"
-        Resource  = "\${aws_s3_bucket.app_frontend.arn}/*"
-      }
-    ]
-  })
-}
-
-resource "aws_s3_bucket_website_configuration" "app_frontend" {
-  bucket = aws_s3_bucket.app_frontend.id
-
-  index_document {
-    suffix = "index.html"
-  }
-
-  error_document {
-    key = "index.html"
-  }
-}
-`;
-        }
-        // Add API Gateway
-        const apiType = needsRealtime ? 'websocket' : 'rest';
-        if (apiType === 'websocket') {
-            infrastructureCode += `
-# WebSocket API Gateway for real-time features
-resource "aws_apigatewayv2_api" "app_websocket" {
-  name                       = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}WebSocket-\${random_string.suffix.result}"
-  protocol_type              = "WEBSOCKET"
-  route_selection_expression = "$request.body.action"
-  
-  tags = {
-    Name = "${concept.name}WebSocket"
-  }
-}
-
-resource "aws_apigatewayv2_stage" "app_websocket" {
-  api_id = aws_apigatewayv2_api.app_websocket.id
-  name   = "prod"
-}
-
-resource "aws_lambda_permission" "websocket_lambda" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.app_api.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "\${aws_apigatewayv2_api.app_websocket.execution_arn}/*/*"
-}
-`;
-        }
-        else {
-            infrastructureCode += `
-# REST API Gateway
-resource "aws_api_gateway_rest_api" "app_api" {
-  name        = "${concept.name.replace(/[^a-zA-Z0-9]/g, '')}API-\${random_string.suffix.result}"
-  description = "API for ${concept.name}"
-
-  endpoint_configuration {
-    types = ["REGIONAL"]
-  }
-  
-  tags = {
-    Name = "${concept.name}API"
-  }
-}
-
-resource "aws_api_gateway_resource" "app_resource" {
-  rest_api_id = aws_api_gateway_rest_api.app_api.id
-  parent_id   = aws_api_gateway_rest_api.app_api.root_resource_id
-  path_part   = "{proxy+}"
-}
-
-resource "aws_api_gateway_method" "app_method" {
-  rest_api_id   = aws_api_gateway_rest_api.app_api.id
-  resource_id   = aws_api_gateway_resource.app_resource.id
-  http_method   = "ANY"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "app_integration" {
-  rest_api_id = aws_api_gateway_rest_api.app_api.id
-  resource_id = aws_api_gateway_resource.app_resource.id
-  http_method = aws_api_gateway_method.app_method.http_method
-
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.app_api.invoke_arn
-}
-
-resource "aws_api_gateway_deployment" "app_deployment" {
-  depends_on = [
-    aws_api_gateway_method.app_method,
-    aws_api_gateway_integration.app_integration
-  ]
-
-  rest_api_id = aws_api_gateway_rest_api.app_api.id
-  stage_name  = "prod"
-}
-
-resource "aws_lambda_permission" "api_gw" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.app_api.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "\${aws_api_gateway_rest_api.app_api.execution_arn}/*/*"
-}
-`;
-        }
-        // Add outputs
-        infrastructureCode += `
-# Outputs
-output "api_gateway_url" {
-  value = ${needsRealtime ?
-            'aws_apigatewayv2_stage.app_websocket.invoke_url' :
-            'aws_api_gateway_deployment.app_deployment.invoke_url'}
-  description = "API Gateway URL"
-}
-`;
-        if (!isApiOnly) {
-            infrastructureCode += `
-output "frontend_url" {
-  value = "http://\${aws_s3_bucket.app_frontend.bucket}.s3-website-\${var.aws_region}.amazonaws.com"
-  description = "Frontend website URL"
-}
-`;
-        }
-        if (needsDatabase) {
-            infrastructureCode += `
-output "database_name" {
-  value = aws_dynamodb_table.app_data.name
-  description = "DynamoDB table name"
-}
-`;
-        }
-        if (needsFileUpload) {
-            infrastructureCode += `
-output "storage_bucket" {
-  value = aws_s3_bucket.app_storage.bucket
-  description = "S3 storage bucket name"
-}
-`;
-        }
-        return infrastructureCode;
-    });
-}
-// Generate application code (simplified)
-function generateApplicationCode(concept) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const prompt = `Generate SIMPLE, working code for: ${concept.description}
-
-Core feature: ${concept.coreFeature}
-
-IMPORTANT: Return ONLY valid JSON, no explanatory text. Format exactly like this:
-{
-  "backend": {
-    "index.js": "Lambda handler code using Express + serverless-http"
-  },
-  "package.json": "Dependencies for the backend"
-}
-
-Keep it MINIMAL - just the core feature working. Use real, runnable code.`;
-        const response = yield openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-                { role: "system", content: "You are a code generator that returns ONLY valid JSON. Never include explanatory text, markdown formatting, or anything other than pure JSON." },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.1,
-        });
-        try {
-            const content = response.choices[0].message.content || "{}";
-            // Clean any markdown formatting
-            const cleanContent = content.replace(/```json\n?|```\n?/g, '').trim();
-            return JSON.parse(cleanContent);
-        }
-        catch (error) {
-            console.error('Failed to parse application code JSON:', error);
-            console.error('AI Response was:', response.choices[0].message.content);
-            // Return minimal working code as fallback
-            return {
-                backend: {
-                    "index.js": `
-const express = require('express');
-const serverless = require('serverless-http');
-const app = express();
-
-app.use(express.json());
-
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to ${concept.name}' });
-});
-
-module.exports.handler = serverless(app);
-        `
-                },
-                "package.json": JSON.stringify({
-                    name: concept.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-                    version: "1.0.0",
-                    dependencies: {
-                        express: "^4.18.0",
-                        "serverless-http": "^3.2.0"
-                    }
-                }, null, 2)
-            };
-        }
-    });
-}
-// Generate frontend code (simplified)
-function generateFrontendCode(concept) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const prompt = `Generate a SIMPLE React frontend for: ${concept.description}
-
-Core feature: ${concept.coreFeature}
-
-IMPORTANT: Return ONLY valid JSON, no explanatory text. Format exactly like this:
-{
-  "index.html": "Single HTML file with embedded React",
-  "style.css": "Simple, clean CSS"
-}
-
-Make it look GOOD but keep it SIMPLE. Single page, no routing, just the core feature.`;
-        const response = yield openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-                { role: "system", content: "You are a code generator that returns ONLY valid JSON. Never include explanatory text, markdown formatting, or anything other than pure JSON." },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.1,
-        });
-        try {
-            const content = response.choices[0].message.content || "{}";
-            // Clean any markdown formatting
-            const cleanContent = content.replace(/```json\n?|```\n?/g, '').trim();
-            return JSON.parse(cleanContent);
-        }
-        catch (error) {
-            console.error('Failed to parse frontend code JSON:', error);
-            console.error('AI Response was:', response.choices[0].message.content);
-            // Return minimal working frontend as fallback
-            return {
-                "index.html": `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${concept.name}</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</head>
-<body>
-    <div id="root"></div>
-    
-    <script type="text/babel">
-        function App() {
-            return (
-                <div className="app">
-                    <h1>${concept.name}</h1>
-                    <p>${concept.description}</p>
-                    <div className="feature">
-                        <h2>${concept.coreFeature}</h2>
-                        <button>Get Started</button>
-                    </div>
-                </div>
-            );
-        }
-        
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
-</body>
-</html>
-      `,
-                "style.css": `
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-    margin: 0;
-    padding: 0;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-}
-
-.app {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 2rem;
-    text-align: center;
-    color: white;
-}
-
-h1 { font-size: 3rem; margin-bottom: 1rem; }
-h2 { font-size: 1.5rem; margin-bottom: 1rem; }
-p { font-size: 1.2rem; margin-bottom: 2rem; opacity: 0.9; }
-
-.feature {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 2rem;
-    margin: 2rem 0;
-}
-
-button {
-    background: #4CAF50;
-    color: white;
-    border: none;
-    padding: 1rem 2rem;
-    font-size: 1.1rem;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-button:hover { background: #45a049; }
-      `
-            };
-        }
-    });
-}
-// Deploy infrastructure using existing system
-function deployInfrastructure(projectId, infraCode) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const fetch = (yield Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
-        // Clean any markdown formatting from infrastructure code
-        const cleanInfraCode = cleanTerraformCode(infraCode);
-        // Save infrastructure code
-        const fs = yield Promise.resolve().then(() => __importStar(require('fs')));
-        const path = yield Promise.resolve().then(() => __importStar(require('path')));
-        const workspaceDir = path.join(__dirname, "../../terraform-runner/workspace", projectId);
-        if (!fs.existsSync(workspaceDir)) {
-            fs.mkdirSync(workspaceDir, { recursive: true });
-        }
-        fs.writeFileSync(path.join(workspaceDir, "main.tf"), cleanInfraCode);
-        // Call terraform service
-        const response = yield fetch("http://localhost:8000/deploy", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ projectId }),
-        });
-        return yield response.json();
-    });
-}
-// Deploy application using existing system
-function deployApplication(projectId, code, infraOutputs) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // Upload frontend files to S3
-        const fs = yield Promise.resolve().then(() => __importStar(require('fs')));
-        const path = yield Promise.resolve().then(() => __importStar(require('path')));
-        const workspaceDir = path.join(__dirname, "../../terraform-runner/workspace", projectId);
-        // Write frontend files
-        if (code.frontend) {
-            Object.entries(code.frontend).forEach(([filename, content]) => {
-                fs.writeFileSync(path.join(workspaceDir, filename), content);
-            });
-        }
-        // Safely handle infraOutputs which might be undefined or malformed
-        let appUrl = '';
-        let apiUrl = '';
-        let adminUrl = '';
-        try {
-            if (infraOutputs && typeof infraOutputs === 'object') {
-                // Try to get URLs from terraform outputs
-                appUrl = infraOutputs.s3_website_url ||
-                    infraOutputs.website_url ||
-                    (infraOutputs.s3_bucket_name ? `http://${infraOutputs.s3_bucket_name}.s3-website-us-east-1.amazonaws.com` : '');
-                apiUrl = infraOutputs.api_gateway_url ||
-                    infraOutputs.api_url ||
-                    '';
-                adminUrl = infraOutputs.lambda_function_name ?
-                    `https://console.aws.amazon.com/lambda/home?region=us-east-1#/functions/${infraOutputs.lambda_function_name}` :
-                    `https://console.aws.amazon.com/console/home?region=us-east-1`;
+    try {
+        console.log(`[Magic Flow] Phase 6: Starting infrastructure provisioning for job ${jobId}`);
+        job.status = "processing";
+        job.phase = "infra_provision";
+        job.progress = 95;
+        job.lastAccessed = new Date();
+        // Use the existing Terraform deployment system
+        const { deployInfrastructure } = yield Promise.resolve().then(() => __importStar(require('./deployController')));
+        const mockReq = {
+            body: {
+                terraformCode: job.infraCode,
+                projectId: `magic-${jobId}`
             }
-            // If we still don't have URLs, try to get terraform outputs directly
-            if (!appUrl || !apiUrl) {
-                console.warn(`[Magic] Missing outputs, attempting to fetch terraform outputs directly for ${projectId}`);
-                const outputsResult = yield getTerraformOutputs(projectId);
-                if (outputsResult && outputsResult.outputs) {
-                    const outputs = outputsResult.outputs;
-                    appUrl = appUrl || outputs.s3_website_url || outputs.website_url || '';
-                    apiUrl = apiUrl || outputs.api_gateway_url || outputs.api_url || '';
-                    adminUrl = adminUrl || (outputs.lambda_function_name ?
-                        `https://console.aws.amazon.com/lambda/home?region=us-east-1#/functions/${outputs.lambda_function_name}` :
-                        adminUrl);
-                }
-            }
-        }
-        catch (error) {
-            console.error(`[Magic] Error parsing infrastructure outputs for ${projectId}:`, error);
-            console.error(`[Magic] Raw infraOutputs:`, infraOutputs);
-            // Create fallback URLs based on project ID
-            const timestamp = projectId.replace('magic-', '');
-            appUrl = `https://console.aws.amazon.com/s3/home?region=us-east-1#/search?searchType=prefix&prefix=${projectId}`;
-            apiUrl = `https://console.aws.amazon.com/apigateway/home?region=us-east-1#/apis`;
-            adminUrl = `https://console.aws.amazon.com/console/home?region=us-east-1`;
-        }
-        return {
-            appUrl,
-            apiUrl,
-            adminUrl,
-            projectId
         };
-    });
-}
-// Helper function to get terraform outputs directly
-function getTerraformOutputs(projectId) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const fetch = (yield Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
-            const response = yield fetch("http://localhost:8000/outputs", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ projectId }),
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.status}`);
-            }
-            const result = yield response.json();
-            return result;
-        }
-        catch (error) {
-            console.error(`[Magic] Failed to get terraform outputs for ${projectId}:`, error);
-            return null;
-        }
-    });
-}
-// 🧹 ORPHANED RESOURCES MANAGEMENT
-// List all orphaned/abandoned workspaces (expanded to handle ALL types)
-const listOrphanedResources = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const fs = yield Promise.resolve().then(() => __importStar(require('fs')));
-        const path = yield Promise.resolve().then(() => __importStar(require('path')));
-        const workspaceDir = path.join(__dirname, "../../terraform-runner/workspace");
-        if (!fs.existsSync(workspaceDir)) {
-            res.json({ orphanedResources: [], message: "No workspace directory found" });
-            return;
-        }
-        // Get ALL workspace directories, not just magic-* ones
-        const allDirs = fs.readdirSync(workspaceDir).filter(dir => {
-            const dirPath = path.join(workspaceDir, dir);
-            return fs.statSync(dirPath).isDirectory() && dir !== '.DS_Store';
-        });
-        const orphanedResources = [];
-        for (const dir of allDirs) {
-            const dirPath = path.join(workspaceDir, dir);
-            const stateFile = path.join(dirPath, 'terraform.tfstate');
-            if (fs.existsSync(stateFile)) {
-                try {
-                    const stateContent = fs.readFileSync(stateFile, 'utf8');
-                    const state = JSON.parse(stateContent);
-                    // Check if there are actual resources in the state
-                    const hasResources = state.resources && state.resources.length > 0;
-                    // Get basic info about the workspace
-                    const stats = fs.statSync(dirPath);
-                    const createdAt = stats.mtime;
-                    const ageInHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-                    // Get terraform outputs if available (only for workspaces with resources)
-                    let outputs = {};
-                    if (hasResources) {
-                        try {
-                            const outputsResult = yield getTerraformOutputs(dir);
-                            outputs = (outputsResult === null || outputsResult === void 0 ? void 0 : outputsResult.outputs) || {};
-                        }
-                        catch (error) {
-                            console.warn(`Could not get outputs for ${dir}:`, error);
-                        }
-                    }
-                    // Count resources by type
-                    const resourceCounts = {};
-                    if (state.resources) {
-                        state.resources.forEach((resource) => {
-                            resourceCounts[resource.type] = (resourceCounts[resource.type] || 0) + 1;
-                        });
-                    }
-                    // Determine workspace type
-                    let workspaceType = 'unknown';
-                    if (dir.startsWith('magic-')) {
-                        workspaceType = 'magic';
-                    }
-                    else if (dir.startsWith('test-project-')) {
-                        workspaceType = 'test';
-                    }
-                    else if (dir.match(/^[a-f0-9\-]{36}$/)) {
-                        workspaceType = 'uuid';
-                    }
-                    orphanedResources.push({
-                        projectId: dir,
-                        workspaceType,
-                        createdAt: createdAt.toISOString(),
-                        ageInHours: Math.round(ageInHours * 100) / 100,
-                        resourceCount: state.resources ? state.resources.length : 0,
-                        resourceTypes: resourceCounts,
-                        outputs,
-                        stateFileSize: Math.round(stateContent.length / 1024) + 'KB',
-                        status: hasResources ? 'orphaned' : 'empty_state'
-                    });
-                }
-                catch (error) {
-                    console.error(`Error reading state file for ${dir}:`, error);
-                }
-            }
-            else {
-                // Directory without state file - could be incomplete workspace
-                const stats = fs.statSync(dirPath);
-                const createdAt = stats.mtime;
-                const ageInHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-                // Determine workspace type
-                let workspaceType = 'unknown';
-                if (dir.startsWith('magic-')) {
-                    workspaceType = 'magic';
-                }
-                else if (dir.startsWith('test-project-')) {
-                    workspaceType = 'test';
-                }
-                else if (dir.match(/^[a-f0-9\-]{36}$/)) {
-                    workspaceType = 'uuid';
-                }
-                orphanedResources.push({
-                    projectId: dir,
-                    workspaceType,
-                    createdAt: createdAt.toISOString(),
-                    ageInHours: Math.round(ageInHours * 100) / 100,
-                    resourceCount: 0,
-                    resourceTypes: {},
-                    outputs: {},
-                    stateFileSize: '0KB',
-                    status: 'no_state'
-                });
-            }
-        }
-        // Sort by age (oldest first)
-        orphanedResources.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        // Separate results by type
-        const resourceWorkspaces = orphanedResources.filter(r => r.resourceCount > 0);
-        const emptyWorkspaces = orphanedResources.filter(r => r.resourceCount === 0 && r.status === 'empty_state');
-        const noStateWorkspaces = orphanedResources.filter(r => r.status === 'no_state');
-        res.json({
-            orphanedResources,
-            resourceWorkspaces,
-            emptyWorkspaces,
-            noStateWorkspaces,
-            total: orphanedResources.length,
-            totalWithResources: resourceWorkspaces.length,
-            totalEmpty: emptyWorkspaces.length,
-            totalNoState: noStateWorkspaces.length,
-            message: orphanedResources.length > 0 ?
-                `Found ${resourceWorkspaces.length} workspaces with AWS resources, ${emptyWorkspaces.length} empty state workspaces, and ${noStateWorkspaces.length} workspaces without state` :
-                "No orphaned resources found"
-        });
-    }
-    catch (error) {
-        console.error('[Magic] Error listing orphaned resources:', error);
-        res.status(500).json({
-            error: 'Failed to list orphaned resources',
-            details: error.message
-        });
-    }
-});
-exports.listOrphanedResources = listOrphanedResources;
-// Clean up a specific orphaned workspace (updated to handle any workspace type)
-const cleanupOrphanedResource = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { projectId } = req.params;
-        if (!projectId) {
-            res.status(400).json({ error: 'Invalid projectId. Project ID is required.' });
-            return;
-        }
-        const fs = yield Promise.resolve().then(() => __importStar(require('fs')));
-        const path = yield Promise.resolve().then(() => __importStar(require('path')));
-        const workspaceDir = path.join(__dirname, "../../terraform-runner/workspace", projectId);
-        if (!fs.existsSync(workspaceDir)) {
-            res.status(404).json({ error: 'Workspace not found' });
-            return;
-        }
-        const stateFile = path.join(workspaceDir, 'terraform.tfstate');
-        if (!fs.existsSync(stateFile)) {
-            // No state file, just clean up the directory
-            fs.rmSync(workspaceDir, { recursive: true, force: true });
-            res.json({
-                message: 'Workspace cleaned up (no Terraform state found)',
-                projectId,
-                action: 'directory_removed'
-            });
-            return;
-        }
-        // Check if there are actually resources to destroy
-        try {
-            const stateContent = fs.readFileSync(stateFile, 'utf8');
-            const state = JSON.parse(stateContent);
-            const hasResources = state.resources && state.resources.length > 0;
-            if (!hasResources) {
-                // Empty state file, just clean up the directory
-                fs.rmSync(workspaceDir, { recursive: true, force: true });
+        const mockRes = {
+            json: (data) => {
+                job.deploymentResult = data;
+                job.progress = 100;
+                job.phase = 'completed';
+                job.status = 'completed';
+                job.endTime = new Date();
+                job.lastAccessed = new Date();
+                console.log(`[Magic Flow] Phase 6 Complete: Infrastructure provisioned successfully`);
                 res.json({
-                    message: 'Workspace cleaned up (empty Terraform state)',
-                    projectId,
-                    action: 'directory_removed'
+                    jobId,
+                    status: "completed",
+                    phase: "completed",
+                    message: "Infrastructure provisioned successfully! App is ready for deployment.",
+                    deploymentResult: data
                 });
-                return;
-            }
-        }
-        catch (error) {
-            console.error(`Error parsing state file for ${projectId}:`, error);
-        }
-        // Call terraform destroy
-        const fetch = (yield Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
-        const response = yield fetch("http://localhost:8000/destroy", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ projectId }),
-        });
-        const result = yield response.json();
-        if (result.status === 'success') {
-            // Also remove the workspace directory
-            fs.rmSync(workspaceDir, { recursive: true, force: true });
-            res.json({
-                message: 'Orphaned resources successfully cleaned up',
-                projectId,
-                action: 'terraform_destroyed',
-                logs: result.stdout || ''
-            });
-        }
-        else {
-            res.status(500).json({
-                error: 'Failed to destroy resources',
-                projectId,
-                details: result.stderr || result.error,
-                suggestion: 'You may need to clean up resources manually in AWS Console'
-            });
-        }
-    }
-    catch (error) {
-        console.error('[Magic] Error cleaning up orphaned resource:', error);
-        res.status(500).json({
-            error: 'Failed to cleanup orphaned resource',
-            details: error.message
-        });
-    }
-});
-exports.cleanupOrphanedResource = cleanupOrphanedResource;
-// Clean up all orphaned resources (dangerous - use with caution)
-const cleanupAllOrphanedResources = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { confirm } = req.body;
-        if (confirm !== 'YES_DESTROY_ALL_ORPHANED_RESOURCES') {
-            res.status(400).json({
-                error: 'Missing confirmation',
-                message: 'To confirm, send POST request with body: {"confirm": "YES_DESTROY_ALL_ORPHANED_RESOURCES"}'
-            });
-            return;
-        }
-        // Get list of orphaned resources
-        const fs = yield Promise.resolve().then(() => __importStar(require('fs')));
-        const path = yield Promise.resolve().then(() => __importStar(require('path')));
-        const workspaceDir = path.join(__dirname, "../../terraform-runner/workspace");
-        // Get ALL workspace directories, not just magic-* ones
-        const allDirs = fs.readdirSync(workspaceDir).filter(dir => {
-            const dirPath = path.join(workspaceDir, dir);
-            return fs.statSync(dirPath).isDirectory() && dir !== '.DS_Store';
-        });
-        const cleanupResults = [];
-        let totalCleaned = 0;
-        let totalFailed = 0;
-        for (const dir of allDirs) {
-            const dirPath = path.join(workspaceDir, dir);
-            const stateFile = path.join(dirPath, 'terraform.tfstate');
-            if (fs.existsSync(stateFile)) {
-                try {
-                    const stateContent = fs.readFileSync(stateFile, 'utf8');
-                    const state = JSON.parse(stateContent);
-                    // Check if there are actual resources in the state
-                    const hasResources = state.resources && state.resources.length > 0;
-                    if (hasResources) {
-                        try {
-                            // Call terraform destroy
-                            const fetch = (yield Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
-                            const response = yield fetch("http://localhost:8000/destroy", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ projectId: dir }),
-                            });
-                            const result = yield response.json();
-                            if (result.status === 'success') {
-                                // Remove the workspace directory
-                                fs.rmSync(dirPath, { recursive: true, force: true });
-                                cleanupResults.push({
-                                    projectId: dir,
-                                    status: 'success',
-                                    message: 'Resources destroyed and workspace cleaned up'
-                                });
-                                totalCleaned++;
-                            }
-                            else {
-                                cleanupResults.push({
-                                    projectId: dir,
-                                    status: 'failed',
-                                    error: result.stderr || result.error
-                                });
-                                totalFailed++;
-                            }
-                        }
-                        catch (error) {
-                            cleanupResults.push({
-                                projectId: dir,
-                                status: 'failed',
-                                error: error.message
-                            });
-                            totalFailed++;
-                        }
-                    }
-                    else {
-                        // Empty state file, just remove the directory
-                        try {
-                            fs.rmSync(dirPath, { recursive: true, force: true });
-                            cleanupResults.push({
-                                projectId: dir,
-                                status: 'success',
-                                message: 'Empty workspace directory removed'
-                            });
-                            totalCleaned++;
-                        }
-                        catch (error) {
-                            cleanupResults.push({
-                                projectId: dir,
-                                status: 'failed',
-                                error: error.message
-                            });
-                            totalFailed++;
-                        }
-                    }
-                }
-                catch (error) {
-                    console.error(`Error processing ${dir}:`, error);
-                    cleanupResults.push({
-                        projectId: dir,
-                        status: 'failed',
-                        error: `Failed to parse state file: ${error}`
-                    });
-                    totalFailed++;
-                }
-            }
-            else {
-                // No state file, just remove the directory
-                try {
-                    fs.rmSync(dirPath, { recursive: true, force: true });
-                    cleanupResults.push({
-                        projectId: dir,
-                        status: 'success',
-                        message: 'Directory without state removed'
-                    });
-                    totalCleaned++;
-                }
-                catch (error) {
-                    cleanupResults.push({
-                        projectId: dir,
-                        status: 'failed',
-                        error: error.message
-                    });
-                    totalFailed++;
-                }
-            }
-        }
-        res.json({
-            message: `Cleanup completed: ${totalCleaned} successful, ${totalFailed} failed`,
-            totalCleaned,
-            totalFailed,
-            results: cleanupResults
-        });
-    }
-    catch (error) {
-        console.error('[Magic] Error in bulk cleanup:', error);
-        res.status(500).json({
-            error: 'Failed to cleanup orphaned resources',
-            details: error.message
-        });
-    }
-});
-exports.cleanupAllOrphanedResources = cleanupAllOrphanedResources;
-// Get detailed information about a specific workspace (updated to handle any workspace type)
-const getWorkspaceDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { projectId } = req.params;
-        if (!projectId) {
-            res.status(400).json({ error: 'Invalid projectId. Project ID is required.' });
-            return;
-        }
-        const fs = yield Promise.resolve().then(() => __importStar(require('fs')));
-        const path = yield Promise.resolve().then(() => __importStar(require('path')));
-        const workspaceDir = path.join(__dirname, "../../terraform-runner/workspace", projectId);
-        if (!fs.existsSync(workspaceDir)) {
-            res.status(404).json({ error: 'Workspace not found' });
-            return;
-        }
-        // Determine workspace type
-        let workspaceType = 'unknown';
-        if (projectId.startsWith('magic-')) {
-            workspaceType = 'magic';
-        }
-        else if (projectId.startsWith('test-project-')) {
-            workspaceType = 'test';
-        }
-        else if (projectId.match(/^[a-f0-9\-]{36}$/)) {
-            workspaceType = 'uuid';
-        }
-        const stateFile = path.join(workspaceDir, 'terraform.tfstate');
-        let stateInfo = null;
-        if (fs.existsSync(stateFile)) {
-            try {
-                const stateContent = fs.readFileSync(stateFile, 'utf8');
-                const state = JSON.parse(stateContent);
-                stateInfo = {
-                    hasResources: state.resources && state.resources.length > 0,
-                    resourceCount: state.resources ? state.resources.length : 0,
-                    resources: state.resources ? state.resources.map((r) => ({
-                        type: r.type,
-                        name: r.name,
-                        provider: r.provider
-                    })) : []
-                };
-            }
-            catch (error) {
-                stateInfo = { error: 'Failed to parse state file' };
-            }
-        }
-        // Get file list
-        const files = fs.readdirSync(workspaceDir).map(file => {
-            const filePath = path.join(workspaceDir, file);
-            const stats = fs.statSync(filePath);
-            return {
-                name: file,
-                size: stats.size,
-                isDirectory: stats.isDirectory(),
-                modified: stats.mtime.toISOString()
-            };
-        });
-        // Get terraform outputs if available
-        let outputs = {};
-        try {
-            const outputsResult = yield getTerraformOutputs(projectId);
-            outputs = (outputsResult === null || outputsResult === void 0 ? void 0 : outputsResult.outputs) || {};
-        }
-        catch (error) {
-            console.warn(`Could not get outputs for ${projectId}:`, error);
-        }
-        res.json({
-            projectId,
-            workspaceType,
-            workspaceDir,
-            stateInfo,
-            outputs,
-            files,
-            actions: {
-                cleanup: `/api/magic/cleanup/${projectId}`,
-                manualCleanup: `cd ${workspaceDir} && terraform destroy -auto-approve`
-            }
-        });
-    }
-    catch (error) {
-        console.error('[Magic] Error getting workspace details:', error);
-        res.status(500).json({
-            error: 'Failed to get workspace details',
-            details: error.message
-        });
-    }
-});
-exports.getWorkspaceDetails = getWorkspaceDetails;
-// 📊 COMPREHENSIVE RESOURCE MANAGEMENT API
-// Get comprehensive resource status for all workspaces with cost and deployment info
-const getResourcesOverview = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const fs = yield Promise.resolve().then(() => __importStar(require('fs')));
-        const path = yield Promise.resolve().then(() => __importStar(require('path')));
-        const workspaceDir = path.join(__dirname, "../../terraform-runner/workspace");
-        if (!fs.existsSync(workspaceDir)) {
-            res.json({
-                resources: [],
-                summary: {
-                    total: 0,
-                    active: 0,
-                    provisioned: 0,
-                    deploymentFailed: 0,
-                    orphaned: 0,
-                    incomplete: 0
-                },
-                costEstimate: {
-                    monthly: 0,
-                    breakdown: {}
-                }
-            });
-            return;
-        }
-        // Get all workspace directories
-        const allDirs = fs.readdirSync(workspaceDir).filter(dir => {
-            const dirPath = path.join(workspaceDir, dir);
-            return fs.statSync(dirPath).isDirectory() && dir !== '.DS_Store';
-        });
-        const resources = [];
-        let totalMonthlyCost = 0;
-        const costBreakdown = {};
-        for (const dir of allDirs) {
-            const dirPath = path.join(workspaceDir, dir);
-            const stateFile = path.join(dirPath, 'terraform.tfstate');
-            const stats = fs.statSync(dirPath);
-            // Determine workspace type
-            let workspaceType = 'unknown';
-            let source = 'unknown';
-            if (dir.startsWith('magic-')) {
-                workspaceType = 'magic';
-                source = 'Magic App Builder';
-            }
-            else if (dir.startsWith('test-project-')) {
-                workspaceType = 'test';
-                source = 'Test Project';
-            }
-            else if (dir.match(/^[a-f0-9\-]{36}$/)) {
-                workspaceType = 'uuid';
-                source = 'General Project';
-            }
-            let deploymentStatus = 'incomplete';
-            let resourceCount = 0;
-            let resourceTypes = {};
-            let terraformOutputs = {};
-            let hasLiveResources = false;
-            let estimatedMonthlyCost = 0;
-            // Analyze terraform state if exists
-            if (fs.existsSync(stateFile)) {
-                try {
-                    const stateContent = fs.readFileSync(stateFile, 'utf8');
-                    const state = JSON.parse(stateContent);
-                    if (state.resources && state.resources.length > 0) {
-                        hasLiveResources = true;
-                        resourceCount = state.resources.length;
-                        // Count resources by type and estimate costs
-                        state.resources.forEach((resource) => {
-                            resourceTypes[resource.type] = (resourceTypes[resource.type] || 0) + 1;
-                            // Estimate costs based on resource type
-                            const resourceCost = estimateResourceCost(resource.type);
-                            estimatedMonthlyCost += resourceCost;
-                        });
-                        // Try to get terraform outputs to determine deployment success
-                        try {
-                            const outputsResult = yield getTerraformOutputs(dir);
-                            terraformOutputs = (outputsResult === null || outputsResult === void 0 ? void 0 : outputsResult.outputs) || {};
-                            // Check if we have expected outputs (indicates successful deployment)
-                            const hasWebsiteUrl = terraformOutputs.s3_website_url || terraformOutputs.website_url;
-                            const hasApiUrl = terraformOutputs.api_gateway_url || terraformOutputs.api_url;
-                            if (hasWebsiteUrl || hasApiUrl) {
-                                deploymentStatus = 'active';
-                            }
-                            else {
-                                deploymentStatus = 'provisioned_no_app'; // Resources exist but no app deployed
-                            }
-                        }
-                        catch (error) {
-                            deploymentStatus = 'provisioned_no_app';
-                        }
-                        // Check if this is a failed Magic App Builder deployment
-                        if (workspaceType === 'magic' && deploymentStatus === 'provisioned_no_app') {
-                            deploymentStatus = 'deployment_failed';
-                        }
-                    }
-                    else {
-                        deploymentStatus = 'empty_state';
-                    }
-                }
-                catch (error) {
-                    deploymentStatus = 'corrupted_state';
-                }
-            }
-            else {
-                deploymentStatus = 'incomplete';
-            }
-            // Calculate age
-            const ageInHours = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60);
-            const ageInDays = Math.floor(ageInHours / 24);
-            // Add to cost breakdown
-            if (estimatedMonthlyCost > 0) {
-                costBreakdown[source] = (costBreakdown[source] || 0) + estimatedMonthlyCost;
-                totalMonthlyCost += estimatedMonthlyCost;
-            }
-            resources.push({
-                projectId: dir,
-                workspaceType,
-                source,
-                deploymentStatus,
-                resourceCount,
-                resourceTypes,
-                outputs: terraformOutputs,
-                hasLiveResources,
-                estimatedMonthlyCost,
-                createdAt: stats.mtime.toISOString(),
-                ageInHours: Math.round(ageInHours * 100) / 100,
-                ageInDays,
-                workspaceDir: dirPath,
-                actions: {
-                    details: `/api/magic/workspace/${dir}`,
-                    cleanup: `/api/magic/cleanup/${dir}`,
-                    console: hasLiveResources ?
-                        `https://console.aws.amazon.com/console/home?region=us-east-1` :
-                        null
-                }
-            });
-        }
-        // Sort by creation date (newest first)
-        resources.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        // Generate summary
-        const summary = {
-            total: resources.length,
-            active: resources.filter(r => r.deploymentStatus === 'active').length,
-            provisioned: resources.filter(r => r.hasLiveResources).length,
-            deploymentFailed: resources.filter(r => r.deploymentStatus === 'deployment_failed').length,
-            orphaned: resources.filter(r => r.deploymentStatus === 'provisioned_no_app').length,
-            incomplete: resources.filter(r => !r.hasLiveResources).length
-        };
-        res.json({
-            resources,
-            summary,
-            costEstimate: {
-                monthly: Math.round(totalMonthlyCost * 100) / 100,
-                breakdown: costBreakdown
             },
-            lastUpdated: new Date().toISOString()
-        });
+            status: (code) => ({
+                json: (data) => {
+                    throw new Error(`Infrastructure provisioning failed: ${JSON.stringify(data)}`);
+                }
+            })
+        };
+        yield deployInfrastructure(mockReq, mockRes);
     }
     catch (error) {
-        console.error('[Resource Management] Error getting resources overview:', error);
+        console.error(`[Magic Flow] Phase 6 failed for job ${jobId}:`, error);
+        appCreationJobs[jobId] = Object.assign(Object.assign({}, appCreationJobs[jobId]), { status: "failed", phase: "infra_provision", progress: 100, error: error.message || "Infrastructure provisioning failed", endTime: new Date(), lastAccessed: new Date() });
         res.status(500).json({
-            error: 'Failed to get resources overview',
-            details: error.message
+            jobId,
+            status: "failed",
+            phase: "infra_provision",
+            error: error.message || "Infrastructure provisioning failed"
         });
     }
 });
-exports.getResourcesOverview = getResourcesOverview;
-// Helper function to estimate monthly cost based on resource type
-function estimateResourceCost(resourceType) {
-    const costEstimates = {
-        'aws_lambda_function': 5, // ~$5/month for minimal usage
-        'aws_s3_bucket': 10, // ~$10/month for small website
-        'aws_api_gateway_rest_api': 5, // ~$5/month for minimal usage
-        'aws_dynamodb_table': 25, // ~$25/month for small table
-        'aws_iam_role': 0, // Free
-        'aws_iam_policy': 0, // Free
-        'aws_iam_role_policy_attachment': 0, // Free
-        'aws_api_gateway_deployment': 0, // Covered by API Gateway
-        'aws_api_gateway_resource': 0, // Covered by API Gateway
-        'aws_api_gateway_method': 0, // Covered by API Gateway
-        'aws_api_gateway_integration': 0, // Covered by API Gateway
-        'aws_lambda_permission': 0, // Free
-        'aws_s3_bucket_policy': 0, // Free
-        'aws_s3_bucket_website_configuration': 0, // Free
-        'aws_s3_bucket_public_access_block': 0, // Free
-        'random_string': 0, // Free (Terraform resource)
-        'local_file': 0, // Free (Terraform resource)
-        'archive_file': 0, // Free (Terraform resource)
-        'data.archive_file': 0 // Free (Terraform resource)
-    };
-    return costEstimates[resourceType] || 5; // Default $5/month for unknown resources
-}
-// Get resource status by category for dashboard
-const getResourcesByCategory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { category } = req.params;
-        // Get full overview first
-        const overviewReq = Object.assign({}, req);
-        const overviewRes = {
-            json: (data) => data,
-            status: (code) => ({ json: (data) => data })
-        };
-        // Mock the response object to capture data
-        let overviewData = null;
-        overviewRes.json = (data) => {
-            overviewData = data;
-            return data;
-        };
-        yield (0, exports.getResourcesOverview)(overviewReq, overviewRes);
-        if (!overviewData) {
-            res.status(500).json({ error: 'Failed to get resources data' });
-            return;
-        }
-        // Filter by category
-        let filteredResources = overviewData.resources;
-        switch (category) {
-            case 'active':
-                filteredResources = overviewData.resources.filter((r) => r.deploymentStatus === 'active');
-                break;
-            case 'provisioned':
-                filteredResources = overviewData.resources.filter((r) => r.hasLiveResources);
-                break;
-            case 'failed':
-                filteredResources = overviewData.resources.filter((r) => r.deploymentStatus === 'deployment_failed');
-                break;
-            case 'orphaned':
-                filteredResources = overviewData.resources.filter((r) => r.deploymentStatus === 'provisioned_no_app');
-                break;
-            case 'incomplete':
-                filteredResources = overviewData.resources.filter((r) => !r.hasLiveResources);
-                break;
-            case 'costly':
-                filteredResources = overviewData.resources.filter((r) => r.estimatedMonthlyCost > 0);
-                break;
-            default:
-                filteredResources = overviewData.resources;
-        }
-        res.json({
-            category,
-            resources: filteredResources,
-            count: filteredResources.length,
-            totalCost: filteredResources.reduce((sum, r) => sum + r.estimatedMonthlyCost, 0)
-        });
+exports.provisionInfrastructure = provisionInfrastructure;
+/**
+ * Status Endpoints
+ */
+const getConceptStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { jobId } = req.params;
+    if (!jobId || !conceptJobs[jobId]) {
+        res.status(404).json({ error: "Concept job not found" });
+        return;
     }
-    catch (error) {
-        console.error('[Resource Management] Error getting resources by category:', error);
-        res.status(500).json({
-            error: 'Failed to get resources by category',
-            details: error.message
-        });
-    }
+    memoryManager_1.memoryManager.touchJob(conceptJobs[jobId]);
+    res.json(conceptJobs[jobId]);
 });
-exports.getResourcesByCategory = getResourcesByCategory;
+exports.getConceptStatus = getConceptStatus;
+const getBuildStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { jobId } = req.params;
+    if (!jobId || !appCreationJobs[jobId]) {
+        res.status(404).json({ error: "Build job not found" });
+        return;
+    }
+    memoryManager_1.memoryManager.touchJob(appCreationJobs[jobId]);
+    res.json(appCreationJobs[jobId]);
+});
+exports.getBuildStatus = getBuildStatus;
+/**
+ * Health Check Endpoints
+ */
+const getMagicHealth = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const conceptJobCount = Object.keys(conceptJobs).length;
+    const buildJobCount = Object.keys(appCreationJobs).length;
+    const conceptStatuses = Object.values(conceptJobs).reduce((acc, job) => {
+        acc[job.status] = (acc[job.status] || 0) + 1;
+        return acc;
+    }, {});
+    const buildStatuses = Object.values(appCreationJobs).reduce((acc, job) => {
+        acc[job.status] = (acc[job.status] || 0) + 1;
+        return acc;
+    }, {});
+    res.json({
+        conceptJobs: {
+            total: conceptJobCount,
+            statuses: conceptStatuses
+        },
+        buildJobs: {
+            total: buildJobCount,
+            statuses: buildStatuses
+        },
+        recentConcepts: Object.entries(conceptJobs)
+            .sort(([, a], [, b]) => { var _a, _b; return (((_a = b.startTime) === null || _a === void 0 ? void 0 : _a.getTime()) || 0) - (((_b = a.startTime) === null || _b === void 0 ? void 0 : _b.getTime()) || 0); })
+            .slice(0, 5)
+            .map(([id, job]) => ({
+            id,
+            status: job.status,
+            phase: job.phase,
+            progress: job.progress,
+            startTime: job.startTime
+        })),
+        recentBuilds: Object.entries(appCreationJobs)
+            .sort(([, a], [, b]) => { var _a, _b; return (((_a = b.startTime) === null || _a === void 0 ? void 0 : _a.getTime()) || 0) - (((_b = a.startTime) === null || _b === void 0 ? void 0 : _b.getTime()) || 0); })
+            .slice(0, 5)
+            .map(([id, job]) => ({
+            id,
+            status: job.status,
+            phase: job.phase,
+            progress: job.progress,
+            startTime: job.startTime
+        }))
+    });
+});
+exports.getMagicHealth = getMagicHealth;
