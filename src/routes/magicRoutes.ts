@@ -1,50 +1,35 @@
 import express from "express";
 import { 
-  generateConceptForValidation, 
-  approveConceptAndBuild,
+  startMagicFlow,
+  handleUserConfirmation, 
+  provisionInfrastructure,
   getConceptStatus,
-  getAppCreationStatus,
-  listOrphanedResources,
-  cleanupOrphanedResource,
-  cleanupAllOrphanedResources,
-  getWorkspaceDetails,
-  getResourcesOverview,
-  getResourcesByCategory
+  getBuildStatus,
+  getMagicHealth
 } from "../controllers/magicController";
 import asyncHandler from "../utils/asyncHandler";
 
 const router = express.Router();
 
-// 🔍 Step 1: Generate concept and diagrams for validation
-router.post("/generate-concept", asyncHandler(generateConceptForValidation));
+// 🔍 PHASE 1: Start Magic Flow - Idea Analysis
+// User provides app idea + target customers, AI analyzes comprehensively
+router.post("/start", asyncHandler(startMagicFlow));
 
-// 📊 Get concept generation status  
+// 📊 Get concept analysis status
 router.get("/concept-status/:jobId", asyncHandler(getConceptStatus));
 
-// 🚀 Step 2: User approves concept, build the actual app
-router.post("/approve-and-build", asyncHandler(approveConceptAndBuild));
+// ✅ PHASE 2: User Confirmation/Rejection
+// User reviews analysis and either confirms to proceed or rejects to restart
+router.post("/confirm", asyncHandler(handleUserConfirmation));
 
-// 📊 Get app creation status
-router.get("/build-status/:jobId", asyncHandler(getAppCreationStatus));
+// 📊 Get build status (covers phases 3-5: UML → Infra → App Code)
+router.get("/build-status/:jobId", asyncHandler(getBuildStatus));
 
-// 📊 COMPREHENSIVE RESOURCE MANAGEMENT API
-// Get comprehensive overview of all resources with cost and deployment status
-router.get("/resources/overview", asyncHandler(getResourcesOverview));
+// 🚀 PHASE 6: Infrastructure Provisioning (Manual Trigger)
+// User manually triggers infrastructure provisioning when ready
+router.post("/provision/:jobId", asyncHandler(provisionInfrastructure));
 
-// Get resources filtered by category (active, provisioned, failed, orphaned, etc.)
-router.get("/resources/category/:category", asyncHandler(getResourcesByCategory));
-
-// 🧹 ORPHANED RESOURCES MANAGEMENT
-// List all orphaned/abandoned magic workspaces with AWS resources
-router.get("/orphaned-resources", asyncHandler(listOrphanedResources));
-
-// Get detailed information about a specific workspace
-router.get("/workspace/:projectId", asyncHandler(getWorkspaceDetails));
-
-// Clean up a specific orphaned workspace
-router.delete("/cleanup/:projectId", asyncHandler(cleanupOrphanedResource));
-
-// Clean up ALL orphaned resources (dangerous - requires confirmation)
-router.post("/cleanup-all", asyncHandler(cleanupAllOrphanedResources));
+// 📊 Health check for magic flow
+router.get("/health", asyncHandler(getMagicHealth));
 
 export default router; 
