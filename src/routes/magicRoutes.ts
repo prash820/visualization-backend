@@ -15,12 +15,18 @@ const router = express.Router();
 // User provides app idea + target customers, AI analyzes comprehensively
 router.post("/start", asyncHandler(startMagicFlow));
 
+// 🔄 BACKWARD COMPATIBILITY: Old endpoint name
+router.post("/generate-concept", asyncHandler(startMagicFlow));
+
 // 📊 Get concept analysis status
 router.get("/concept-status/:jobId", asyncHandler(getConceptStatus));
 
 // ✅ PHASE 2: User Confirmation/Rejection
 // User reviews analysis and either confirms to proceed or rejects to restart
 router.post("/confirm", asyncHandler(handleUserConfirmation));
+
+// 🔄 BACKWARD COMPATIBILITY: Old endpoint name
+router.post("/approve-and-build", asyncHandler(handleUserConfirmation));
 
 // 📊 Get build status (covers phases 3-5: UML → Infra → App Code)
 router.get("/build-status/:jobId", asyncHandler(getBuildStatus));

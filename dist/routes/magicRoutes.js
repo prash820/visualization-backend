@@ -10,11 +10,15 @@ const router = express_1.default.Router();
 // 🔍 PHASE 1: Start Magic Flow - Idea Analysis
 // User provides app idea + target customers, AI analyzes comprehensively
 router.post("/start", (0, asyncHandler_1.default)(magicController_1.startMagicFlow));
+// 🔄 BACKWARD COMPATIBILITY: Old endpoint name
+router.post("/generate-concept", (0, asyncHandler_1.default)(magicController_1.startMagicFlow));
 // 📊 Get concept analysis status
 router.get("/concept-status/:jobId", (0, asyncHandler_1.default)(magicController_1.getConceptStatus));
 // ✅ PHASE 2: User Confirmation/Rejection
 // User reviews analysis and either confirms to proceed or rejects to restart
 router.post("/confirm", (0, asyncHandler_1.default)(magicController_1.handleUserConfirmation));
+// 🔄 BACKWARD COMPATIBILITY: Old endpoint name
+router.post("/approve-and-build", (0, asyncHandler_1.default)(magicController_1.handleUserConfirmation));
 // 📊 Get build status (covers phases 3-5: UML → Infra → App Code)
 router.get("/build-status/:jobId", (0, asyncHandler_1.default)(magicController_1.getBuildStatus));
 // 🚀 PHASE 6: Infrastructure Provisioning (Manual Trigger)
