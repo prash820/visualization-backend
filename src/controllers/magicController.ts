@@ -4,6 +4,7 @@ import { memoryManager, type MemoryOptimizedJob } from "../utils/memoryManager";
 import { getProjectById, saveProject } from '../utils/projectFileStore';
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from "dotenv";
+import { deployInfrastructure } from './deployController';
 
 dotenv.config();
 
@@ -474,7 +475,7 @@ Return ONLY raw Terraform HCL code (no markdown, no code fences, just plain .tf 
 
 /**
  * PHASE 5: Application Code Generation
- * Generate application code using the agentic system based on component diagrams
+ * Generate application code using simplified approach based on component diagrams
  */
 async function generateApplicationCode(jobId: string) {
   try {
@@ -487,39 +488,72 @@ async function generateApplicationCode(jobId: string) {
 
     const { analysisResult, umlDiagrams, infraCode, userPrompt } = job;
     
-    // Use the agentic code generation system from openAIController
-    const { generateApplicationCode } = await import('./openAIController');
+    // Generate application code using AI
+    const codePrompt = `Based on the app analysis and UML diagrams, generate a complete application code structure.
+
+App Analysis: ${JSON.stringify(analysisResult, null, 2)}
+UML Diagrams: ${JSON.stringify(umlDiagrams, null, 2)}
+Infrastructure Code: ${infraCode}
+Original Prompt: ${userPrompt}
+
+Generate a complete application with frontend and backend code structure in the following JSON format:
+{
+  "frontend": {
+    "components": {
+      "App.tsx": "main app component code",
+      "components/Header.tsx": "header component",
+      "components/TaskList.tsx": "task list component",
+      "pages/Dashboard.tsx": "dashboard page"
+    },
+    "utils": {
+      "api.ts": "API utility functions",
+      "constants.ts": "app constants"
+    }
+  },
+  "backend": {
+    "controllers": {
+      "taskController.ts": "task management controller",
+      "userController.ts": "user management controller"
+    },
+    "models": {
+      "Task.ts": "task model",
+      "User.ts": "user model"
+    },
+    "routes": {
+      "taskRoutes.ts": "task routes",
+      "userRoutes.ts": "user routes"
+    },
+    "utils": {
+      "database.ts": "database connection",
+      "auth.ts": "authentication utilities"
+    }
+  },
+  "documentation": "comprehensive documentation for the application"
+}
+
+Requirements:
+1. Generate complete, functional code for each file
+2. Use modern TypeScript/JavaScript with proper types
+3. Include proper error handling and validation
+4. Follow best practices for the identified architecture
+5. Include proper API endpoints and database models
+6. Add authentication and authorization where needed
+7. Include comprehensive documentation
+
+Return ONLY the JSON response with the complete application code structure.`;
+
+    const appCode = await makeAIRequest(codePrompt);
+    const parsedAppCode = JSON.parse(appCode);
     
-    // Create a mock request for the agentic system
-    const mockReq = {
-      body: {
-        prompt: userPrompt,
-        umlDiagrams,
-        documentation: JSON.stringify(analysisResult),
-        infraCode
-      }
-    } as any;
+    job.appCode = parsedAppCode;
+    job.progress = 90;
+    job.phase = 'infra_provision';
+    job.lastAccessed = new Date();
     
-    const mockRes = {
-      json: (data: any) => {
-        job.appCode = data;
-        job.progress = 90;
-        job.phase = 'infra_provision';
-        job.lastAccessed = new Date();
-        
-        console.log(`[Magic Flow] Phase 5 Complete: Application code generated, ready for infrastructure provisioning`);
-        
-        // Ready for manual provisioning trigger
-        job.status = "ready_for_provision";
-      },
-      status: (code: number) => ({
-        json: (data: any) => {
-          throw new Error(`App generation failed: ${JSON.stringify(data)}`);
-        }
-      })
-    } as any;
+    console.log(`[Magic Flow] Phase 5 Complete: Application code generated, ready for infrastructure provisioning`);
     
-    await generateApplicationCode(mockReq, mockRes);
+    // Ready for manual provisioning trigger
+    job.status = "ready_for_provision";
     
   } catch (error: any) {
     console.error(`[Magic Flow] Phase 5 failed for job ${jobId}:`, error);
@@ -564,7 +598,6 @@ export const provisionInfrastructure = async (req: Request, res: Response): Prom
     job.lastAccessed = new Date();
 
     // Use the existing Terraform deployment system
-    const { deployInfrastructure } = await import('./deployController');
     
     const mockReq = {
       body: {

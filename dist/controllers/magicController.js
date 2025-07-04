@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -51,6 +18,7 @@ const memoryManager_1 = require("../utils/memoryManager");
 const projectFileStore_1 = require("../utils/projectFileStore");
 const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const deployController_1 = require("./deployController");
 dotenv_1.default.config();
 const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY || "",
@@ -424,7 +392,7 @@ Return ONLY raw Terraform HCL code (no markdown, no code fences, just plain .tf 
 }
 /**
  * PHASE 5: Application Code Generation
- * Generate application code using the agentic system based on component diagrams
+ * Generate application code using simplified approach based on component diagrams
  */
 function generateApplicationCode(jobId) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -435,34 +403,68 @@ function generateApplicationCode(jobId) {
             job.phase = 'app_generation';
             job.lastAccessed = new Date();
             const { analysisResult, umlDiagrams, infraCode, userPrompt } = job;
-            // Use the agentic code generation system from openAIController
-            const { generateApplicationCode } = yield Promise.resolve().then(() => __importStar(require('./openAIController')));
-            // Create a mock request for the agentic system
-            const mockReq = {
-                body: {
-                    prompt: userPrompt,
-                    umlDiagrams,
-                    documentation: JSON.stringify(analysisResult),
-                    infraCode
-                }
-            };
-            const mockRes = {
-                json: (data) => {
-                    job.appCode = data;
-                    job.progress = 90;
-                    job.phase = 'infra_provision';
-                    job.lastAccessed = new Date();
-                    console.log(`[Magic Flow] Phase 5 Complete: Application code generated, ready for infrastructure provisioning`);
-                    // Ready for manual provisioning trigger
-                    job.status = "ready_for_provision";
-                },
-                status: (code) => ({
-                    json: (data) => {
-                        throw new Error(`App generation failed: ${JSON.stringify(data)}`);
-                    }
-                })
-            };
-            yield generateApplicationCode(mockReq, mockRes);
+            // Generate application code using AI
+            const codePrompt = `Based on the app analysis and UML diagrams, generate a complete application code structure.
+
+App Analysis: ${JSON.stringify(analysisResult, null, 2)}
+UML Diagrams: ${JSON.stringify(umlDiagrams, null, 2)}
+Infrastructure Code: ${infraCode}
+Original Prompt: ${userPrompt}
+
+Generate a complete application with frontend and backend code structure in the following JSON format:
+{
+  "frontend": {
+    "components": {
+      "App.tsx": "main app component code",
+      "components/Header.tsx": "header component",
+      "components/TaskList.tsx": "task list component",
+      "pages/Dashboard.tsx": "dashboard page"
+    },
+    "utils": {
+      "api.ts": "API utility functions",
+      "constants.ts": "app constants"
+    }
+  },
+  "backend": {
+    "controllers": {
+      "taskController.ts": "task management controller",
+      "userController.ts": "user management controller"
+    },
+    "models": {
+      "Task.ts": "task model",
+      "User.ts": "user model"
+    },
+    "routes": {
+      "taskRoutes.ts": "task routes",
+      "userRoutes.ts": "user routes"
+    },
+    "utils": {
+      "database.ts": "database connection",
+      "auth.ts": "authentication utilities"
+    }
+  },
+  "documentation": "comprehensive documentation for the application"
+}
+
+Requirements:
+1. Generate complete, functional code for each file
+2. Use modern TypeScript/JavaScript with proper types
+3. Include proper error handling and validation
+4. Follow best practices for the identified architecture
+5. Include proper API endpoints and database models
+6. Add authentication and authorization where needed
+7. Include comprehensive documentation
+
+Return ONLY the JSON response with the complete application code structure.`;
+            const appCode = yield makeAIRequest(codePrompt);
+            const parsedAppCode = JSON.parse(appCode);
+            job.appCode = parsedAppCode;
+            job.progress = 90;
+            job.phase = 'infra_provision';
+            job.lastAccessed = new Date();
+            console.log(`[Magic Flow] Phase 5 Complete: Application code generated, ready for infrastructure provisioning`);
+            // Ready for manual provisioning trigger
+            job.status = "ready_for_provision";
         }
         catch (error) {
             console.error(`[Magic Flow] Phase 5 failed for job ${jobId}:`, error);
@@ -493,7 +495,6 @@ const provisionInfrastructure = (req, res) => __awaiter(void 0, void 0, void 0, 
         job.progress = 95;
         job.lastAccessed = new Date();
         // Use the existing Terraform deployment system
-        const { deployInfrastructure } = yield Promise.resolve().then(() => __importStar(require('./deployController')));
         const mockReq = {
             body: {
                 terraformCode: job.infraCode,
@@ -523,7 +524,7 @@ const provisionInfrastructure = (req, res) => __awaiter(void 0, void 0, void 0, 
                 }
             })
         };
-        yield deployInfrastructure(mockReq, mockRes);
+        yield (0, deployController_1.deployInfrastructure)(mockReq, mockRes);
     }
     catch (error) {
         console.error(`[Magic Flow] Phase 6 failed for job ${jobId}:`, error);
