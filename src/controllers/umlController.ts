@@ -4,16 +4,12 @@ import { generateUmlFromPrompt, UMLDiagrams, parseUMLResponse } from '../utils/u
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import { memoryManager, type MemoryOptimizedJob } from "../utils/memoryManager";
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropic, ANTHROPIC_MODEL } from '../config/aiProvider';
 
 dotenv.config();
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
-});
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_SECRET_KEY,
 });
 
 // In-memory job store for UML jobs - now with memory management
@@ -118,7 +114,7 @@ Focus on creating diagrams that clearly show:
 Return ONLY the JSON object, no explanations.`;
 
   const response = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20241022",
+    model: ANTHROPIC_MODEL,
     max_tokens: 4000,
     temperature: 0.3,
     system: systemPrompt,

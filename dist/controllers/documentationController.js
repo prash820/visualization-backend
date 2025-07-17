@@ -13,14 +13,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteProjectDocumentationHandler = exports.getProjectDocumentationHandler = exports.getDocumentationStatus = exports.generateDocumentation = void 0;
-const openai_1 = __importDefault(require("openai"));
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
 const projectFileStore_1 = require("../utils/projectFileStore");
-const openai = new openai_1.default({
-    apiKey: process.env.OPENAI_API_KEY || "",
-    timeout: 240000, // 4 minutes timeout for OpenAI API calls
-});
+const aiProvider_1 = require("../config/aiProvider");
 const MAX_RETRIES = 3;
 // Helper function to extract structure information from template
 function getTemplateStructure(template) {
@@ -140,7 +136,6 @@ const deleteProjectDocumentationHandler = (req, res) => __awaiter(void 0, void 0
 exports.deleteProjectDocumentationHandler = deleteProjectDocumentationHandler;
 function processDocumentationGeneration(projectId_1, prompt_1, umlDiagrams_1) {
     return __awaiter(this, arguments, void 0, function* (projectId, prompt, umlDiagrams, retryCount = 0) {
-        var _a;
         try {
             // Update documentation status to processing
             yield (0, projectFileStore_1.updateProjectDocumentation)(projectId, {
@@ -193,29 +188,27 @@ UML Diagrams: ${JSON.stringify(umlDiagrams)}`;
                 progress: 40
             });
             console.log('[generateDesignDocument] Calling OpenAI with prompt and UML diagrams...');
-            const response = yield openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: `Application Description: ${prompt}\n\nUML Diagrams: ${JSON.stringify(umlDiagrams)}` }
-                ],
-                temperature: 0.2,
-                max_tokens: 4000
+            const response = yield aiProvider_1.anthropic.messages.create({
+                model: aiProvider_1.ANTHROPIC_MODEL,
+                max_tokens: 4000,
+                temperature: 0.3,
+                messages: [{ role: "user", content: prompt }]
             });
+            const content = response.content[0];
+            const resultText = content.type === 'text' ? content.text : '';
             // Update progress
             yield (0, projectFileStore_1.updateProjectDocumentation)(projectId, {
                 status: 'processing',
                 progress: 80
             });
-            let content = ((_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) || '';
-            console.log('[generateDesignDocument] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
-            console.log('[generateDesignDocument] typeof content:', typeof content);
+            let markdownContent = resultText;
+            console.log('[generateDesignDocument] AI response preview:', resultText.split('\n').slice(0, 2).join('\n'));
+            console.log('[generateDesignDocument] typeof content:', typeof resultText);
             // Enforce Markdown output only, with fallback
-            let markdownContent = content;
             try {
-                if (typeof content === "string" && content.trim().startsWith("{")) {
+                if (typeof resultText === "string" && resultText.trim().startsWith("{")) {
                     // AI returned JSON instead of Markdown, try to convert
-                    const obj = JSON.parse(content);
+                    const obj = JSON.parse(resultText);
                     // Improved JSON-to-Markdown converter
                     function jsonToMarkdown(obj, level = 2) {
                         let md = '';

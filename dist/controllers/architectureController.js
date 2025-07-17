@@ -13,14 +13,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateArchitectureDiagram = void 0;
-const openai_1 = __importDefault(require("openai"));
+const aiProvider_1 = require("../config/aiProvider");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const openai = new openai_1.default({
-    apiKey: process.env.OPENAI_API_KEY || "",
-});
 const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+    var _a, _b;
     const { prompt } = req.body;
     console.log("[Architecture Controller] Generating diagram for prompt:", prompt);
     if (!prompt) {
@@ -28,70 +25,26 @@ const generateArchitectureDiagram = (req, res) => __awaiter(void 0, void 0, void
         return;
     }
     try {
-        const completion = yield openai.chat.completions.create({
-            model: "gpt-4-turbo-preview",
-            messages: [
-                {
-                    role: "system",
-                    content: `You are an AI assistant specialized in generating cloud architecture diagrams.
-          Return only valid JSON with two arrays: "nodes" and "edges".
-          Each node should have:
-          - id: unique identifier
-          - type: node type (e.g., "default", "input", "output")
-          - position: { x: number, y: number }
-          - data: { label: string, [key: string]: any }
-          
-          Each edge should have:
-          - id: unique identifier
-          - source: source node id
-          - target: target node id
-          - label: optional description
-          
-          Example format:
-          {
-            "nodes": [
-              {
-                "id": "node1",
-                "type": "default",
-                "position": { "x": 100, "y": 100 },
-                "data": { "label": "API Gateway" }
-              }
-            ],
-            "edges": [
-              {
-                "id": "edge1",
-                "source": "node1",
-                "target": "node2",
-                "label": "invokes"
-              }
-            ]
-          }
-          
-          Do not include any extra text.`
-                },
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ],
-            temperature: 0.7,
+        const response = yield aiProvider_1.anthropic.messages.create({
+            model: aiProvider_1.ANTHROPIC_MODEL,
+            max_tokens: 4000,
+            temperature: 0.3,
+            messages: [{ role: "user", content: prompt }]
         });
-        const response = (_a = completion.choices[0].message) === null || _a === void 0 ? void 0 : _a.content;
-        if (!response) {
-            throw new Error('No response from OpenAI');
-        }
-        console.log("[Architecture Controller] Received OpenAI response:", response);
+        const content = response.content[0];
+        const resultText = content.type === 'text' ? content.text : '';
+        console.log("[Architecture Controller] Received Anthropic response:", resultText);
         try {
-            const parsedData = JSON.parse(response);
+            const parsedData = JSON.parse(resultText);
             console.log("[Architecture Controller] Parsed data:", {
-                nodes: (_b = parsedData.nodes) === null || _b === void 0 ? void 0 : _b.length,
-                edges: (_c = parsedData.edges) === null || _c === void 0 ? void 0 : _c.length,
+                nodes: (_a = parsedData.nodes) === null || _a === void 0 ? void 0 : _a.length,
+                edges: (_b = parsedData.edges) === null || _b === void 0 ? void 0 : _b.length,
             });
             res.json(parsedData);
         }
         catch (parseError) {
             console.error("[Architecture Controller] Error parsing response:", parseError);
-            throw new Error("Invalid JSON response from OpenAI");
+            throw new Error("Invalid JSON response from Anthropic");
         }
     }
     catch (error) {

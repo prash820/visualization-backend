@@ -1,0 +1,28 @@
+service: lambda-backend
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: us-east-1
+  environment:
+    DYNAMODB_CALC_TABLE: ${env:DYNAMODB_CALC_TABLE}
+
+functions:
+  app:
+    handler: dist/index.handler
+    events:
+      - http:
+          path: /
+          method: any
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: any
+          cors: true
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3000

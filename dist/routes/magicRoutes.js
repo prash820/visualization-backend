@@ -21,6 +21,15 @@ router.post("/confirm", (0, asyncHandler_1.default)(magicController_1.handleUser
 router.post("/approve-and-build", (0, asyncHandler_1.default)(magicController_1.handleUserConfirmation));
 // 📊 Get build status (covers phases 3-5: UML → Infra → App Code)
 router.get("/build-status/:jobId", (0, asyncHandler_1.default)(magicController_1.getBuildStatus));
+// 🔧 FAIL-SAFE: Retrigger Infrastructure Generation
+// Allows regenerating infrastructure code when there are issues
+router.post("/retrigger-infra/:jobId", (0, asyncHandler_1.default)(magicController_1.retriggerInfraGeneration));
+// 🔄 FAIL-SAFE: Restart from Specific Phase  
+// Allows restarting the magic flow from a specific phase (UML, infra, or app generation)
+router.post("/restart-from-phase/:jobId", (0, asyncHandler_1.default)(magicController_1.restartFromPhase));
+// 📊 Infrastructure Status Check
+// Get detailed status of infrastructure generation phase
+router.get("/infrastructure-status/:jobId", (0, asyncHandler_1.default)(magicController_1.getInfrastructureStatus));
 // 🚀 PHASE 6: Infrastructure Provisioning (Manual Trigger)
 // User manually triggers infrastructure provisioning when ready
 router.post("/provision/:jobId", (0, asyncHandler_1.default)(magicController_1.provisionInfrastructure));

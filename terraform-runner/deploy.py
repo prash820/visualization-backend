@@ -7,6 +7,7 @@ import boto3
 import zipfile
 import tempfile
 import gc  # Add garbage collection
+import requests  # Add requests for HTTP calls to main backend
 from python_terraform import Terraform
 from dotenv import load_dotenv
 from botocore.exceptions import ClientError
@@ -164,6 +165,37 @@ class AWSCredentialManager:
 
 # Global credential manager instance
 aws_credential_manager = AWSCredentialManager()
+
+def update_project_deployment_status(project_id, deployment_status, deployment_outputs=None):
+    """Update the project's deployment status in the main backend"""
+    try:
+        # Get the main backend URL from environment
+        backend_url = os.getenv('BACKEND_URL', 'http://localhost:5001')
+        
+        # Prepare the update data
+        update_data = {
+            'deploymentStatus': deployment_status,
+            'lastDeployed': time.strftime('%Y-%m-%dT%H:%M:%SZ')
+        }
+        
+        if deployment_outputs:
+            update_data['deploymentOutputs'] = deployment_outputs
+        
+        # Make HTTP request to update project status
+        response = requests.post(
+            f"{backend_url}/api/projects/{project_id}/deployment-status",
+            json=update_data,
+            headers={'Content-Type': 'application/json'},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"[DEPLOY] Successfully updated project {project_id} deployment status to {deployment_status}")
+        else:
+            logger.warning(f"[DEPLOY] Failed to update project {project_id} status: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        logger.warning(f"[DEPLOY] Could not update project {project_id} deployment status: {e}")
 
 def create_lambda_zip_files(workspace_dir):
     """Create dummy ZIP files for Lambda functions referenced in Terraform configuration"""
@@ -468,8 +500,32 @@ def deploy_terraform(project_id, user_id=None):
         
         if return_code == 0:
             logger.info("[DEPLOY] Terraform apply succeeded")
+            
+            # Get Terraform outputs for status update
+            try:
+                outputs_return_code, outputs_stdout, outputs_stderr = tf.output(capture_output=True)
+                if outputs_return_code == 0:
+                    # Parse outputs (they come as key=value pairs)
+                    deployment_outputs = {}
+                    for line in outputs_stdout.strip().split('\n'):
+                        if '=' in line:
+                            key, value = line.split('=', 1)
+                            deployment_outputs[key.strip()] = value.strip().strip('"')
+                    
+                    # Update project deployment status in main backend
+                    update_project_deployment_status(project_id, 'deployed', deployment_outputs)
+                else:
+                    logger.warning(f"[DEPLOY] Could not get Terraform outputs: {outputs_stderr}")
+                    # Still update status as deployed even without outputs
+                    update_project_deployment_status(project_id, 'deployed')
+            except Exception as e:
+                logger.warning(f"[DEPLOY] Error getting outputs or updating status: {e}")
+                # Still update status as deployed
+                update_project_deployment_status(project_id, 'deployed')
         else:
             logger.error("[DEPLOY] Terraform apply failed")
+            # Update project status as failed
+            update_project_deployment_status(project_id, 'failed')
 
         result = {"status": "success" if return_code == 0 else "error", "stdout": stdout, "stderr": stderr}
         if import_results:
@@ -890,6 +946,9 @@ def destroy_terraform_with_cleanup(project_id, user_id=None):
         logger.info("✅ Infrastructure destroy completed successfully")
         cleanup_logs.append("SUCCESS: All infrastructure destroyed")
         
+        # Update project deployment status to destroyed
+        update_project_deployment_status(project_id, 'destroyed')
+        
         # Clean up workspace directory
         try:
             import shutil
@@ -902,6 +961,9 @@ def destroy_terraform_with_cleanup(project_id, user_id=None):
     else:
         logger.error("❌ Infrastructure destroy failed")
         cleanup_logs.append(f"FAILED: Terraform destroy failed - {stderr}")
+        
+        # Update project deployment status to failed
+        update_project_deployment_status(project_id, 'failed')
 
     return {
         "status": "success" if return_code == 0 else "error",

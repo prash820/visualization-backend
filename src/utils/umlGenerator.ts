@@ -10,8 +10,16 @@ export interface UMLDiagrams {
   class?: string;
   sequence?: string;
   entity?: string;
-  component?: string;
+  frontendComponent?: string;
+  backendComponent?: string;
   architecture?: string;
+  state?: string;
+  c4?: string;
+  // New separate frontend and backend diagrams
+  frontendClass?: string;
+  frontendSequence?: string;
+  backendClass?: string;
+  backendSequence?: string;
 }
 
 const getAwsLogoNames = (): string => {
@@ -27,367 +35,391 @@ const getAwsLogoNames = (): string => {
   }
 };
 
+const getMermaidDocs = (): string => {
+  try {
+    const docsPath = path.join(__dirname, '../../mermaid-docs/docs/syntax');
+    
+    // Read the key documentation files with more comprehensive content
+    const flowchartDoc = fs.readFileSync(path.join(docsPath, 'flowchart.md'), 'utf-8');
+    const classDoc = fs.readFileSync(path.join(docsPath, 'classDiagram.md'), 'utf-8');
+    const sequenceDoc = fs.readFileSync(path.join(docsPath, 'sequenceDiagram.md'), 'utf-8');
+    const erDoc = fs.readFileSync(path.join(docsPath, 'entityRelationshipDiagram.md'), 'utf-8');
+    const architectureDoc = fs.readFileSync(path.join(docsPath, 'architecture.md'), 'utf-8');
+    const stateDoc = fs.readFileSync(path.join(docsPath, 'stateDiagram.md'), 'utf-8');
+    const c4Doc = fs.readFileSync(path.join(docsPath, 'c4.md'), 'utf-8');
+    
+    return `
+MERMAID OFFICIAL DOCUMENTATION - COMPREHENSIVE REFERENCE:
+
+FLOWCHART DOCUMENTATION (for component diagrams):
+${flowchartDoc.substring(0, 5000)}
+
+CLASS DIAGRAM DOCUMENTATION (for detailed class modeling):
+${classDoc.substring(0, 5000)}
+
+SEQUENCE DIAGRAM DOCUMENTATION (for detailed interactions):
+${sequenceDoc.substring(0, 5000)}
+
+ENTITY RELATIONSHIP DOCUMENTATION (for database modeling):
+${erDoc.substring(0, 5000)}
+
+ARCHITECTURE DIAGRAM DOCUMENTATION (for system architecture):
+${architectureDoc.substring(0, 5000)}
+
+STATE DIAGRAM DOCUMENTATION (for system behavior modeling):
+${stateDoc.substring(0, 5000)}
+
+C4 DIAGRAM DOCUMENTATION (for context and container modeling):
+${c4Doc.substring(0, 5000)}
+
+CRITICAL SYNTAX RULES:
+- Use proper indentation and line breaks
+- Each element must be on its own line
+- Use correct syntax for relationships and connections
+- Follow the exact format shown in examples
+- Use proper grouping and subgraph syntax
+- Include all necessary attributes and methods
+- Use proper UML notation and symbols
+    `;
+  } catch (error) {
+    console.error('[UML Generator] Error reading Mermaid docs:', error);
+    return '';
+  }
+};
+
 export const generateUmlFromPrompt = async (prompt: string): Promise<UMLDiagrams> => {
   try {
-    const awsLogoNames = getAwsLogoNames();
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+    const mermaidDocs = getMermaidDocs();
+    
+    // First call: Generate detailed UML diagrams (class, sequence, entity)
+    console.log("[UML Generator] Generating detailed UML diagrams...");
+    const basicCompletion = await openai.chat.completions.create({
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: `You are a UML diagram expert. Generate comprehensive UML diagrams in Mermaid syntax for the given system description.
-          Return all diagrams in this format:
-
-          \`\`\`mermaid
-          classDiagram
-          [Your class diagram here showing class relationships and attributes]
-          \`\`\`
-
-          \`\`\`mermaid
-          sequenceDiagram
-          [Your sequence diagram here showing key system interactions and flow]
-          \`\`\`
-
-          \`\`\`mermaid
-          flowchart TB
-          [Your component diagram here showing system architecture]
-          \`\`\`
-
-           \`\`\`mermaid
-          architecture-beta
-          [Your architecture diagram here showing AWS services and infrastructure]
-          \`\`\`
-
-          Diagram Type Guidelines:
-
-          1. Class Diagram Rules:
-             Class diagrams represent the structure of software classes, their properties, methods, and relationships. When using Mermaid, follow these rules:
-
-            Use the correct declaration: Start with classDiagram.
-
-            Define classes using the class ClassName syntax. Use PascalCase for class names.
-
-            Properties and methods:
-
-            Use + for public, - for private, # for protected.
-
-            Syntax: +propertyName: Type, +methodName(param: Type): ReturnType
-
-            Relationships:
-
-            Inheritance: ClassA <|-- ClassB
-
-            Association: ClassA --> ClassB
-
-            Aggregation: ClassA o-- ClassB
-
-            Composition: ClassA *-- ClassB
-
-            Dependency: ClassA ..> ClassB
-
-            Use class blocks to define attributes and methods inline:
-
-            \`\`\`mermaid
-            class User {
-              +id: int
-              +name: string
-              +login(): boolean
-            }
-            \`\`\`
-            Keep labels short and meaningful. Avoid generic names like Class1, DataModel.
-
-            Example:
-
-            \`\`\`mermaid
-            classDiagram
-              class User {
-                +id: int
-                +name: string
-                +login(): boolean
-              }
-              class Admin {
-                +accessLevel: int
-              }
-              User <|-- Admin
-            \`\`\`
-            Use this format to create readable and consistent object-oriented diagrams.
-
-          2. Sequence Diagram Rules:
-            Sequence diagrams show how objects or components interact over time. Follow these rules when generating them using Mermaid:
-
-            Use the correct declaration: Start with sequenceDiagram.
-
-            Define participants using participant, actor, or autonumber for labeled steps.
-
-            Message syntax:
-
-            Synchronous: A->>B: Message
-
-            Asynchronous: A->>+B: Start Call
-
-            Response/Return: B-->>A: Response
-
-            Activation: activate B / deactivate B
-
-            Use Note to annotate timelines:
-
-            Note right of A: note content
-
-            Note over A,B: shared note
-
-            Avoid unnecessary actors. Label each participant with a meaningful name (e.g., User, AuthService, DB).
-
-            Indicate lifelines properly and avoid bidirectional confusion.
-
-            Example:
-
-            \`\`\`mermaid
-            sequenceDiagram
-              participant User
-              participant WebApp
-              participant API
-              participant DB
-
-              User->>WebApp: Clicks Login
-              WebApp->>API: Sends Credentials
-              API->>DB: Query User
-              DB-->>API: User Data
-              API-->>WebApp: Auth Token
-              WebApp-->>User: Login Successful
-            \`\`\`
-            Use this format for readable, time-ordered interaction flows between components.
-
-          3. Component Diagram Rules:
-             Component diagrams help visualize the structure and interactions between software components in a system. The following rules should be followed when generating component diagrams using Mermaid syntax.
-
-              Use the correct Mermaid declaration: Start with flowchart TB for top-down or flowchart LR for left-to-right layout.
-
-              Group related components using subgraph: Subgraphs logically group components like Frontend, Backend, or Storage. Do not nest subgraphs. Use Title Case for subgraph names.
-
-              Node types:
-
-              Components: Represent using square brackets, e.g., [User Service]. Use short, descriptive, and Title Case labels.
-
-              Interfaces (optional): Use parentheses, e.g., (User API), to show exposed interfaces.
-
-              External systems/databases (optional): Also use [Label], and distinguish using naming or placement in dedicated subgraphs.
-
-              Connection types (dependencies):
-
-              --> for direct dependency. Example: [Client App] --> [API Gateway]
-
-              -.-> for optional or indirect dependency. Example: [Service A] -.-> [Cache Layer]
-
-              ==>> for strong or event-based dependency. Example: [Order Service] ==>> [Event Stream]
-
-              Layout tips: Choose TB or LR for directional clarity. Use subgraphs to separate frontends, backends, databases, and third-party services. Maintain logical flow (e.g., clients → APIs → services → databases).
-
-              Naming conventions: Use meaningful, concise names like Auth Service or Event Broker. Avoid vague labels like System 1.
-
-              Example:
-
-              \`\`\`mermaid
-              flowchart TB
-                subgraph Frontend
-                  [Web App]
-                  [Mobile App]
-                end
-                subgraph Backend
-                  [API Gateway]
-                  [Auth Service]
-                  [User Service]
-                  [Notification Service]
-                end
-                subgraph Storage
-                  [PostgreSQL Database]
-                  [S3 Bucket]
-                end
-                subgraph Auth
-                  [Cognito]
-                end
-                [Web App] --> [API Gateway]
-                [Mobile App] --> [API Gateway]
-                [API Gateway] --> [Auth Service]
-                [API Gateway] --> [User Service]
-                [API Gateway] --> [Notification Service]
-                [User Service] --> [PostgreSQL Database]
-                [Notification Service] --> [S3 Bucket]
-                [Auth Service] --> [Cognito]
-                \`\`\`
-              Use this structure to ensure clarity, maintainability, and visual consistency across all generated component diagrams.
-
-          4. Architecture Diagram Rules:
-
-          \`\`\`mermaid
-          architecture-beta
-          [Focus on AWS infrastructure. The architecture diagram should show the AWS services, resources, and networking required to deploy and run the system. Use AWS-specific services (e.g., Lambda, S3, RDS, VPC, API Gateway, etc), icons, and groupings.
-
-          ⚠️ CRITICAL RULES - READ FIRST:
-          1. Edge Directions:
-             - EVERY edge MUST specify directions on BOTH sides
-             - Format: serviceA:L --> R:serviceB
-             - Valid directions: L (Left), R (Right), T (Top), B (Bottom)
-             - ❌ INVALID: serviceA --> serviceB (missing directions)
-             - ❌ INVALID: serviceA:L --> serviceB (missing second direction)
-             - ✅ VALID: serviceA:L --> R:serviceB (both directions specified)
-
-          2. Group Connections:
-             - Groups CANNOT be connected directly
-             - If you need to connect to a group, you MUST:
-               1. Define a service inside that group
-               2. Connect to that service instead
-             - ❌ INVALID: serviceA --> groupB (connecting to group)
-             - ❌ INVALID: groupA --> groupB (connecting groups)
-             - ✅ VALID: serviceA:L --> R:serviceB (where serviceB is in a group)
-
-          3. Service Requirements:
-             - Every group that needs to be connected MUST have at least one service
-             - Every service should have at least one connection
-             - Services should be named descriptively (e.g., auth_service, payment_service)
-
-          Official Mermaid Examples:
-
-          1. Basic Group and Service Structure:
-          \`\`\`mermaid
-          architecture-beta
-              group api(cloud)[API]
-                  service db(database)[Database] in api
-                  service disk1(disk)[Storage] in api
-                  service disk2(disk)[Storage] in api
-                  service server(server)[Server] in api
-
-              db:L -- R:server
-              disk1:T -- B:server
-              disk2:T -- B:db
-          \`\`\`
-
-          2. Nested Groups and Services:
-          \`\`\`mermaid
-          architecture-beta
-              group public_api(cloud)[Public API]
-                  group private_api(cloud)[Private API] in public_api
-                      service db(database)[Database] in private_api
-                  service gateway(internet)[Gateway] in public_api
-              service client(server)[Client]
-
-              client:R --> L:gateway
-              gateway:R --> L:db
-          \`\`\`
-
-          3. Using Junctions for Complex Routing:
-          \`\`\`mermaid
-          architecture-beta
-              service left_disk(disk)[Disk]
-              service top_disk(disk)[Disk]
-              service bottom_disk(disk)[Disk]
-              service top_gateway(internet)[Gateway]
-              service bottom_gateway(internet)[Gateway]
-              junction junctionCenter
-              junction junctionRight
-
-              left_disk:R -- L:junctionCenter
-              top_disk:B -- T:junctionCenter
-              bottom_disk:T -- B:junctionCenter
-              junctionCenter:R -- L:junctionRight
-              top_gateway:B -- T:junctionRight
-              bottom_gateway:T -- B:junctionRight
-          \`\`\`
-
-          4. AWS Services with Custom Icons:
-          \`\`\`mermaid
-          architecture-beta
-              group api(logos:aws-lambda)[API]
-                  service db(logos:aws-aurora)[Database] in api
-                  service disk1(logos:aws-glacier)[Storage] in api
-                  service disk2(logos:aws-s3)[Storage] in api
-                  service server(logos:aws-ec2)[Server] in api
-
-              db:L -- R:server
-              disk1:T -- B:server
-              disk2:T -- B:db
-          \`\`\`
-
-          Now, proceed with the rest of the architecture diagram rules:
-
-          1. Basic Structure:
-             - Start with 'architecture-beta'
-             - Define groups first, then services, then edges
-             - Use proper indentation for readability
-
-          2. Groups:
-             - Syntax: group {group_id}({icon})[{title}] (in {parent_id})?
-             - Example: group api(cloud)[API]
-             - For nested groups: group private_api(cloud)[Private API] in public_api
-             - Use appropriate icons: cloud, database, disk, internet, server
-
-          3. Services:
-             - Syntax: service {service_id}({icon})[{title}] (in {parent_id})?
-             - Example: service db(database)[Database] in api
-             - Place services in appropriate groups
-             - Use descriptive labels and appropriate icons
-
-          4. Edges:
-             - T=Top, B=Bottom, L=Left, R=Right
-             - Example: db:L -- R:server
-             - For arrows: db:L --> R:server
-             - Choose edge directions to minimize line crossings
-             - Prefer consistent edge directions for main flow
-
-          5. Icons:
-             - Default icons: cloud, database, disk, internet, server
-             - Use appropriate icons for each service type
-             - For cloud services, use specific icons from the following list:
-             ${awsLogoNames}]
-          \`\`\`
-
-          Follow these rules:
-          1. Use proper Mermaid syntax
-          2. Include all essential components
-          3. Keep diagrams clean and readable
-          4. Use descriptive labels
-          5. Return ONLY the diagrams
-          6. Generate all relevant diagram types
-          7. NEVER connect groups directly
-          8. ALWAYS connect services to services
-          9. ALWAYS specify both edge directions
-          10. Show complete data flow through the system
-
-          ⚠️ IMPORTANT: Since this is an AWS-based application, you MUST ALWAYS include an architecture-beta diagram showing the AWS infrastructure, even if the user doesn't explicitly request it. The architecture diagram should show:
-          - How the application is deployed on AWS
-          - The AWS services used
-          - The networking between services
-          - The data flow through the system
-          - The monitoring and observability setup
-
-          When generating the architecture-beta diagram:
-          - Arrange the main services and data flow in a clear, logical order (preferably left-to-right or top-to-bottom).
-          - Minimize edge crossings and overlaps.
-          - Place the primary workflow as a straight line or gentle curve, with auxiliary or supporting services (such as monitoring, external APIs, or AI engines) positioned above, below, or to the side of the main flow.
-          - Group related services together for clarity.
-          - Use appropriate AWS icons and groupings.
-          - Ensure the diagram is compact, visually balanced, and easy to understand for both technical and non-technical stakeholders.`
+          content: `You are an expert software architect and UML modeling specialist. Your task is to create comprehensive, detailed UML diagrams that provide deep architectural insights.
+
+${mermaidDocs}
+
+Generate ONLY these 3 diagram types with maximum detail:
+
+1. CLASS DIAGRAM (classDiagram):
+   - Include ALL classes with complete attributes (data types, visibility, default values)
+   - Include ALL methods with parameters, return types, and visibility
+   - Show ALL relationships: inheritance, composition, aggregation, associations, dependencies
+   - Use proper UML notation: + (public), - (private), # (protected), ~ (package)
+   - Include abstract classes, interfaces, and their implementations
+   - Show multiplicity (1, *, 0..1, 1..*, etc.)
+   - Include stereotypes where appropriate (<<Entity>>, <<Service>>, <<Controller>>, etc.)
+   - Group related classes logically
+
+2. SEQUENCE DIAGRAM (sequenceDiagram):
+   - Show complete user interactions and system responses
+   - Include ALL actors (User, Admin, External APIs, Database, etc.)
+   - Show detailed message flows with parameters
+   - Include return values and error handling
+   - Show activation bars for method calls
+   - Include conditional flows (alt, opt, loop)
+   - Show database transactions and external API calls
+   - Include timing considerations where relevant
+
+3. ENTITY RELATIONSHIP DIAGRAM (erDiagram):
+   - Include ALL entities with complete attributes
+   - Show data types, constraints, and relationships
+   - Include primary keys, foreign keys, and indexes
+   - Show cardinality (1:1, 1:N, M:N)
+   - Include junction tables for many-to-many relationships
+   - Show inheritance and specialization
+   - Include business rules and constraints
+   - Show audit fields (created_at, updated_at, etc.)
+
+Return in this exact format:
+
+\`\`\`mermaid
+classDiagram
+[Your detailed class diagram here with complete attributes, methods, and relationships]
+\`\`\`
+
+\`\`\`mermaid
+sequenceDiagram
+[Your detailed sequence diagram here with complete interactions]
+\`\`\`
+
+\`\`\`mermaid
+erDiagram
+[Your detailed entity relationship diagram here with complete entities and relationships]
+\`\`\`
+
+CRITICAL REQUIREMENTS:
+- Be extremely detailed and comprehensive
+- Include ALL classes, methods, attributes, and relationships
+- Use proper UML notation and syntax
+- Make diagrams production-ready and architecturally sound
+- Follow the exact syntax from the official Mermaid documentation
+- Ensure diagrams are complex enough to be useful for real development`
         },
         {
           role: "user",
-          content: prompt
+          content: `Generate comprehensive, detailed UML diagrams for this system. Make them production-ready with complete architectural details: ${prompt}`
         }
       ],
-      temperature: 0.5,
+      temperature: 0.3,
+      max_tokens: 4000
     });
 
-    const response = completion.choices[0].message?.content;
-    if (!response) {
-      throw new Error('No response from OpenAI');
-    }
+    // Second call: Generate detailed component diagrams (frontend, backend, architecture)
+    console.log("[UML Generator] Generating detailed component diagrams...");
+    const componentCompletion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert software architect specializing in system architecture and component modeling. Create comprehensive, detailed component diagrams that provide deep architectural insights.
 
-    console.log("[UML Generator] Received OpenAI response:", response);
+${mermaidDocs}
 
-    // Use the robust parser
-    const diagrams = parseUMLResponse(response);
-    console.log("[UML Generator] Parsed diagrams:", diagrams);
-    return diagrams;
+Generate ONLY these 3 diagram types with maximum detail:
+
+1. FRONTEND COMPONENT DIAGRAM (flowchart TB):
+   - Show ALL UI components, pages, and layouts
+   - Include component hierarchy and nesting
+   - Show state management (Redux, Context, etc.)
+   - Include routing and navigation flows
+   - Show data flow between components
+   - Include external integrations (APIs, third-party services)
+   - Show responsive design considerations
+   - Include error boundaries and loading states
+   - Use subgraphs to group related components
+   - Show component props and event flows
+
+2. BACKEND COMPONENT DIAGRAM (flowchart TB):
+   - Show ALL Lambda functions, handlers, and business logic
+   - Include Express app structure wrapped in serverless-http
+   - Show API Gateway integration and Lambda handlers
+   - Include authentication and authorization middleware
+   - Show database access patterns optimized for Lambda cold starts
+   - Include Lambda-specific utilities and helpers
+   - Show serverless deployment considerations
+   - Include Lambda environment variables and configuration
+   - Show error handling and logging for Lambda context
+   - Use subgraphs to group related Lambda functions and services
+   - Focus on Lambda execution patterns and serverless architecture
+   - Show Lambda function organization and routing
+   - Include Lambda-specific middleware and utilities
+
+3. ARCHITECTURE DIAGRAM (flowchart TB):
+   - Create a simple serverless architecture diagram
+   - Use subgraph "Frontend" for static assets (S3, CloudFront)
+   - Use subgraph "Backend" for serverless functions (Lambda, API Gateway)
+   - Use subgraph "Database" for data storage (DynamoDB, RDS if needed)
+   - Use subgraph "Security" for basic security (IAM, CloudWatch)
+   - Show simple connections between services
+   - Focus on serverless and managed services
+   - Keep it simple: S3 + Lambda + API Gateway + DynamoDB
+   - Avoid complex networking (VPC, subnets, etc.)
+   - Show basic monitoring and logging
+
+Return in this exact format:
+
+\`\`\`mermaid
+flowchart TB
+[Your detailed frontend component diagram here]
+\`\`\`
+
+\`\`\`mermaid
+flowchart TB
+[Your detailed backend component diagram here]
+\`\`\`
+
+\`\`\`mermaid
+flowchart TB
+[Your detailed architecture diagram here with concrete infrastructure resources only]
+\`\`\`
+
+EXAMPLE ARCHITECTURE DIAGRAM STRUCTURE:
+\`\`\`mermaid
+flowchart TB
+    subgraph "Frontend"
+        direction TB
+        S3[S3 Bucket - Static Assets]
+        CloudFront[CloudFront CDN]
+        Route53[Route 53 DNS]
+    end
+    
+    subgraph "Backend"
+        direction TB
+        API_Gateway[API Gateway]
+        Lambda[Lambda Functions]
+    end
+    
+    subgraph "Database"
+        direction TB
+        DynamoDB[DynamoDB Table]
+    end
+    
+    subgraph "Security & Monitoring"
+        direction TB
+        IAM[IAM Roles]
+        CloudWatch[CloudWatch Logs]
+    end
+
+    %% Frontend connections
+    S3 -->|static files| CloudFront
+    CloudFront -->|serves| User[Users]
+    Route53 -->|DNS| CloudFront
+    
+    %% Backend connections
+    User -->|API calls| API_Gateway
+    API_Gateway -->|triggers| Lambda
+    Lambda -->|reads/writes| DynamoDB
+    
+    %% Security & Monitoring
+    IAM -->|permissions| Lambda
+    IAM -->|permissions| S3
+    Lambda -->|logs| CloudWatch
+    API_Gateway -->|logs| CloudWatch
+\`\`\`
+
+CRITICAL REQUIREMENTS:
+- Be extremely detailed and comprehensive
+- Include ALL components, services, and relationships
+- Show complete system architecture and data flows
+- Use proper Mermaid syntax and follow documentation exactly
+- Make diagrams production-ready and architecturally sound
+- Include security, scalability, and performance considerations`
+        },
+        {
+          role: "user",
+          content: `Generate comprehensive, detailed component diagrams for this system. Make them production-ready with complete architectural details: ${prompt}`
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 4000
+    });
+
+    // Third call: Generate separate frontend and backend diagram sets
+    console.log("[UML Generator] Generating separate frontend and backend diagram sets...");
+    const separateDiagramsCompletion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert software architect specializing in frontend and backend separation. Create detailed, separate diagram sets for frontend and backend to enable better code generation.
+
+${mermaidDocs}
+
+Generate ONLY these 4 diagram types with maximum detail and CLEAR SEPARATION:
+
+**FRONTEND DIAGRAMS (React/TypeScript Frontend Only):**
+
+1. FRONTEND CLASS DIAGRAM (classDiagram):
+   - ONLY React components, hooks, and frontend utilities
+   - React component classes with props and state
+   - Custom hooks (useAuth, useApi, etc.)
+   - Context providers and consumers
+   - Frontend service classes (API clients)
+   - TypeScript interfaces for frontend data
+   - NO backend controllers, services, or database classes
+   - Examples: LoginComponent, DashboardComponent, useAuth, AuthContext
+
+2. FRONTEND SEQUENCE DIAGRAM (sequenceDiagram):
+   - ONLY frontend component interactions
+   - User interactions with React components
+   - Component-to-component communication
+   - API calls from frontend to backend (but don't show backend internals)
+   - State management flows (Redux, Context)
+   - Navigation and routing flows
+   - NO backend service-to-service communication
+   - Examples: User clicks button → Component updates → API call
+
+**BACKEND DIAGRAMS (AWS Lambda/Node.js Backend Only):**
+
+3. BACKEND CLASS DIAGRAM (classDiagram):
+   - ONLY Lambda handlers, Express middleware, and business logic services
+   - Lambda handler functions with APIGatewayProxyEvent handling
+   - Express app structure with serverless-http wrapper
+   - Business logic services optimized for Lambda cold starts
+   - Database models and repositories for serverless execution
+   - Authentication and authorization middleware for Lambda
+   - Lambda-specific utilities and helpers
+   - NO React components or frontend classes
+   - Examples: LambdaHandler, ExpressApp, AuthService, UserModel, LambdaUtils
+
+4. BACKEND SEQUENCE DIAGRAM (sequenceDiagram):
+   - ONLY Lambda function execution flows
+   - API Gateway → Lambda handler → Express app flows
+   - Lambda handler to service communication
+   - Database operations optimized for Lambda execution
+   - Authentication and validation flows in Lambda context
+   - NO frontend component interactions
+   - Examples: APIGateway → LambdaHandler → ExpressApp → Service → Database
+
+Return in this exact format with CLEAR LABELS:
+
+\`\`\`mermaid
+classDiagram
+%% FRONTEND CLASS DIAGRAM - React Components Only
+[Your detailed frontend class diagram here with ONLY React components, hooks, and frontend utilities]
+\`\`\`
+
+\`\`\`mermaid
+sequenceDiagram
+%% FRONTEND SEQUENCE DIAGRAM - Component Interactions Only
+[Your detailed frontend sequence diagram here with ONLY component interactions and API calls]
+\`\`\`
+
+\`\`\`mermaid
+classDiagram
+%% BACKEND CLASS DIAGRAM - Backend Services Only
+[Your detailed backend class diagram here with ONLY controllers, services, and models]
+\`\`\`
+
+\`\`\`mermaid
+sequenceDiagram
+%% BACKEND SEQUENCE DIAGRAM - Service Interactions Only
+[Your detailed backend sequence diagram here with ONLY service-to-service and database interactions]
+\`\`\`
+
+CRITICAL REQUIREMENTS:
+- STRICTLY separate frontend and backend concerns
+- Frontend diagrams: ONLY React components, hooks, context, frontend services
+- Backend diagrams: ONLY Lambda handlers, Express middleware, services, models optimized for serverless execution
+- Include ALL relevant classes, methods, and relationships for each layer
+- Show complete data flow and dependencies within each layer
+- Use proper UML notation and Mermaid syntax
+- Make diagrams production-ready and architecturally sound
+- Focus on code generation needs (models, services, components, dependencies)
+- Backend diagrams must focus on Lambda execution patterns and serverless architecture
+- Include Lambda-specific patterns: handler functions, serverless-http, APIGatewayProxyEvent handling
+- Optimize for Lambda cold starts and serverless deployment considerations`
+        },
+        {
+          role: "user",
+          content: `Generate separate, detailed frontend and backend UML diagrams for this system. Focus on code generation needs with complete architectural details: ${prompt}`
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 6000
+    });
+
+    // Parse all responses
+    const basicDiagrams = parseUMLResponse(basicCompletion.choices[0].message.content || '');
+    const componentDiagrams = parseUMLResponse(componentCompletion.choices[0].message.content || '');
+    const separateDiagrams = parseUMLResponse(separateDiagramsCompletion.choices[0].message.content || '');
+
+    // Combine all diagrams
+    const allDiagrams: UMLDiagrams = {
+      ...basicDiagrams,
+      ...componentDiagrams,
+      ...separateDiagrams
+    };
+
+    console.log("[UML Generator] Generated diagram types:", Object.keys(allDiagrams));
+    return allDiagrams;
+
   } catch (error) {
-    console.error('[UML Generator] Error generating UML diagrams:', error);
+    console.error("[UML Generator] Error generating UML diagrams:", error);
     throw error;
   }
 };
@@ -396,19 +428,64 @@ export function parseUMLResponse(response: string): UMLDiagrams {
   const diagrams: UMLDiagrams = {};
   const regex = /```mermaid\s*([\s\S]*?)```/g;
   let match;
+  
   while ((match = regex.exec(response)) !== null) {
     const content = match[1].trim();
+    
     if (content.startsWith("classDiagram")) {
-      diagrams.class = content;
+      // Determine if this is frontend or backend based on content
+      const isFrontend = content.includes('React') || content.includes('Component') || 
+                        content.includes('Hook') || content.includes('Context') ||
+                        content.includes('useState') || content.includes('useEffect');
+      const isBackend = content.includes('Controller') || content.includes('Service') ||
+                       content.includes('Model') || content.includes('Repository') ||
+                       content.includes('Database') || content.includes('API');
+      
+      if (isFrontend && !diagrams.frontendClass) {
+        diagrams.frontendClass = content;
+      } else if (isBackend && !diagrams.backendClass) {
+        diagrams.backendClass = content;
+      } else if (!diagrams.class) {
+        diagrams.class = content;
+      }
     } else if (content.startsWith("sequenceDiagram")) {
-      diagrams.sequence = content;
+      // Determine if this is frontend or backend based on content
+      const isFrontend = content.includes('User') && content.includes('Component') ||
+                        content.includes('React') || content.includes('Hook');
+      const isBackend = content.includes('Controller') || content.includes('Service') ||
+                       content.includes('Database') || content.includes('API');
+      
+      if (isFrontend && !diagrams.frontendSequence) {
+        diagrams.frontendSequence = content;
+      } else if (isBackend && !diagrams.backendSequence) {
+        diagrams.backendSequence = content;
+      } else if (!diagrams.sequence) {
+        diagrams.sequence = content;
+      }
     } else if (content.startsWith("erDiagram")) {
       diagrams.entity = content;
     } else if (content.startsWith("flowchart")) {
-      diagrams.component = content;
-    } else if (content.startsWith("architecture-beta")) {
-      diagrams.architecture = content;
+      // Determine if this is frontend, backend, or architecture based on content
+      const isFrontend = content.includes('Frontend') || content.includes('Component') ||
+                        content.includes('Page') || content.includes('UI');
+      const isBackend = content.includes('Backend') || content.includes('Service') ||
+                       content.includes('Controller') || content.includes('API');
+      const isArchitecture = content.includes('S3') || content.includes('Lambda') ||
+                            content.includes('DynamoDB') || content.includes('CloudFront');
+      
+      if (isFrontend && !diagrams.frontendComponent) {
+        diagrams.frontendComponent = content;
+      } else if (isBackend && !diagrams.backendComponent) {
+        diagrams.backendComponent = content;
+      } else if (isArchitecture && !diagrams.architecture) {
+        diagrams.architecture = content;
+      }
+    } else if (content.startsWith("stateDiagram-v2")) {
+      diagrams.state = content;
+    } else if (content.startsWith("C4Context")) {
+      diagrams.c4 = content;
     }
   }
+  
   return diagrams;
-} 
+}

@@ -17,13 +17,13 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const cors_1 = __importDefault(require("cors"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const helmet_1 = __importDefault(require("helmet"));
-// import { connectDB } from "./db"; // Removed
 const errorHandler_1 = require("./middleware/errorHandler");
 const openAI_1 = __importDefault(require("./routes/openAI"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const project_1 = __importDefault(require("./routes/project"));
 const iac_1 = __importDefault(require("./routes/iac"));
 const deployRoutes_1 = __importDefault(require("./routes/deployRoutes"));
+const sandboxRoutes_1 = __importDefault(require("./routes/sandboxRoutes"));
 const uml_1 = __importDefault(require("./routes/uml"));
 const appCode_1 = __importDefault(require("./routes/appCode"));
 const documentation_1 = __importDefault(require("./routes/documentation"));
@@ -104,6 +104,7 @@ const corsOptions = {
         const allowedOrigins = [
             'http://localhost:3000',
             'http://localhost:3001',
+            'http://localhost:3002', // Add support for frontend on port 3002
             'https://v0-image-analysis-gp-omega.vercel.app',
             'https://chartai-backend-697f80778bd2.herokuapp.com'
         ];
@@ -133,6 +134,7 @@ app.use("/api/auth", auth_1.default);
 app.use("/api/projects", project_1.default);
 app.use("/api/iac", iac_1.default); // ✅ New Route for IaC
 app.use("/api/deploy", deployRoutes_1.default);
+app.use("/api/sandbox", sandboxRoutes_1.default);
 app.use("/api/uml", uml_1.default);
 app.use("/api/documentation", documentation_1.default);
 app.use("/api/code", appCode_1.default);

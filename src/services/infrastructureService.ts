@@ -89,6 +89,24 @@ export class InfrastructureService {
    */
   static async destroyInfrastructure(projectId: string): Promise<{ jobId: string; status: string; message: string }> {
     try {
+      // First check if project exists
+      const { getProjectById } = await import("../utils/projectFileStore");
+      const project = await getProjectById(projectId);
+      
+      if (!project) {
+        throw new Error("Project not found");
+      }
+      
+      // Check if infrastructure is actually deployed
+      const currentStatus = await this.getInfrastructureStatus(projectId);
+      if (currentStatus.deploymentStatus === 'not_deployed' || currentStatus.deploymentStatus === 'destroyed') {
+        return {
+          jobId: `destroy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+          status: "completed",
+          message: "No infrastructure found to destroy"
+        };
+      }
+
       const response = await fetch(`${this.TERRAFORM_RUNNER_URL}/destroy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,22 +114,33 @@ export class InfrastructureService {
       });
 
       if (!response.ok) {
-        throw new Error(`Terraform runner responded with status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Terraform runner responded with status: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json() as TerraformRunnerResponse;
       
       if (result.status === "success") {
+        // Update project status to destroyed
+        project.deploymentStatus = 'destroyed';
+        const { saveProject } = await import("../utils/projectFileStore");
+        await saveProject(project);
+        
         return {
           jobId: `destroy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
           status: "completed",
           message: "Infrastructure destroyed successfully"
         };
       } else {
-        throw new Error(result.stderr || "Terraform destruction failed");
+        throw new Error(result.stderr || result.error || "Terraform destruction failed");
       }
     } catch (error: any) {
-      throw new Error(`Destruction failed: ${error.message}`);
+      // Return a graceful error response instead of throwing
+      return {
+        jobId: `destroy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        status: "failed",
+        message: `Destruction failed: ${error.message}`
+      };
     }
   }
 
@@ -182,17 +211,41 @@ export class InfrastructureService {
         throw new Error("Project not found");
       }
 
-      // Get Terraform state
+      // Get Terraform state to validate actual deployment status
       let terraformState = null;
+      let actualDeploymentStatus = project.deploymentStatus || "not_deployed";
+      
       try {
         terraformState = await this.getTerraformState(projectId);
+        
+        // Only validate deployment status if we can successfully get Terraform state
+        if (project.deploymentStatus === 'deployed' && terraformState) {
+          if (!terraformState.resources || terraformState.resources.length === 0) {
+            // Project claims to be deployed but has no resources in state
+            console.warn(`Project ${projectId} claims to be deployed but has no resources in Terraform state. Correcting status.`);
+            actualDeploymentStatus = "not_deployed";
+            
+            // Update the project status to reflect reality
+            project.deploymentStatus = "not_deployed";
+            const { saveProject } = await import("../utils/projectFileStore");
+            await saveProject(project);
+          }
+        }
       } catch (stateError) {
         console.warn(`Could not retrieve Terraform state for project ${projectId}:`, stateError);
+        
+        // Don't override deployment status just because we can't get state
+        // The project's deploymentStatus should be trusted unless we have clear evidence it's wrong
+        // Only mark as failed if we have explicit evidence of failure
+        if (project.deploymentStatus === 'deployed') {
+          // Keep the deployed status - don't override based on state retrieval failure
+          actualDeploymentStatus = "deployed";
+        }
       }
 
       return {
         projectId,
-        deploymentStatus: project.deploymentStatus || "not_deployed",
+        deploymentStatus: actualDeploymentStatus,
         deploymentJobId: project.deploymentJobId,
         deploymentOutputs: project.deploymentOutputs,
         terraformState,

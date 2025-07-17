@@ -90,16 +90,36 @@ class InfrastructureService {
     static destroyInfrastructure(projectId) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
+                // First check if project exists
+                const { getProjectById } = yield Promise.resolve().then(() => __importStar(require("../utils/projectFileStore")));
+                const project = yield getProjectById(projectId);
+                if (!project) {
+                    throw new Error("Project not found");
+                }
+                // Check if infrastructure is actually deployed
+                const currentStatus = yield this.getInfrastructureStatus(projectId);
+                if (currentStatus.deploymentStatus === 'not_deployed' || currentStatus.deploymentStatus === 'destroyed') {
+                    return {
+                        jobId: `destroy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+                        status: "completed",
+                        message: "No infrastructure found to destroy"
+                    };
+                }
                 const response = yield (0, node_fetch_1.default)(`${this.TERRAFORM_RUNNER_URL}/destroy`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ projectId }),
                 });
                 if (!response.ok) {
-                    throw new Error(`Terraform runner responded with status: ${response.status}`);
+                    const errorText = yield response.text();
+                    throw new Error(`Terraform runner responded with status: ${response.status} - ${errorText}`);
                 }
                 const result = yield response.json();
                 if (result.status === "success") {
+                    // Update project status to destroyed
+                    project.deploymentStatus = 'destroyed';
+                    const { saveProject } = yield Promise.resolve().then(() => __importStar(require("../utils/projectFileStore")));
+                    yield saveProject(project);
                     return {
                         jobId: `destroy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
                         status: "completed",
@@ -107,11 +127,16 @@ class InfrastructureService {
                     };
                 }
                 else {
-                    throw new Error(result.stderr || "Terraform destruction failed");
+                    throw new Error(result.stderr || result.error || "Terraform destruction failed");
                 }
             }
             catch (error) {
-                throw new Error(`Destruction failed: ${error.message}`);
+                // Return a graceful error response instead of throwing
+                return {
+                    jobId: `destroy-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+                    status: "failed",
+                    message: `Destruction failed: ${error.message}`
+                };
             }
         });
     }
@@ -181,17 +206,37 @@ class InfrastructureService {
                 if (!project) {
                     throw new Error("Project not found");
                 }
-                // Get Terraform state
+                // Get Terraform state to validate actual deployment status
                 let terraformState = null;
+                let actualDeploymentStatus = project.deploymentStatus || "not_deployed";
                 try {
                     terraformState = yield this.getTerraformState(projectId);
+                    // Only validate deployment status if we can successfully get Terraform state
+                    if (project.deploymentStatus === 'deployed' && terraformState) {
+                        if (!terraformState.resources || terraformState.resources.length === 0) {
+                            // Project claims to be deployed but has no resources in state
+                            console.warn(`Project ${projectId} claims to be deployed but has no resources in Terraform state. Correcting status.`);
+                            actualDeploymentStatus = "not_deployed";
+                            // Update the project status to reflect reality
+                            project.deploymentStatus = "not_deployed";
+                            const { saveProject } = yield Promise.resolve().then(() => __importStar(require("../utils/projectFileStore")));
+                            yield saveProject(project);
+                        }
+                    }
                 }
                 catch (stateError) {
                     console.warn(`Could not retrieve Terraform state for project ${projectId}:`, stateError);
+                    // Don't override deployment status just because we can't get state
+                    // The project's deploymentStatus should be trusted unless we have clear evidence it's wrong
+                    // Only mark as failed if we have explicit evidence of failure
+                    if (project.deploymentStatus === 'deployed') {
+                        // Keep the deployed status - don't override based on state retrieval failure
+                        actualDeploymentStatus = "deployed";
+                    }
                 }
                 return {
                     projectId,
-                    deploymentStatus: project.deploymentStatus || "not_deployed",
+                    deploymentStatus: actualDeploymentStatus,
                     deploymentJobId: project.deploymentJobId,
                     deploymentOutputs: project.deploymentOutputs,
                     terraformState,

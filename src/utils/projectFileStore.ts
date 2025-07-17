@@ -6,10 +6,31 @@ import { Documentation } from './documentationStore';
 const DATA_FILE = path.join(__dirname, "../../projects.json");
 
 export interface UMLDiagrams {
-  class?: string;
-  sequence?: string;
-  entity?: string;
+  // Overall Architecture
+  architecture?: string;
+  
+  // System-level diagrams
   component?: string;
+  sequence?: string;
+  class?: string;
+  entity?: string;
+  
+  // Frontend-specific diagrams
+  frontendComponent?: string;
+  frontendClass?: string;
+  frontendSequence?: string;
+  uiComponent?: string;
+  
+  // Backend-specific diagrams
+  backendComponent?: string;
+  backendClass?: string;
+  backendSequence?: string;
+  apiSequence?: string;
+  
+  // Integration and deployment
+  integration?: string;
+  deployment?: string;
+  useCase?: string;
 }
 
 export interface DocumentationSection {
@@ -151,7 +172,48 @@ export interface Project {
   documentation?: Documentation;
   designDocument?: DesignDocument;
   infraCode?: string;
+  
+  // Enhanced app code structure
   appCode?: {
+    // App metadata
+    appType: 'react' | 'vue' | 'angular' | 'nextjs' | 'nuxt' | 'svelte' | 'vanilla' | 'unknown';
+    framework: string;
+    version: string;
+    
+    // File structure (organized by folders)
+    fileStructure: {
+      frontend: {
+        components: Record<string, string>;
+        pages: Record<string, string>;
+        utils: Record<string, string>;
+        styles: Record<string, string>;
+        assets: Record<string, string>;
+        config: Record<string, string>;
+      };
+      backend: {
+        controllers: Record<string, string>;
+        models: Record<string, string>;
+        routes: Record<string, string>;
+        utils: Record<string, string>;
+        middleware: Record<string, string>;
+        config: Record<string, string>;
+      };
+      shared: {
+        types: Record<string, string>;
+        interfaces: Record<string, string>;
+        constants: Record<string, string>;
+      };
+      build: {
+        packageJson: string;
+        tsconfig?: string;
+        webpackConfig?: string;
+        viteConfig?: string;
+        dockerfile?: string;
+        dockerCompose?: string;
+      };
+    };
+    
+    // Legacy flat structure (for backward compatibility)
     frontend: {
       components: Record<string, string>;
       pages: Record<string, string>;
@@ -164,7 +226,39 @@ export interface Project {
       utils: Record<string, string>;
     };
     documentation: string;
+    
+    // Build and deployment info
+    buildConfig: {
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
+      scripts: Record<string, string>;
+      buildCommand: string;
+      startCommand: string;
+      port: number;
+    };
+    
+    // Validation and quality metrics
+    validation: {
+      buildErrors: string[];
+      runtimeErrors: string[];
+      missingDependencies: string[];
+      addedDependencies: string[];
+      lintErrors: string[];
+      typeErrors: string[];
+      lastValidated: Date;
+    };
   };
+  
+  // Project file system path (for actual file storage)
+  projectPath?: string;
+  projectStructure?: {
+    root: string;
+    frontend: string;
+    backend: string;
+    shared: string;
+    build: string;
+  };
+  
   deploymentStatus?: 'not_deployed' | 'pending' | 'deployed' | 'failed' | 'destroyed';
   deploymentJobId?: string;
   deploymentOutputs?: any;
@@ -179,6 +273,18 @@ export interface Project {
   magicAnalysis?: any;
   userPrompt?: string;
   targetCustomers?: string;
+  // Sandbox properties
+  sandboxJobId?: string;
+  sandboxUrl?: string;
+  sandboxStatus?: 'not_created' | 'creating' | 'ready' | 'failed';
+  buildErrors?: string[];
+  runtimeErrors?: string[];
+  missingDependencies?: string[];
+  addedDependencies?: string[];
+  // Production deployment properties
+  productionUrl?: string;
+  backendUrl?: string;
+  lastDeployed?: Date;
 }
 
 async function readAll(): Promise<Project[]> {

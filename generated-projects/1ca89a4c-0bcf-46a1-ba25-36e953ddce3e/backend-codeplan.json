@@ -1,0 +1,245 @@
+{
+  "backendComponents": [
+    {
+      "name": "LambdaFunctions",
+      "children": [
+        "CalcFunction",
+        "SciCalcFunction",
+        "AuthFunction",
+        "HistoryFunction"
+      ],
+      "description": "Functions executed as AWS Lambda for different operations like calculations, authentication, and history logging"
+    },
+    {
+      "name": "APIGateway",
+      "children": [
+        "APICalc",
+        "APISciCalc",
+        "APIAuth",
+        "APIHistory"
+      ],
+      "description": "API Gateway endpoints for routing requests to respective Lambda functions"
+    },
+    {
+      "name": "Database",
+      "children": [
+        "DynamoDBCalc",
+        "DynamoDBHistory"
+      ],
+      "description": "DynamoDB tables for storing calculations and history logs"
+    },
+    {
+      "name": "Middleware",
+      "children": [
+        "AuthMiddleware",
+        "LoggingMiddleware"
+      ],
+      "description": "Middleware components for authentication and logging in Lambda context"
+    }
+  ],
+  "backendModels": [
+    {
+      "name": "DatabaseModel",
+      "properties": [
+        "expression: string",
+        "result: number"
+      ],
+      "methods": [
+        "saveCalculation(expression: string, result: number): void",
+        "getCalculationHistory(): Calculation[]"
+      ],
+      "description": "Model for interacting with DynamoDB to save and retrieve calculation data"
+    }
+  ],
+  "backendDependencies": [
+    {
+      "from": "LambdaHandler",
+      "to": "ExpressionService",
+      "type": "uses",
+      "description": "Lambda handler uses ExpressionService to evaluate expressions"
+    },
+    {
+      "from": "LambdaHandler",
+      "to": "ScientificNotationService",
+      "type": "uses",
+      "description": "Lambda handler uses ScientificNotationService for scientific conversions"
+    },
+    {
+      "from": "LambdaHandler",
+      "to": "AuthService",
+      "type": "uses",
+      "description": "Lambda handler uses AuthService for token validation"
+    },
+    {
+      "from": "LambdaHandler",
+      "to": "DatabaseModel",
+      "type": "uses",
+      "description": "Lambda handler uses DatabaseModel to save and retrieve calculation data"
+    }
+  ],
+  "fileStructure": {
+    "frontend": [],
+    "backend": [
+      {
+        "path": "src/index.ts",
+        "content": "",
+        "dependencies": [
+          "express",
+          "serverless-http",
+          "cors",
+          "helmet",
+          "morgan",
+          "./routes",
+          "./middleware/auth",
+          "./middleware/logging"
+        ],
+        "description": "Lambda entry point with Express app wrapped in serverless-http, exports handler function for AWS Lambda deployment, sets up middleware, registers routes, includes error handling for Lambda context",
+        "type": "backend"
+      },
+      {
+        "path": "src/services/CalculatorService.ts",
+        "content": "",
+        "dependencies": [
+          "../models/DatabaseModel",
+          "../utils/validation",
+          "../middleware/auth"
+        ],
+        "description": "Service to handle calculator operations optimized for Lambda cold starts with proper error handling and validation",
+        "type": "backend"
+      },
+      {
+        "path": "src/services/ScientificCalculatorService.ts",
+        "content": "",
+        "dependencies": [
+          "../models/DatabaseModel",
+          "../utils/validation",
+          "../middleware/auth"
+        ],
+        "description": "Service to handle scientific calculator operations optimized for Lambda cold starts with proper error handling and validation",
+        "type": "backend"
+      },
+      {
+        "path": "src/services/AuthService.ts",
+        "content": "",
+        "dependencies": [
+          "../utils/validation"
+        ],
+        "description": "Service to handle authentication logic, including token validation for Lambda execution",
+        "type": "backend"
+      },
+      {
+        "path": "src/middleware/auth.ts",
+        "content": "",
+        "dependencies": [
+          "../services/AuthService"
+        ],
+        "description": "Middleware to handle authentication for incoming requests in Lambda context",
+        "type": "backend"
+      },
+      {
+        "path": "src/middleware/logging.ts",
+        "content": "",
+        "dependencies": [
+          "morgan"
+        ],
+        "description": "Middleware to handle logging of requests and responses for Lambda execution",
+        "type": "backend"
+      },
+      {
+        "path": "src/routes/index.ts",
+        "content": "",
+        "dependencies": [
+          "express",
+          "./calculator",
+          "./scientificCalculator",
+          "./auth"
+        ],
+        "description": "Express router setup for API routes, integrates with Lambda functions",
+        "type": "backend"
+      },
+      {
+        "path": "src/routes/calculator.ts",
+        "content": "",
+        "dependencies": [
+          "express",
+          "../services/CalculatorService"
+        ],
+        "description": "Route definitions for calculator operations, integrates with CalculatorService",
+        "type": "backend"
+      },
+      {
+        "path": "src/routes/scientificCalculator.ts",
+        "content": "",
+        "dependencies": [
+          "express",
+          "../services/ScientificCalculatorService"
+        ],
+        "description": "Route definitions for scientific calculator operations, integrates with ScientificCalculatorService",
+        "type": "backend"
+      },
+      {
+        "path": "src/routes/auth.ts",
+        "content": "",
+        "dependencies": [
+          "express",
+          "../services/AuthService"
+        ],
+        "description": "Route definitions for authentication operations, integrates with AuthService",
+        "type": "backend"
+      },
+      {
+        "path": "src/models/Calculation.ts",
+        "content": "",
+        "dependencies": [],
+        "description": "Model definition for calculation data structure used in DynamoDB interactions",
+        "type": "backend"
+      },
+      {
+        "path": "src/utils/validation.ts",
+        "content": "",
+        "dependencies": [],
+        "description": "Utility functions for input validation used across services in Lambda context",
+        "type": "backend"
+      }
+    ]
+  },
+  "integration": {
+    "apiEndpoints": [
+      {
+        "path": "/api/calculator/calculate",
+        "method": "POST",
+        "frontendComponent": "",
+        "backendService": "CalculatorService",
+        "description": "Lambda API endpoint integration flow for calculator operations"
+      },
+      {
+        "path": "/api/scientific/calculate",
+        "method": "POST",
+        "frontendComponent": "",
+        "backendService": "ScientificCalculatorService",
+        "description": "Lambda API endpoint integration flow for scientific calculator operations"
+      },
+      {
+        "path": "/api/auth/validate",
+        "method": "POST",
+        "frontendComponent": "",
+        "backendService": "AuthService",
+        "description": "Lambda API endpoint integration flow for authentication operations"
+      }
+    ],
+    "dataFlow": [
+      {
+        "from": "CalculatorService",
+        "to": "DatabaseModel",
+        "data": "expression, result",
+        "description": "Data flow from CalculatorService to DatabaseModel for saving calculation results in Lambda context"
+      },
+      {
+        "from": "ScientificCalculatorService",
+        "to": "DatabaseModel",
+        "data": "expression, scientificResult",
+        "description": "Data flow from ScientificCalculatorService to DatabaseModel for saving scientific calculation results in Lambda context"
+      }
+    ]
+  }
+}

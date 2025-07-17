@@ -10,5 +10,11 @@
     "email": "test@chartai.com",
     "passwordHash": "$2b$10$GQwJaFx9T2o5pUbVZ1EOYem4A1Ryu8kBW.UxSSiLFF5iK632CJEzW",
     "createdAt": "2025-05-20T07:43:05.937Z"
+  },
+  {
+    "_id": "7a46ad71-78bf-4504-aec1-ad3b2dea253c",
+    "email": "demo@test.com",
+    "passwordHash": "$2a$10$6dFeYd2e/mgBPq0rceci/eitXUNG2ntdfDnGW8Gs10CfrvbIYyOiG",
+    "createdAt": "2025-07-09T01:22:54.283Z"
   }
 ]

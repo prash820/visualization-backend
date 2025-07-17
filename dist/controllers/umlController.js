@@ -18,13 +18,10 @@ const umlGenerator_1 = require("../utils/umlGenerator");
 const openai_1 = __importDefault(require("openai"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const memoryManager_1 = require("../utils/memoryManager");
-const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
+const aiProvider_1 = require("../config/aiProvider");
 dotenv_1.default.config();
 const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY || "",
-});
-const anthropic = new sdk_1.default({
-    apiKey: process.env.ANTHROPIC_SECRET_KEY,
 });
 const umlJobs = {};
 // Set up memory management for job stores - increased retention time
@@ -109,8 +106,8 @@ Focus on creating diagrams that clearly show:
 4. Use cases and actors
 
 Return ONLY the JSON object, no explanations.`;
-        const response = yield anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
+        const response = yield aiProvider_1.anthropic.messages.create({
+            model: aiProvider_1.ANTHROPIC_MODEL,
             max_tokens: 4000,
             temperature: 0.3,
             system: systemPrompt,

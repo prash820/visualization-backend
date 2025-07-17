@@ -9,4 +9,6 @@ const asyncHandler_1 = __importDefault(require("../utils/asyncHandler"));
 const router = express_1.default.Router();
 // Generate visualization endpoint
 router.post("/", (0, asyncHandler_1.default)(openAIController_1.generateVisualization));
+// Get diagram job status endpoint
+router.get("/diagram-job-status/:jobId", (0, asyncHandler_1.default)(openAIController_1.getDiagramJobStatus));
 exports.default = router;

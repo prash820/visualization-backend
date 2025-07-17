@@ -1,0 +1,1 @@
+import express from "express"; import { createTask } from "./controllers/taskController"; import { validateRequest } from "./middleware/validation"; import { handleError } from "./middleware/error"; const router = express.Router(); router.post("/tasks", validateRequest, createTask); router.use(handleError); export default router;

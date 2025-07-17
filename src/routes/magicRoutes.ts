@@ -5,7 +5,10 @@ import {
   provisionInfrastructure,
   getConceptStatus,
   getBuildStatus,
-  getMagicHealth
+  getMagicHealth,
+  retriggerInfraGeneration,
+  restartFromPhase,
+  getInfrastructureStatus
 } from "../controllers/magicController";
 import asyncHandler from "../utils/asyncHandler";
 
@@ -30,6 +33,18 @@ router.post("/approve-and-build", asyncHandler(handleUserConfirmation));
 
 // 📊 Get build status (covers phases 3-5: UML → Infra → App Code)
 router.get("/build-status/:jobId", asyncHandler(getBuildStatus));
+
+// 🔧 FAIL-SAFE: Retrigger Infrastructure Generation
+// Allows regenerating infrastructure code when there are issues
+router.post("/retrigger-infra/:jobId", asyncHandler(retriggerInfraGeneration));
+
+// 🔄 FAIL-SAFE: Restart from Specific Phase  
+// Allows restarting the magic flow from a specific phase (UML, infra, or app generation)
+router.post("/restart-from-phase/:jobId", asyncHandler(restartFromPhase));
+
+// 📊 Infrastructure Status Check
+// Get detailed status of infrastructure generation phase
+router.get("/infrastructure-status/:jobId", asyncHandler(getInfrastructureStatus));
 
 // 🚀 PHASE 6: Infrastructure Provisioning (Manual Trigger)
 // User manually triggers infrastructure provisioning when ready

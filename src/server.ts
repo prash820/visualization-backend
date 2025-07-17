@@ -3,22 +3,22 @@ import dotenv from "dotenv";
 import cors from "cors";
 import bodyParser from "body-parser";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-// import { connectDB } from "./db"; // Removed
 import { errorHandler } from "./middleware/errorHandler";
 import openAIRoutes from "./routes/openAI";
 import authRoutes from "./routes/auth";
 import projectRoutes from "./routes/project";
 import iacRoutes from "./routes/iac";
 import deployRoutes from "./routes/deployRoutes";
+import sandboxRoutes from "./routes/sandboxRoutes";
 import umlRoutes from "./routes/uml";
 import codeRoutes from "./routes/appCode";
 import documentationRoutes from "./routes/documentation";
 import magicRoutes from "./routes/magicRoutes";
 import { spawn } from "child_process";
 import path from "path";
-import fs from "fs";
 import { memoryManager } from "./utils/memoryManager";
+import { generateUmlFromPrompt } from './utils/umlGenerator';
+import { getProjectById } from './utils/projectFileStore';
 
 dotenv.config();
 const app = express();
@@ -101,6 +101,7 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001', 
+      'http://localhost:3002', // Add support for frontend on port 3002
       'https://v0-image-analysis-gp-omega.vercel.app',
       'https://chartai-backend-697f80778bd2.herokuapp.com'
     ];
@@ -135,6 +136,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/iac", iacRoutes); // ✅ New Route for IaC
 app.use("/api/deploy", deployRoutes);
+app.use("/api/sandbox", sandboxRoutes);
 app.use("/api/uml", umlRoutes);
 app.use("/api/documentation", documentationRoutes);
 app.use("/api/code", codeRoutes);

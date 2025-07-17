@@ -1,0 +1,54 @@
+{
+  "name": "test-backend-service",
+  "version": "1.0.0",
+  "description": "test-backend-service backend service",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint . --ext .ts,.js",
+    "lint:fix": "eslint . --ext .ts,.js --fix"
+  },
+  "dependencies": [
+    "express",
+    "cors",
+    "helmet",
+    "morgan",
+    "dotenv",
+    "pg",
+    "sequelize",
+    "jsonwebtoken",
+    "bcryptjs",
+    "multer"
+  ],
+  "devDependencies": [
+    "jest",
+    "supertest",
+    "eslint",
+    "@typescript-eslint/eslint-plugin",
+    "@typescript-eslint/parser",
+    "typescript",
+    "ts-node",
+    "ts-node-dev",
+    "@types/node",
+    "@types/express",
+    "@types/cors",
+    "@types/morgan",
+    "@types/jsonwebtoken",
+    "@types/bcryptjs",
+    "@types/multer"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "backend",
+    "api",
+    "express",
+    "typescript"
+  ],
+  "author": "AI Generated",
+  "license": "MIT"
+}

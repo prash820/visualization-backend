@@ -1,5 +1,5 @@
 import express from "express";
-import { generateIaC, generateApplicationCode, getIaCJobStatus } from "../controllers/openAIController";
+import { generateIaC, getIaCJobStatus } from "../controllers/iacController";
 import asyncHandler from "../utils/asyncHandler";
 
 const router = express.Router();
@@ -9,8 +9,5 @@ router.post("/", asyncHandler(generateIaC));
 
 // Poll IaC job status
 router.get("/status/:jobId", asyncHandler(getIaCJobStatus));
-
-// Generate Application Code
-router.post("/app", asyncHandler(generateApplicationCode));
 
 export default router;

@@ -1,11 +1,7 @@
 import { Request, Response } from 'express';
-import OpenAI from "openai";
+import { anthropic, ANTHROPIC_MODEL } from '../config/aiProvider';
 import dotenv from "dotenv";
 dotenv.config();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
-});
 
 interface DiagramNode {
   id: string;
@@ -32,64 +28,19 @@ export const generateArchitectureDiagram = async (req: Request, res: Response): 
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        {
-          role: "system",
-          content: `You are an AI assistant specialized in generating cloud architecture diagrams.
-          Return only valid JSON with two arrays: "nodes" and "edges".
-          Each node should have:
-          - id: unique identifier
-          - type: node type (e.g., "default", "input", "output")
-          - position: { x: number, y: number }
-          - data: { label: string, [key: string]: any }
-          
-          Each edge should have:
-          - id: unique identifier
-          - source: source node id
-          - target: target node id
-          - label: optional description
-          
-          Example format:
-          {
-            "nodes": [
-              {
-                "id": "node1",
-                "type": "default",
-                "position": { "x": 100, "y": 100 },
-                "data": { "label": "API Gateway" }
-              }
-            ],
-            "edges": [
-              {
-                "id": "edge1",
-                "source": "node1",
-                "target": "node2",
-                "label": "invokes"
-              }
-            ]
-          }
-          
-          Do not include any extra text.`
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
+    const response = await anthropic.messages.create({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 4000,
+      temperature: 0.3,
+      messages: [{ role: "user", content: prompt }]
     });
+    const content = response.content[0];
+    const resultText = content.type === 'text' ? content.text : '';
 
-    const response = completion.choices[0].message?.content;
-    if (!response) {
-      throw new Error('No response from OpenAI');
-    }
-
-    console.log("[Architecture Controller] Received OpenAI response:", response);
+    console.log("[Architecture Controller] Received Anthropic response:", resultText);
 
     try {
-      const parsedData = JSON.parse(response);
+      const parsedData = JSON.parse(resultText);
       console.log("[Architecture Controller] Parsed data:", {
         nodes: parsedData.nodes?.length,
         edges: parsedData.edges?.length,
@@ -98,7 +49,7 @@ export const generateArchitectureDiagram = async (req: Request, res: Response): 
       res.json(parsedData);
     } catch (parseError) {
       console.error("[Architecture Controller] Error parsing response:", parseError);
-      throw new Error("Invalid JSON response from OpenAI");
+      throw new Error("Invalid JSON response from Anthropic");
     }
   } catch (error) {
     console.error('[Architecture Controller] Error generating diagram:', error);

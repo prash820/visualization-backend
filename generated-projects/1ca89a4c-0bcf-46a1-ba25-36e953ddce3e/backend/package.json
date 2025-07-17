@@ -1,0 +1,28 @@
+{
+  "name": "lambda-backend",
+  "version": "1.0.0",
+  "description": "Node.js backend for AWS Lambda deployment",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "deploy": "serverless deploy",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "serverless-http": "^2.7.0",
+    "cors": "^2.8.5",
+    "helmet": "^4.6.0",
+    "morgan": "^1.10.0",
+    "aws-sdk": "^2.814.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.5.4",
+    "ts-node": "^10.4.0",
+    "@types/node": "^16.11.7",
+    "@types/express": "^4.17.13",
+    "@types/aws-lambda": "^8.10.76",
+    "@types/morgan": "^1.9.3"
+  }
+}

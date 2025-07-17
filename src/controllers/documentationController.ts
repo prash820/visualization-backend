@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import OpenAI from 'openai';
 import fs from 'fs/promises';
 import path from 'path';
 import {
@@ -9,11 +8,7 @@ import {
   deleteProjectDocumentation,
   getProjectById
 } from '../utils/projectFileStore';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
-  timeout: 240000, // 4 minutes timeout for OpenAI API calls
-});
+import { anthropic, ANTHROPIC_MODEL } from '../config/aiProvider';
 
 const MAX_RETRIES = 3;
 
@@ -199,15 +194,14 @@ UML Diagrams: ${JSON.stringify(umlDiagrams)}`;
 
     console.log('[generateDesignDocument] Calling OpenAI with prompt and UML diagrams...');
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Application Description: ${prompt}\n\nUML Diagrams: ${JSON.stringify(umlDiagrams)}` }
-      ],
-      temperature: 0.2,
-      max_tokens: 4000
+    const response = await anthropic.messages.create({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 4000,
+      temperature: 0.3,
+      messages: [{ role: "user", content: prompt }]
     });
+    const content = response.content[0];
+    const resultText = content.type === 'text' ? content.text : '';
 
     // Update progress
     await updateProjectDocumentation(projectId, {
@@ -215,15 +209,14 @@ UML Diagrams: ${JSON.stringify(umlDiagrams)}`;
       progress: 80
     });
 
-    let content = response.choices[0].message?.content || '';
-    console.log('[generateDesignDocument] AI response preview:', content.split('\n').slice(0, 2).join('\n'));
-    console.log('[generateDesignDocument] typeof content:', typeof content);
+    let markdownContent = resultText;
+    console.log('[generateDesignDocument] AI response preview:', resultText.split('\n').slice(0, 2).join('\n'));
+    console.log('[generateDesignDocument] typeof content:', typeof resultText);
     // Enforce Markdown output only, with fallback
-    let markdownContent = content;
     try {
-      if (typeof content === "string" && content.trim().startsWith("{")) {
+      if (typeof resultText === "string" && resultText.trim().startsWith("{")) {
         // AI returned JSON instead of Markdown, try to convert
-        const obj = JSON.parse(content);
+        const obj = JSON.parse(resultText);
         // Improved JSON-to-Markdown converter
         function jsonToMarkdown(obj: any, level = 2): string {
           let md = '';
