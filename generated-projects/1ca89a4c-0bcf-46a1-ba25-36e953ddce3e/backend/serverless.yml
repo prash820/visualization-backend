@@ -5,24 +5,25 @@ provider:
   runtime: nodejs14.x
   region: us-east-1
   environment:
-    DYNAMODB_CALC_TABLE: ${env:DYNAMODB_CALC_TABLE}
+    JWT_SECRET_KEY: ${env:JWT_SECRET_KEY}
+    DYNAMODB_TABLE_NAME: ${env:DYNAMODB_TABLE_NAME}
+    AWS_REGION: ${env:AWS_REGION}
 
 functions:
   app:
-    handler: dist/index.handler
+    handler: src/index.handler
     events:
       - http:
           path: /
           method: any
-          cors: true
       - http:
           path: /{proxy+}
           method: any
-          cors: true
 
 plugins:
   - serverless-offline
+  - serverless-dotenv-plugin
 
 custom:
-  serverless-offline:
-    httpPort: 3000
+  dotenv:
+    basePath: ./

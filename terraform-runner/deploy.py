@@ -172,33 +172,18 @@ def update_project_deployment_status(project_id, deployment_status, deployment_o
         # Get the main backend URL from environment
         backend_url = os.getenv('BACKEND_URL', 'http://localhost:5001')
         
-        # Prepare the update data
-        update_data = {
-            'deploymentStatus': deployment_status,
-            'lastDeployed': time.strftime('%Y-%m-%dT%H:%M:%SZ')
-        }
+        # Since we don't have a direct project update endpoint, we'll log the status
+        # The deployment status will be captured in the job result when the deployment completes
+        logger.info(f"[DEPLOY] Project {project_id} deployment status: {deployment_status}")
         
         if deployment_outputs:
-            update_data['deploymentOutputs'] = deployment_outputs
-        
-        # Make HTTP request to update project status
-        response = requests.post(
-            f"{backend_url}/api/projects/{project_id}/deployment-status",
-            json=update_data,
-            headers={'Content-Type': 'application/json'},
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            logger.info(f"[DEPLOY] Successfully updated project {project_id} deployment status to {deployment_status}")
-        else:
-            logger.warning(f"[DEPLOY] Failed to update project {project_id} status: {response.status_code} - {response.text}")
+            logger.info(f"[DEPLOY] Project {project_id} deployment outputs: {deployment_outputs}")
             
     except Exception as e:
-        logger.warning(f"[DEPLOY] Could not update project {project_id} deployment status: {e}")
+        logger.warning(f"[DEPLOY] Could not log project {project_id} deployment status: {e}")
 
 def create_lambda_zip_files(workspace_dir):
-    """Create dummy ZIP files for Lambda functions referenced in Terraform configuration"""
+    """Create Lambda ZIP files from actual application code or dummy files"""
     logger.info("[DEPLOY] Creating Lambda ZIP files...")
     
     # Read the terraform configuration to find Lambda functions
@@ -221,10 +206,123 @@ def create_lambda_zip_files(workspace_dir):
                 zip_path = os.path.join(workspace_dir, filename)
                 
                 if not os.path.exists(zip_path):
-                    logger.info(f"[DEPLOY] Creating dummy ZIP file: {filename}")
+                    logger.info(f"[DEPLOY] Creating ZIP file: {filename}")
                     
-                    # Create a simple Lambda function
-                    lambda_code = '''
+                    # Check if this is a Node.js application (notes_app.zip)
+                    if filename == "notes_app.zip":
+                        # Look for deployment package in the generated project
+                        project_id = os.path.basename(workspace_dir)
+                        deployment_package_path = os.path.join(
+                            os.path.dirname(os.path.dirname(os.path.dirname(workspace_dir))),
+                            "generated-projects",
+                            project_id,
+                            "backend",
+                            "deployment-package"
+                        )
+                        
+                        if os.path.exists(deployment_package_path):
+                            logger.info(f"[DEPLOY] Found deployment package at: {deployment_package_path}")
+                            
+                            # Create ZIP from deployment package with proper flattening
+                            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                                for root, dirs, files in os.walk(deployment_package_path):
+                                    for file in files:
+                                        file_path = os.path.join(root, file)
+                                        arc_name = os.path.relpath(file_path, deployment_package_path)
+                                        
+                                        # Skip node_modules for smaller ZIP
+                                        if arc_name.startswith('node_modules/'):
+                                            continue
+                                        
+                                        # Files are already flattened in deployment package, so use as-is
+                                        zipf.write(file_path, arc_name)
+                                        logger.debug(f"[DEPLOY] Added to ZIP: {arc_name}")
+                            
+                            logger.info(f"[DEPLOY] Created {filename} from deployment package ({os.path.getsize(zip_path)} bytes)")
+                        else:
+                            logger.warning(f"[DEPLOY] Deployment package not found at: {deployment_package_path}")
+                            # Fall back to dummy Node.js function
+                            create_dummy_nodejs_zip(zip_path, filename)
+                    else:
+                        # For other ZIP files, create dummy Python function
+                        create_dummy_python_zip(zip_path, filename)
+                else:
+                    logger.info(f"[DEPLOY] ZIP file already exists: {filename}")
+        
+        if filenames:
+            logger.info(f"[DEPLOY] Processed {len(filenames)} Lambda ZIP files")
+        else:
+            logger.info("[DEPLOY] No Lambda ZIP files required")
+            
+    except Exception as e:
+        logger.warning(f"[DEPLOY] Error creating Lambda ZIP files: {e}")
+        # Don't fail the deployment for this
+
+def create_dummy_nodejs_zip(zip_path, filename):
+    """Create a dummy Node.js Lambda function ZIP"""
+    logger.info(f"[DEPLOY] Creating dummy Node.js ZIP: {filename}")
+    
+    # Create a simple Node.js Lambda function
+    lambda_code = '''
+const express = require('express');
+const serverless = require('serverless-http');
+
+const app = express();
+app.use(express.json());
+
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    message: 'Dummy Lambda function created by chart-app deployment system',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post('/notes', (req, res) => {
+  res.status(201).json({
+    id: 'dummy-id',
+    content: req.body.content || 'Dummy note',
+    createdAt: new Date().toISOString(),
+    message: 'This is a dummy function. Please deploy actual application code.'
+  });
+});
+
+// Catch-all route for other endpoints
+app.use('*', (req, res) => {
+  res.status(404).json({ 
+    message: 'Not Found',
+    note: 'This is a dummy function. Please deploy actual application code.'
+  });
+});
+
+module.exports.handler = serverless(app);
+'''
+    
+    package_json = '''{
+  "name": "dummy-lambda",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.18.2",
+    "serverless-http": "^3.2.0"
+  }
+}'''
+    
+    # Create ZIP file with the dummy code
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        # Add the main file
+        zipf.writestr('index.js', lambda_code)
+        # Add package.json
+        zipf.writestr('package.json', package_json)
+    
+    logger.info(f"[DEPLOY] Created dummy Node.js {filename} ({os.path.getsize(zip_path)} bytes)")
+
+def create_dummy_python_zip(zip_path, filename):
+    """Create a dummy Python Lambda function ZIP"""
+    logger.info(f"[DEPLOY] Creating dummy Python ZIP: {filename}")
+    
+    # Create a simple Lambda function
+    lambda_code = '''
 import json
 
 def handler(event, context):
@@ -237,31 +335,19 @@ def handler(event, context):
         'body': json.dumps({
             'message': 'Hello from Lambda!',
             'event': event,
-            'function': 'meal_plan_service'
+            'function': 'dummy_function'
         })
     }
 '''
-                    
-                    # Create ZIP file with the dummy code
-                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                        # Add the Python file
-                        zipf.writestr('lambda_function.py', lambda_code)
-                        
-                        # Add a simple requirements.txt
-                        zipf.writestr('requirements.txt', '')
-                    
-                    logger.info(f"[DEPLOY] Created {filename} ({os.path.getsize(zip_path)} bytes)")
-                else:
-                    logger.info(f"[DEPLOY] ZIP file already exists: {filename}")
-        
-        if filenames:
-            logger.info(f"[DEPLOY] Processed {len(filenames)} Lambda ZIP files")
-        else:
-            logger.info("[DEPLOY] No Lambda ZIP files required")
-            
-    except Exception as e:
-        logger.warning(f"[DEPLOY] Error creating Lambda ZIP files: {e}")
-        # Don't fail the deployment for this
+    
+    # Create ZIP file with the dummy code
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        # Add the Python file
+        zipf.writestr('lambda_function.py', lambda_code)
+        # Add a simple requirements.txt
+        zipf.writestr('requirements.txt', '')
+    
+    logger.info(f"[DEPLOY] Created dummy Python {filename} ({os.path.getsize(zip_path)} bytes)")
 
 def import_existing_resources(project_id, terraform_config):
     """Import existing AWS resources into Terraform state to avoid conflicts"""
@@ -472,8 +558,11 @@ def deploy_terraform(project_id, user_id=None):
             logger.error(f"[DEPLOY] Terraform binary test failed: {e}")
 
         init_return_code, init_stdout, init_stderr = tf.init(upgrade=True)
-        logger.info(f"[DEPLOY] Init stdout:\n{init_stdout}")
-        logger.info(f"[DEPLOY] Init stderr:\n{init_stderr}")
+        
+        # Only log init stderr if there's an error
+        if init_stderr and init_return_code != 0:
+            logger.info(f"[DEPLOY] Init stderr:\n{init_stderr}")
+        
         if init_return_code != 0:
             logger.error("[DEPLOY] Terraform init failed")
             return {"status": "error", "logs": init_stderr, "error": "Terraform init failed"}
@@ -495,8 +584,16 @@ def deploy_terraform(project_id, user_id=None):
 
         logger.info("[DEPLOY] Running terraform apply...")
         return_code, stdout, stderr = tf.apply(skip_plan=True, capture_output=True)
-        logger.info(f"[DEPLOY] Apply stdout:\n{stdout}")
-        logger.info(f"[DEPLOY] Apply stderr:\n{stderr}")
+        
+        # Only log stdout if it's short or contains important info
+        if stdout and len(stdout.strip()) < 500:
+            logger.info(f"[DEPLOY] Apply stdout: {stdout.strip()}")
+        elif stdout:
+            logger.info(f"[DEPLOY] Apply stdout: {stdout.strip()[:200]}...")
+        
+        # Only log stderr if there's an error or important warnings
+        if stderr and (return_code != 0 or "error" in stderr.lower() or "warning" in stderr.lower()):
+            logger.info(f"[DEPLOY] Apply stderr:\n{stderr}")
         
         if return_code == 0:
             logger.info("[DEPLOY] Terraform apply succeeded")
@@ -949,12 +1046,33 @@ def destroy_terraform_with_cleanup(project_id, user_id=None):
         # Update project deployment status to destroyed
         update_project_deployment_status(project_id, 'destroyed')
         
-        # Clean up workspace directory
+        # Clean up workspace directory but preserve terraform.tf
         try:
             import shutil
+            
+            # Preserve terraform.tf file for future deployments
+            terraform_file = os.path.join(workspace_dir, "terraform.tf")
+            preserved_terraform = None
+            
+            if os.path.exists(terraform_file):
+                with open(terraform_file, 'r') as f:
+                    preserved_terraform = f.read()
+                logger.info(f"💾 Preserved terraform.tf for future deployments")
+                cleanup_logs.append("Terraform configuration preserved")
+            
+            # Remove workspace directory
             shutil.rmtree(workspace_dir)
             logger.info(f"🧹 Cleaned up workspace directory: {workspace_dir}")
             cleanup_logs.append("Workspace directory cleaned up")
+            
+            # Recreate workspace directory and restore terraform.tf
+            if preserved_terraform:
+                os.makedirs(workspace_dir, exist_ok=True)
+                with open(terraform_file, 'w') as f:
+                    f.write(preserved_terraform)
+                logger.info(f"💾 Restored terraform.tf for future deployments")
+                cleanup_logs.append("Terraform configuration restored")
+                
         except Exception as e:
             logger.warning(f"⚠️ Could not clean workspace directory: {e}")
             cleanup_logs.append(f"Warning: Workspace cleanup failed - {e}")

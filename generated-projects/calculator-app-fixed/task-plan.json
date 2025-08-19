@@ -1,0 +1,42 @@
+{
+  "projectId": "calculator-app-fixed",
+  "createdAt": "2025-08-07T06:05:08.469Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/calculator-app-fixed/frontend/src/components/Button.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/components/Input.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/components/Loading.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/components/AuthForm.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/components/DataList.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/components/DataForm.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/pages/HomePage.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/pages/LoginPage.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/pages/DetailPage.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/hooks/useUseApi.ts",
+    "generated-projects/calculator-app-fixed/frontend/src/hooks/useUseAuth.ts",
+    "generated-projects/calculator-app-fixed/frontend/src/services/apiService.ts",
+    "generated-projects/calculator-app-fixed/frontend/src/utils/types.ts",
+    "generated-projects/calculator-app-fixed/frontend/src/utils/constants.ts",
+    "generated-projects/calculator-app-fixed/frontend/src/utils/utils.ts",
+    "generated-projects/calculator-app-fixed/frontend/package.json",
+    "generated-projects/calculator-app-fixed/frontend/public/index.html",
+    "generated-projects/calculator-app-fixed/frontend/src/App.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/index.tsx",
+    "generated-projects/calculator-app-fixed/frontend/src/index.css",
+    "generated-projects/calculator-app-fixed/frontend/tsconfig.json",
+    "generated-projects/calculator-app-fixed/backend/package.json",
+    "generated-projects/calculator-app-fixed/backend/src/index.ts",
+    "generated-projects/calculator-app-fixed/backend/tsconfig.json",
+    "generated-projects/calculator-app-fixed/shared/package.json",
+    "generated-projects/calculator-app-fixed/shared/types.ts",
+    "generated-projects/calculator-app-fixed/shared/index.ts",
+    "generated-projects/calculator-app-fixed/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

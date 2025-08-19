@@ -1,36 +1,44 @@
 # Lambda Backend
 
-This is a Node.js backend application designed to be deployed on AWS Lambda using the Serverless Framework. It uses Express.js and integrates with AWS services.
+This project is a Node.js backend deployed as an AWS Lambda function using the Serverless Framework. It includes an Express.js application integrated with AWS Lambda via `serverless-http`.
 
 ## Prerequisites
 
-- Node.js and npm installed
-- AWS CLI configured
+- Node.js and npm/yarn installed
+- AWS account with IAM permissions for Lambda and API Gateway
 - Serverless Framework installed globally (`npm install -g serverless`)
 
-## Installation
+## Setup
 
 1. Clone the repository.
-2. Run `npm install` to install dependencies.
-3. Copy `.env.example` to `.env` and configure your environment variables.
+2. Install dependencies: `npm install` or `yarn install`.
+3. Create a `.env` file based on `.env.example` and fill in the required values.
 
 ## Scripts
 
 - `npm run build`: Compiles TypeScript to JavaScript.
 - `npm run dev`: Runs the application locally using `ts-node`.
-- `npm run deploy`: Deploys the application to AWS Lambda using Serverless Framework.
+- `npm run deploy`: Deploys the application to AWS Lambda using the Serverless Framework.
 
 ## Deployment
 
-Ensure your AWS credentials are configured and run `npm run deploy` to deploy the application to AWS Lambda.
+To deploy the application, run:
+
+```bash
+serverless deploy
+```
+
+This will package and deploy your application to AWS Lambda and create the necessary API Gateway endpoints.
 
 ## Local Development
 
-Use `npm run dev` to start the application locally. You can test the endpoints using a tool like Postman or curl.
+To run the application locally, use:
 
-## Environment Variables
+```bash
+npm run dev
+```
 
-- `DYNAMODB_CALC_TABLE`: The name of the DynamoDB table used for storing calculations.
+This will start the Express.js server locally for testing purposes.
 
 ## License
 

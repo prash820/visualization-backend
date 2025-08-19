@@ -1,0 +1,36 @@
+{
+  "projectId": "calculator-app-ai-fix",
+  "createdAt": "2025-08-07T01:57:19.410Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/calculator-app-ai-fix/frontend/src/components/CalculatorApp.tsx",
+    "generated-projects/calculator-app-ai-fix/frontend/src/pages/Dashboard.tsx",
+    "generated-projects/calculator-app-ai-fix/frontend/src/hooks/useApi.ts",
+    "generated-projects/calculator-app-ai-fix/frontend/src/services/api.ts",
+    "generated-projects/calculator-app-ai-fix/frontend/src/utils/types.ts",
+    "generated-projects/calculator-app-ai-fix/frontend/package.json",
+    "generated-projects/calculator-app-ai-fix/frontend/public/index.html",
+    "generated-projects/calculator-app-ai-fix/frontend/src/App.tsx",
+    "generated-projects/calculator-app-ai-fix/frontend/src/index.tsx",
+    "generated-projects/calculator-app-ai-fix/frontend/src/index.css",
+    "generated-projects/calculator-app-ai-fix/backend/src/controllers/CalculatorController.ts",
+    "generated-projects/calculator-app-ai-fix/backend/src/models/Calculation.ts",
+    "generated-projects/calculator-app-ai-fix/backend/src/services/CalculatorService.ts",
+    "generated-projects/calculator-app-ai-fix/backend/src/routes/calculatorRoutes.ts",
+    "generated-projects/calculator-app-ai-fix/backend/src/middleware/errorHandler.ts",
+    "generated-projects/calculator-app-ai-fix/backend/src/utils/config.ts",
+    "generated-projects/calculator-app-ai-fix/backend/package.json",
+    "generated-projects/calculator-app-ai-fix/backend/src/index.ts",
+    "generated-projects/calculator-app-ai-fix/backend/tsconfig.json",
+    "generated-projects/calculator-app-ai-fix/shared/types.ts"
+  ],
+  "errors": [],
+  "warnings": [
+    "Could not check for missing components: Command failed: npx tsc --noEmit --project generated-projects/calculator-app-ai-fix/frontend/tsconfig.json\n"
+  ]
+}

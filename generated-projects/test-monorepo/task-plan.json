@@ -1,0 +1,31 @@
+{
+  "projectId": "test-monorepo",
+  "createdAt": "2025-08-07T02:38:40.791Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/test-monorepo/frontend/src/components/CalculatorApp.tsx",
+    "generated-projects/test-monorepo/frontend/package.json",
+    "generated-projects/test-monorepo/frontend/public/index.html",
+    "generated-projects/test-monorepo/frontend/src/App.tsx",
+    "generated-projects/test-monorepo/frontend/src/index.tsx",
+    "generated-projects/test-monorepo/frontend/src/index.css",
+    "generated-projects/test-monorepo/frontend/tsconfig.json",
+    "generated-projects/test-monorepo/frontend/src/components/Display.tsx",
+    "generated-projects/test-monorepo/frontend/src/components/Keypad.tsx",
+    "generated-projects/test-monorepo/backend/src/controllers/CalculatorController.ts",
+    "generated-projects/test-monorepo/backend/package.json",
+    "generated-projects/test-monorepo/backend/src/index.ts",
+    "generated-projects/test-monorepo/backend/tsconfig.json",
+    "generated-projects/test-monorepo/shared/package.json",
+    "generated-projects/test-monorepo/shared/types.ts",
+    "generated-projects/test-monorepo/shared/index.ts",
+    "generated-projects/test-monorepo/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

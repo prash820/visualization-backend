@@ -1,4 +1,4 @@
-import { DynamoDB } from 'aws-sdk';
+import { DynamoDBClient, PutItemCommand, ScanCommand } from '@aws-sdk/client-dynamodb';
 
 interface Calculation {
   expression: string;
@@ -6,26 +6,24 @@ interface Calculation {
 }
 
 export class DatabaseModel {
-  private dynamoDb: DynamoDB.DocumentClient;
+  private client: DynamoDBClient;
   private tableName: string;
 
   constructor() {
-    this.dynamoDb = new DynamoDB.DocumentClient();
-    this.tableName = process.env.DYNAMODB_CALC_TABLE || 'Calculations';
+    this.client = new DynamoDBClient({ region: process.env.AWS_REGION });
+    this.tableName = process.env.DYNAMODB_TABLE_NAME || 'Calculations';
   }
 
   async saveCalculation(expression: string, result: number): Promise<void> {
-    const params = {
-      TableName: this.tableName,
-      Item: {
-        expression,
-        result,
-        timestamp: new Date().toISOString()
-      }
-    };
-
     try {
-      await this.dynamoDb.put(params).promise();
+      const params = {
+        TableName: this.tableName,
+        Item: {
+          expression: { S: expression },
+          result: { N: result.toString() }
+        }
+      };
+      await this.client.send(new PutItemCommand(params));
     } catch (error: any) {
       if (error.message) {
         throw new Error(`Error saving calculation: ${error.message}`);
@@ -35,13 +33,15 @@ export class DatabaseModel {
   }
 
   async getCalculationHistory(): Promise<Calculation[]> {
-    const params = {
-      TableName: this.tableName
-    };
-
     try {
-      const data = await this.dynamoDb.scan(params).promise();
-      return data.Items as Calculation[];
+      const params = {
+        TableName: this.tableName
+      };
+      const data = await this.client.send(new ScanCommand(params));
+      return (data.Items || []).map(item => ({
+        expression: item.expression.S || '',
+        result: parseFloat(item.result.N || '0')
+      }));
     } catch (error: any) {
       if (error.message) {
         throw new Error(`Error retrieving calculation history: ${error.message}`);

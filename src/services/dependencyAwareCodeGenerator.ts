@@ -582,6 +582,37 @@ export default ${component.name};`;
       }
     }
     
+    // CRITICAL FIX: Ensure file has proper extension to prevent duplicates
+    const fileName = path.basename(filePath);
+    const dirName = path.dirname(filePath);
+    
+    // Check if file has no extension and add appropriate one
+    if (!fileName.includes('.')) {
+      let extension = '.ts'; // Default to .ts
+      
+      // Determine extension based on file type and content
+      if (fileType === 'frontend') {
+        // Check if it's a React component (contains JSX)
+        if (file.content.includes('React') || file.content.includes('jsx') || file.content.includes('tsx') || 
+            file.content.includes('useState') || file.content.includes('useEffect') || file.content.includes('return (')) {
+          extension = '.tsx';
+        } else {
+          extension = '.ts';
+        }
+      } else if (fileType === 'backend') {
+        // Backend files should always be .ts
+        extension = '.ts';
+      } else {
+        // Default to .ts for unknown types
+        extension = '.ts';
+      }
+      
+      // Add extension to filename
+      const newFileName = fileName + extension;
+      filePath = path.join(dirName, newFileName);
+      console.log(`[DependencyAwareGenerator] Added extension to file: ${fileName} -> ${newFileName}`);
+    }
+    
     const fullPath = path.join(this.projectPath, filePath);
     
     if (fallbackUsed) {

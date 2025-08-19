@@ -1,0 +1,27 @@
+{
+  "projectId": "task1-1234",
+  "createdAt": "2025-08-08T02:59:05.436Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/task1-1234/frontend/package.json",
+    "generated-projects/task1-1234/frontend/public/index.html",
+    "generated-projects/task1-1234/frontend/src/App.tsx",
+    "generated-projects/task1-1234/frontend/src/index.tsx",
+    "generated-projects/task1-1234/frontend/src/index.css",
+    "generated-projects/task1-1234/frontend/tsconfig.json",
+    "generated-projects/task1-1234/backend/package.json",
+    "generated-projects/task1-1234/backend/src/index.ts",
+    "generated-projects/task1-1234/backend/tsconfig.json",
+    "generated-projects/task1-1234/shared/package.json",
+    "generated-projects/task1-1234/shared/types.ts",
+    "generated-projects/task1-1234/shared/index.ts",
+    "generated-projects/task1-1234/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

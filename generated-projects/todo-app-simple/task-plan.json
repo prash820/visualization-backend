@@ -1,0 +1,38 @@
+{
+  "projectId": "todo-app-simple",
+  "createdAt": "2025-08-08T03:59:58.318Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/todo-app-simple/frontend/src/components/UserComponent.tsx",
+    "generated-projects/todo-app-simple/frontend/src/components/TaskComponent.tsx",
+    "generated-projects/todo-app-simple/frontend/src/hooks/useAuth.ts",
+    "generated-projects/todo-app-simple/frontend/src/services/UserService.ts",
+    "generated-projects/todo-app-simple/frontend/src/services/TaskService.ts",
+    "generated-projects/todo-app-simple/frontend/package.json",
+    "generated-projects/todo-app-simple/frontend/public/index.html",
+    "generated-projects/todo-app-simple/frontend/src/App.tsx",
+    "generated-projects/todo-app-simple/frontend/src/index.tsx",
+    "generated-projects/todo-app-simple/frontend/src/index.css",
+    "generated-projects/todo-app-simple/frontend/tsconfig.json",
+    "generated-projects/todo-app-simple/backend/src/controllers/UserController.ts",
+    "generated-projects/todo-app-simple/backend/src/controllers/TaskController.ts",
+    "generated-projects/todo-app-simple/backend/src/models/User.ts",
+    "generated-projects/todo-app-simple/backend/src/models/Task.ts",
+    "generated-projects/todo-app-simple/backend/src/services/UserService.ts",
+    "generated-projects/todo-app-simple/backend/src/services/TaskService.ts",
+    "generated-projects/todo-app-simple/backend/package.json",
+    "generated-projects/todo-app-simple/backend/src/index.ts",
+    "generated-projects/todo-app-simple/backend/tsconfig.json",
+    "generated-projects/todo-app-simple/shared/package.json",
+    "generated-projects/todo-app-simple/shared/types.ts",
+    "generated-projects/todo-app-simple/shared/index.ts",
+    "generated-projects/todo-app-simple/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

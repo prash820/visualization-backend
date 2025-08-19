@@ -1,0 +1,37 @@
+{
+  "projectId": "calculator-app-final",
+  "createdAt": "2025-08-07T02:35:26.092Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/calculator-app-final/frontend/src/components/CalculatorApp.tsx",
+    "generated-projects/calculator-app-final/frontend/src/pages/Dashboard.tsx",
+    "generated-projects/calculator-app-final/frontend/src/hooks/useApi.ts",
+    "generated-projects/calculator-app-final/frontend/src/services/api.ts",
+    "generated-projects/calculator-app-final/frontend/src/utils/types.ts",
+    "generated-projects/calculator-app-final/frontend/package.json",
+    "generated-projects/calculator-app-final/frontend/public/index.html",
+    "generated-projects/calculator-app-final/frontend/src/App.tsx",
+    "generated-projects/calculator-app-final/frontend/src/index.tsx",
+    "generated-projects/calculator-app-final/frontend/src/index.css",
+    "generated-projects/calculator-app-final/frontend/tsconfig.json",
+    "generated-projects/calculator-app-final/frontend/src/components/Display.tsx",
+    "generated-projects/calculator-app-final/frontend/src/components/Keypad.tsx",
+    "generated-projects/calculator-app-final/backend/src/controllers/calculatorController.ts",
+    "generated-projects/calculator-app-final/backend/src/models/calculation.ts",
+    "generated-projects/calculator-app-final/backend/src/services/calculatorService.ts",
+    "generated-projects/calculator-app-final/backend/src/routes/calculatorRoutes.ts",
+    "generated-projects/calculator-app-final/backend/src/middleware/errorHandler.ts",
+    "generated-projects/calculator-app-final/backend/src/utils/config.ts",
+    "generated-projects/calculator-app-final/backend/package.json",
+    "generated-projects/calculator-app-final/backend/src/index.ts",
+    "generated-projects/calculator-app-final/backend/tsconfig.json",
+    "generated-projects/calculator-app-final/shared/types.ts"
+  ],
+  "errors": [],
+  "warnings": []
+}

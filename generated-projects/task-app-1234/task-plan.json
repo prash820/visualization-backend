@@ -1,0 +1,29 @@
+{
+  "projectId": "task-app-1234",
+  "createdAt": "2025-08-07T01:36:06.262Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/task-app-1234/frontend/src/components/CalculatorApp.tsx",
+    "generated-projects/task-app-1234/frontend/src/components/Display.tsx",
+    "generated-projects/task-app-1234/frontend/src/components/Keypad.tsx",
+    "generated-projects/task-app-1234/frontend/src/components/Key.tsx",
+    "generated-projects/task-app-1234/frontend/package.json",
+    "generated-projects/task-app-1234/frontend/public/index.html",
+    "generated-projects/task-app-1234/frontend/src/App.tsx",
+    "generated-projects/task-app-1234/frontend/src/index.tsx",
+    "generated-projects/task-app-1234/backend/src/controllers/CalculatorController.ts",
+    "generated-projects/task-app-1234/backend/src/services/CalculatorService.ts",
+    "generated-projects/task-app-1234/backend/src/routes/CalculatorRoute.ts",
+    "generated-projects/task-app-1234/backend/package.json",
+    "generated-projects/task-app-1234/backend/src/index.ts",
+    "generated-projects/task-app-1234/backend/tsconfig.json",
+    "generated-projects/task-app-1234/shared/types.ts"
+  ],
+  "errors": [],
+  "warnings": []
+}

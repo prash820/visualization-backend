@@ -1,29 +1,34 @@
-import { validateAuthToken } from '../utils/validation';
+import jwt from 'jsonwebtoken';
 
-interface AuthResponse {
-  isValid: boolean;
-  userId?: string;
-  error?: string;
+interface TokenPayload {
+  userId: string;
+  email: string;
 }
 
 export class AuthService {
-  async validateToken(token: string): Promise<AuthResponse> {
-    try {
-      const isValid = validateAuthToken(token);
-      if (!isValid) {
-        return { isValid: false, error: 'Invalid token' };
-      }
-      // Simulate token decoding to get userId
-      const userId = this.decodeToken(token);
-      return { isValid: true, userId };
-    } catch (error: any) {
-      return { isValid: false, error: error.message || 'Token validation failed' };
-    }
+  private secretKey: string;
+
+  constructor() {
+    this.secretKey = process.env.JWT_SECRET_KEY || '';
   }
 
-  private decodeToken(token: string): string {
-    // Simulate decoding logic
-    return 'decodedUserId';
+  public async validateToken(token: string): Promise<TokenPayload> {
+    try {
+      if (!token) {
+        throw new Error('Token is required');
+      }
+
+      const decoded = jwt.verify(token, this.secretKey) as TokenPayload;
+      return decoded;
+    } catch (error: any) {
+      if (error.name === 'TokenExpiredError') {
+        throw new Error('Token has expired');
+      } else if (error.name === 'JsonWebTokenError') {
+        throw new Error('Invalid token');
+      } else {
+        throw new Error(error.message || 'Token validation failed');
+      }
+    }
   }
 }
 

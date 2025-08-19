@@ -1,0 +1,78 @@
+{
+  "projectId": "task-1234",
+  "createdAt": "2025-08-08T02:47:50.928Z",
+  "overview": {
+    "name": "Freelance Project Manager",
+    "description": "A web application designed to streamline project management for freelancers and their clients. It allows freelancers to manage multiple projects, track tasks, and monitor earnings, while clients can post projects, assign them to freelancers, and communicate through a built-in messaging system.",
+    "architecture": "Full-stack application with React frontend and Node.js backend",
+    "infrastructure": "AWS-based infrastructure with S3, DynamoDB, Lambda, and API Gateway"
+  },
+  "components": {
+    "frontend": {
+      "framework": "React with TypeScript",
+      "components": [
+        "Button.tsx",
+        "Input.tsx",
+        "Loading.tsx",
+        "AuthForm.tsx",
+        "DataList.tsx",
+        "DataForm.tsx"
+      ],
+      "pages": [
+        "HomePage.tsx",
+        "LoginPage.tsx",
+        "DetailPage.tsx"
+      ],
+      "hooks": [
+        "useUseApi.ts",
+        "useUseAuth.ts"
+      ],
+      "services": [
+        "UserService.ts",
+        "ProjectService.ts",
+        "TaskService.ts",
+        "apiService.ts"
+      ]
+    },
+    "backend": {
+      "framework": "Node.js with Express",
+      "controllers": [
+        "UserController.ts",
+        "ProjectController.ts",
+        "TaskController.ts"
+      ],
+      "models": [
+        "UserModel.ts",
+        "ProjectModel.ts",
+        "TaskModel.ts"
+      ],
+      "services": [],
+      "routes": [
+        "UserRoutes.ts",
+        "ProjectRoutes.ts",
+        "TaskRoutes.ts"
+      ]
+    }
+  },
+  "infrastructure": {
+    "provider": "AWS",
+    "services": [
+      "S3",
+      "DynamoDB",
+      "Lambda",
+      "API Gateway",
+      "CloudWatch"
+    ],
+    "deploymentUrl": "http://localhost:3000"
+  },
+  "deployment": {
+    "status": "completed",
+    "projectPath": "generated-projects/task-1234",
+    "instructions": [
+      "1. Navigate to the project directory",
+      "2. Install dependencies: npm install (in both frontend and backend)",
+      "3. Start development server: npm run dev",
+      "4. Build for production: npm run build"
+    ]
+  }
+}

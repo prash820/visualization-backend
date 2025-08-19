@@ -1,0 +1,63 @@
+{
+  "projectId": "calculator-app-ts-fix",
+  "createdAt": "2025-08-07T02:30:08.111Z",
+  "overview": {
+    "name": "EduCalc",
+    "description": "EduCalc is a user-friendly calculator app designed specifically for students, offering basic arithmetic operations, scientific functions, and a history log to track calculations.",
+    "architecture": "Full-stack application with React frontend and Node.js backend",
+    "infrastructure": "AWS-based infrastructure with S3, DynamoDB, Lambda, and API Gateway"
+  },
+  "components": {
+    "frontend": {
+      "framework": "React with TypeScript",
+      "components": [
+        "CalculatorApp.tsx"
+      ],
+      "pages": [
+        "Dashboard.tsx"
+      ],
+      "hooks": [
+        "useApi.ts"
+      ],
+      "services": [
+        "api.ts"
+      ]
+    },
+    "backend": {
+      "framework": "Node.js with Express",
+      "controllers": [
+        "CalculatorController.ts"
+      ],
+      "models": [
+        "Calculation.ts"
+      ],
+      "services": [
+        "CalculatorService.ts"
+      ],
+      "routes": [
+        "calculatorRoutes.ts"
+      ]
+    }
+  },
+  "infrastructure": {
+    "provider": "AWS",
+    "services": [
+      "S3",
+      "DynamoDB",
+      "Lambda",
+      "API Gateway",
+      "CloudWatch"
+    ],
+    "deploymentUrl": "http://localhost:3000"
+  },
+  "deployment": {
+    "status": "completed",
+    "projectPath": "generated-projects/calculator-app-ts-fix",
+    "instructions": [
+      "1. Navigate to the project directory",
+      "2. Install dependencies: npm install (in both frontend and backend)",
+      "3. Start development server: npm run dev",
+      "4. Build for production: npm run build"
+    ]
+  }
+}

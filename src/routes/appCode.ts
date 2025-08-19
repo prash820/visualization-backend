@@ -1,19 +1,31 @@
-import express from "express";
-import asyncHandler from "../utils/asyncHandler";
-import { generateApplicationCode, getCodeGenerationLogs, streamCodeGenerationLogs, generateAppCodeForProject } from "../controllers/appCodeController";
+import express from 'express';
+import { AppCodeController } from '../controllers/appCodeController';
 
 const router = express.Router();
+const appCodeController = new AppCodeController();
 
-// POST /api/generate-app-code
-router.post("/", asyncHandler(generateApplicationCode));
+/**
+ * Convert app-code.json to folder structure
+ * POST /api/app-code/convert
+ */
+router.post('/convert', appCodeController.convertAppCode.bind(appCodeController));
 
-// POST /api/generate-app-code/generate-for-project/:projectId
-router.post("/generate-for-project/:projectId", asyncHandler(generateAppCodeForProject));
+/**
+ * Validate generated code
+ * POST /api/app-code/validate
+ */
+router.post('/validate', appCodeController.validateGeneratedCode.bind(appCodeController));
 
-// GET /api/generate-app-code/logs/:jobId
-router.get("/logs/:jobId", asyncHandler(getCodeGenerationLogs));
+/**
+ * Get project structure
+ * GET /api/app-code/structure/:projectId
+ */
+router.get('/structure/:projectId', appCodeController.getProjectStructure.bind(appCodeController));
 
-// GET /api/generate-app-code/stream/:jobId
-router.get("/stream/:jobId", asyncHandler(streamCodeGenerationLogs));
+/**
+ * Deploy project
+ * POST /api/app-code/deploy
+ */
+router.post('/deploy', appCodeController.deployProject.bind(appCodeController));
 
 export default router; 

@@ -1,0 +1,13 @@
+{
+  "name": "shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.5"
+  }
+}

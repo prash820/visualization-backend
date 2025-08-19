@@ -1,49 +1,20 @@
-import { APIGatewayProxyEvent } from 'aws-lambda';
+export function isValidExpression(expression: string): boolean {
+  const expressionPattern = /^[0-9+\-*/().\s]+$/;
+  return expressionPattern.test(expression);
+}
 
-export function validateExpressionInput(event: APIGatewayProxyEvent): boolean {
-  try {
-    const body = JSON.parse(event.body || '{}');
-    if (typeof body.expression !== 'string' || body.expression.trim() === '') {
-      return false;
-    }
-    return true;
-  } catch (error: any) {
-    if (error.message) {
-      console.error('Error parsing input:', error.message);
-    }
-    return false;
+export function isValidNumber(value: any): boolean {
+  return typeof value === 'number' && !isNaN(value);
+}
+
+export function validateCalculationInput(expression: string): void {
+  if (!isValidExpression(expression)) {
+    throw new Error('Invalid expression format.');
   }
 }
 
-export function validateAuthToken(token: string): boolean {
-  try {
-    if (typeof token !== 'string' || token.trim() === '') {
-      return false;
-    }
-    // Add additional token validation logic here if needed
-    return true;
-  } catch (error: any) {
-    if (error.message) {
-      console.error('Error validating token:', error.message);
-    }
-    return false;
-  }
-}
-
-export function validateScientificInput(event: APIGatewayProxyEvent): boolean {
-  try {
-    const body = JSON.parse(event.body || '{}');
-    if (typeof body.expression !== 'string' || body.expression.trim() === '') {
-      return false;
-    }
-    if (typeof body.scientificOption !== 'string' || body.scientificOption.trim() === '') {
-      return false;
-    }
-    return true;
-  } catch (error: any) {
-    if (error.message) {
-      console.error('Error parsing scientific input:', error.message);
-    }
-    return false;
+export function validateResult(result: any): void {
+  if (!isValidNumber(result)) {
+    throw new Error('Invalid result format.');
   }
 }

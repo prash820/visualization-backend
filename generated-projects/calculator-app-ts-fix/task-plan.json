@@ -1,0 +1,37 @@
+{
+  "projectId": "calculator-app-ts-fix",
+  "createdAt": "2025-08-07T02:30:07.652Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/calculator-app-ts-fix/frontend/src/components/CalculatorApp.tsx",
+    "generated-projects/calculator-app-ts-fix/frontend/src/pages/Dashboard.tsx",
+    "generated-projects/calculator-app-ts-fix/frontend/src/hooks/useApi.ts",
+    "generated-projects/calculator-app-ts-fix/frontend/src/services/api.ts",
+    "generated-projects/calculator-app-ts-fix/frontend/src/utils/types.ts",
+    "generated-projects/calculator-app-ts-fix/frontend/package.json",
+    "generated-projects/calculator-app-ts-fix/frontend/public/index.html",
+    "generated-projects/calculator-app-ts-fix/frontend/src/App.tsx",
+    "generated-projects/calculator-app-ts-fix/frontend/src/index.tsx",
+    "generated-projects/calculator-app-ts-fix/frontend/src/index.css",
+    "generated-projects/calculator-app-ts-fix/frontend/tsconfig.json",
+    "generated-projects/calculator-app-ts-fix/backend/src/controllers/CalculatorController.ts",
+    "generated-projects/calculator-app-ts-fix/backend/src/models/Calculation.ts",
+    "generated-projects/calculator-app-ts-fix/backend/src/services/CalculatorService.ts",
+    "generated-projects/calculator-app-ts-fix/backend/src/routes/calculatorRoutes.ts",
+    "generated-projects/calculator-app-ts-fix/backend/src/middleware/errorHandler.ts",
+    "generated-projects/calculator-app-ts-fix/backend/src/utils/config.ts",
+    "generated-projects/calculator-app-ts-fix/backend/package.json",
+    "generated-projects/calculator-app-ts-fix/backend/src/index.ts",
+    "generated-projects/calculator-app-ts-fix/backend/tsconfig.json",
+    "generated-projects/calculator-app-ts-fix/shared/types.ts"
+  ],
+  "errors": [],
+  "warnings": [
+    "Could not check for missing components: Command failed: npx tsc --noEmit --project generated-projects/calculator-app-ts-fix/frontend/tsconfig.json\n"
+  ]
+}

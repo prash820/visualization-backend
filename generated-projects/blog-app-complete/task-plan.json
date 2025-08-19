@@ -1,0 +1,40 @@
+{
+  "projectId": "blog-app-complete",
+  "createdAt": "2025-08-07T03:09:55.787Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/blog-app-complete/frontend/src/components/BlogApp.tsx",
+    "generated-projects/blog-app-complete/frontend/src/components/PostList.tsx",
+    "generated-projects/blog-app-complete/frontend/src/components/PostDetail.tsx",
+    "generated-projects/blog-app-complete/frontend/src/components/Auth.tsx",
+    "generated-projects/blog-app-complete/frontend/src/components/CommentList.tsx",
+    "generated-projects/blog-app-complete/frontend/src/pages/HomePage.tsx",
+    "generated-projects/blog-app-complete/frontend/src/services/apiService.ts",
+    "generated-projects/blog-app-complete/frontend/src/utils/types.ts",
+    "generated-projects/blog-app-complete/frontend/package.json",
+    "generated-projects/blog-app-complete/frontend/public/index.html",
+    "generated-projects/blog-app-complete/frontend/src/App.tsx",
+    "generated-projects/blog-app-complete/frontend/src/index.tsx",
+    "generated-projects/blog-app-complete/frontend/src/index.css",
+    "generated-projects/blog-app-complete/frontend/tsconfig.json",
+    "generated-projects/blog-app-complete/backend/src/controllers/AuthController.ts",
+    "generated-projects/blog-app-complete/backend/src/models/UserModel.ts",
+    "generated-projects/blog-app-complete/backend/src/services/AuthService.ts",
+    "generated-projects/blog-app-complete/backend/src/routes/authRoutes.ts",
+    "generated-projects/blog-app-complete/backend/src/middleware/authMiddleware.ts",
+    "generated-projects/blog-app-complete/backend/package.json",
+    "generated-projects/blog-app-complete/backend/src/index.ts",
+    "generated-projects/blog-app-complete/backend/tsconfig.json",
+    "generated-projects/blog-app-complete/shared/package.json",
+    "generated-projects/blog-app-complete/shared/types.ts",
+    "generated-projects/blog-app-complete/shared/index.ts",
+    "generated-projects/blog-app-complete/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

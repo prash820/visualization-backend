@@ -3,99 +3,87 @@
     "src": {
       "components": {
         "App": {
-          "App.tsx": "Main application component, includes Header and Router",
-          "App.test.tsx": "Tests for App component"
+          "App.tsx": "Main application component",
+          "App.test.tsx": "Tests for App component",
+          "App.css": "Styles for App component"
         },
         "Header": {
           "Header.tsx": "Header component",
-          "Header.test.tsx": "Tests for Header component"
+          "Header.test.tsx": "Tests for Header component",
+          "Header.css": "Styles for Header component"
         },
         "Calculator": {
-          "Calculator.tsx": "Main calculator component, includes Display, Keypad, ScientificCalc, History, ErrorBoundary, Loading",
+          "Calculator.tsx": "Calculator component",
           "Calculator.test.tsx": "Tests for Calculator component",
+          "Calculator.css": "Styles for Calculator component",
           "Display": {
             "Display.tsx": "Display component",
-            "Display.test.tsx": "Tests for Display component"
+            "Display.test.tsx": "Tests for Display component",
+            "Display.css": "Styles for Display component"
           },
           "Keypad": {
             "Keypad.tsx": "Keypad component",
             "Keypad.test.tsx": "Tests for Keypad component",
-            "Button": {
-              "Button.tsx": "Button component",
-              "Button.test.tsx": "Tests for Button component"
-            }
+            "Keypad.css": "Styles for Keypad component"
           },
           "ScientificCalc": {
-            "ScientificCalc.tsx": "Scientific calculator component",
-            "ScientificCalc.test.tsx": "Tests for ScientificCalc component"
+            "ScientificCalc.tsx": "Scientific Calculator component",
+            "ScientificCalc.test.tsx": "Tests for Scientific Calculator component",
+            "ScientificCalc.css": "Styles for Scientific Calculator component"
           },
           "History": {
             "History.tsx": "History component",
-            "History.test.tsx": "Tests for History component"
+            "History.test.tsx": "Tests for History component",
+            "History.css": "Styles for History component"
           },
           "ErrorBoundary": {
-            "ErrorBoundary.tsx": "Error boundary component",
-            "ErrorBoundary.test.tsx": "Tests for ErrorBoundary component"
+            "ErrorBoundary.tsx": "Error Boundary component",
+            "ErrorBoundary.test.tsx": "Tests for Error Boundary component"
           },
           "Loading": {
-            "Loading.tsx": "Loading state component",
-            "Loading.test.tsx": "Tests for Loading component"
+            "Loading.tsx": "Loading State component",
+            "Loading.test.tsx": "Tests for Loading State component"
           }
         }
       },
       "hooks": {
-        "useScientificNotation.ts": "Custom hook for scientific notation",
-        "useScientificNotation.test.ts": "Tests for useScientificNotation hook"
+        "useScientificNotation.ts": "Custom hook for scientific notation"
       },
       "context": {
-        "CalculatorContext.tsx": "Context for calculator state management",
-        "CalculatorContext.test.tsx": "Tests for CalculatorContext"
+        "CalculatorContext.tsx": "Context for calculator state management"
       },
       "services": {
-        "ApiClient.ts": "API client for external calculations",
-        "ApiClient.test.ts": "Tests for ApiClient"
+        "ApiClient.ts": "API client service",
+        "AuthService.ts": "Authentication service"
       },
       "store": {
         "index.ts": "Redux store setup",
-        "calculatorSlice.ts": "Redux slice for calculator state",
-        "calculatorSlice.test.ts": "Tests for calculator slice"
+        "calculatorSlice.ts": "Redux slice for calculator"
       },
       "routes": {
-        "index.tsx": "Routes configuration using React Router"
+        "index.tsx": "Route configuration"
       },
       "types": {
-        "index.ts": "TypeScript interfaces and types",
-        "CalculatorProps.ts": "Interface for Calculator props",
-        "CalculatorState.ts": "Interface for Calculator state",
-        "DisplayProps.ts": "Interface for Display props",
-        "ButtonProps.ts": "Interface for Button props"
+        "CalculatorTypes.ts": "TypeScript interfaces and types for calculator"
       },
       "styles": {
-        "global.css": "Global styles",
-        "App.css": "Styles for App component",
-        "Header.css": "Styles for Header component",
-        "Calculator.css": "Styles for Calculator component",
-        "Display.css": "Styles for Display component",
-        "Keypad.css": "Styles for Keypad component",
-        "ScientificCalc.css": "Styles for ScientificCalc component",
-        "History.css": "Styles for History component",
-        "ErrorBoundary.css": "Styles for ErrorBoundary component",
-        "Loading.css": "Styles for Loading component"
+        "global.css": "Global styles"
       },
       "index.tsx": "Application entry point",
       "index.css": "Entry point styles",
-      "setupTests.ts": "Jest setup file"
+      "setupTests.ts": "Test setup file"
     }
   },
   "dependencies": {
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.0.0",
-    "redux": "^4.0.0",
+    "redux": "^4.1.0",
     "react-redux": "^8.0.0",
-    "typescript": "^4.0.0",
+    "typescript": "^4.5.0",
     "axios": "^0.24.0",
     "jest": "^27.0.0",
-    "testing-library/react": "^12.0.0"
+    "react-testing-library": "^12.0.0",
+    "redux-thunk": "^2.4.0"
   }
 }

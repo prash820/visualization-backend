@@ -1,0 +1,16 @@
+{
+  "lastUpdated": "2025-08-14T03:41:55.604Z",
+  "prices": {
+    "EC2": {},
+    "S3": {},
+    "LAMBDA": {},
+    "DYNAMODB": {},
+    "RDS": {},
+    "API_GATEWAY": {},
+    "CLOUDFRONT": {},
+    "ROUTE53": {},
+    "ELASTICACHE": {},
+    "ELASTIC_BEANSTALK": {},
+    "AURORA": {}
+  }
+}

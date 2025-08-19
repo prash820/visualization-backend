@@ -1,0 +1,42 @@
+{
+  "projectId": "freelance-app-abc",
+  "createdAt": "2025-08-07T06:13:17.939Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/freelance-app-abc/frontend/src/components/Button.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/components/Input.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/components/Loading.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/components/AuthForm.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/components/DataList.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/components/DataForm.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/pages/HomePage.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/pages/LoginPage.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/pages/DetailPage.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/hooks/useUseApi.ts",
+    "generated-projects/freelance-app-abc/frontend/src/hooks/useUseAuth.ts",
+    "generated-projects/freelance-app-abc/frontend/src/services/apiService.ts",
+    "generated-projects/freelance-app-abc/frontend/src/utils/types.ts",
+    "generated-projects/freelance-app-abc/frontend/src/utils/constants.ts",
+    "generated-projects/freelance-app-abc/frontend/src/utils/utils.ts",
+    "generated-projects/freelance-app-abc/frontend/package.json",
+    "generated-projects/freelance-app-abc/frontend/public/index.html",
+    "generated-projects/freelance-app-abc/frontend/src/App.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/index.tsx",
+    "generated-projects/freelance-app-abc/frontend/src/index.css",
+    "generated-projects/freelance-app-abc/frontend/tsconfig.json",
+    "generated-projects/freelance-app-abc/backend/package.json",
+    "generated-projects/freelance-app-abc/backend/src/index.ts",
+    "generated-projects/freelance-app-abc/backend/tsconfig.json",
+    "generated-projects/freelance-app-abc/shared/package.json",
+    "generated-projects/freelance-app-abc/shared/types.ts",
+    "generated-projects/freelance-app-abc/shared/index.ts",
+    "generated-projects/freelance-app-abc/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

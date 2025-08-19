@@ -1,0 +1,24 @@
+{
+  "projectId": "test-missing-components-simple",
+  "createdAt": "2025-08-07T02:33:58.248Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/test-missing-components-simple/frontend/src/components/CalculatorApp.tsx",
+    "generated-projects/test-missing-components-simple/frontend/package.json",
+    "generated-projects/test-missing-components-simple/frontend/public/index.html",
+    "generated-projects/test-missing-components-simple/frontend/src/App.tsx",
+    "generated-projects/test-missing-components-simple/frontend/src/index.tsx",
+    "generated-projects/test-missing-components-simple/frontend/src/index.css",
+    "generated-projects/test-missing-components-simple/frontend/tsconfig.json",
+    "generated-projects/test-missing-components-simple/frontend/src/components/Display.tsx",
+    "generated-projects/test-missing-components-simple/frontend/src/components/Keypad.tsx",
+    "generated-projects/test-missing-components-simple/shared/types.ts"
+  ],
+  "errors": [],
+  "warnings": []
+}

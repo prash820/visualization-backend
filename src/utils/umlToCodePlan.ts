@@ -2,7 +2,29 @@
 import { openai, OPENAI_MODEL, anthropic, ANTHROPIC_MODEL } from '../config/aiProvider';
 
 /**
+ * Remove any content fields from file structure to ensure structure-only approach
+ */
+function removeContentFields(fileStructure: any): any {
+  if (fileStructure.frontend && Array.isArray(fileStructure.frontend)) {
+    fileStructure.frontend = fileStructure.frontend.map((file: any) => {
+      const { content, ...fileWithoutContent } = file;
+      return fileWithoutContent;
+    });
+  }
+  
+  if (fileStructure.backend && Array.isArray(fileStructure.backend)) {
+    fileStructure.backend = fileStructure.backend.map((file: any) => {
+      const { content, ...fileWithoutContent } = file;
+      return fileWithoutContent;
+    });
+  }
+  
+  return fileStructure;
+}
+
+/**
  * Enhanced CodePlan type: output of the UML parser with complete structure
+ * NOTE: This should NOT contain actual code content, only structure and specifications
  */
 export interface CodePlan {
   // Component structure with descriptions
@@ -45,21 +67,21 @@ export interface CodePlan {
     description?: string;
   }>;
   
-  // Complete file structure with paths, content, dependencies, and descriptions
+  // File structure with paths, dependencies, and descriptions (NO CONTENT)
   fileStructure: {
     frontend: Array<{ 
       path: string; 
-      content: string; 
       dependencies: string[]; 
       description?: string;
       type?: 'frontend';
+      // REMOVED: content: string; - Code plan should not store actual code
     }>;
     backend: Array<{ 
       path: string; 
-      content: string; 
       dependencies: string[]; 
       description?: string;
       type?: 'backend';
+      // REMOVED: content: string; - Code plan should not store actual code
     }>;
   };
   
@@ -84,7 +106,7 @@ export interface CodePlan {
     apiEndpoints: Array<{
       path: string;
       method: string;
-      frontendComponent: string;
+      frontendComponent: string | null;
       backendService: string;
       description?: string;
     }>;
@@ -94,6 +116,31 @@ export interface CodePlan {
       data: string;
       description?: string;
     }>;
+  };
+  
+  // Infrastructure configuration for AWS Lambda and API Gateway
+  infrastructure?: {
+    lambdaFunction?: {
+      name: string;
+      runtime: string;
+      handler: string;
+      environment?: Record<string, string>;
+    };
+    apiGateway: {
+      routes: Array<{
+        path: string;
+        method: string;
+        description?: string;
+      }>;
+    };
+    database?: {
+      type: string;
+      tables: string[];
+    };
+    storage?: {
+      type: string;
+      buckets: string[];
+    };
   };
 }
 
@@ -134,7 +181,34 @@ function safeJSONParse(text: string, fallback: any = {}): any {
 }
 
 /**
- * AI-powered UML diagram analyzer with complete structure generation
+ * Ensure index.ts is always included in backend file structure
+ */
+function ensureIndexTsInBackend(fileStructure: any): any {
+  if (!fileStructure.backend) {
+    fileStructure.backend = [];
+  }
+  
+  // Check if index.ts already exists in src/ directory
+  const hasIndexTs = fileStructure.backend.some((file: any) => 
+    file.path === 'src/index.ts' || file.path === 'index.ts'
+  );
+  
+  // If not, add it to src/ directory
+  if (!hasIndexTs) {
+    fileStructure.backend.unshift({
+      path: 'src/index.ts',
+      dependencies: [],
+      description: 'Main Lambda entry point for the backend application',
+      type: 'backend'
+    });
+    console.log('[umlToCodePlan] Added missing src/index.ts to backend file structure');
+  }
+  
+  return fileStructure;
+}
+
+/**
+ * AI-powered UML diagram analyzer with STRICT adherence to diagrams
  */
 async function analyzeUMLDiagramsWithAI(diagrams: {
   frontendComponentDiagram?: string;
@@ -143,9 +217,9 @@ async function analyzeUMLDiagramsWithAI(diagrams: {
   backendClassDiagram?: string;
   frontendSequenceDiagram?: string;
   backendSequenceDiagram?: string;
-}): Promise<CodePlan> {
-  console.log('[umlToCodePlan] Starting enhanced AI-powered UML analysis...');
-  console.log('[umlToCodePlan] Raw diagrams object:', JSON.stringify(diagrams, null, 2));
+}, infrastructureContext?: any, planType: 'frontend' | 'backend' = 'frontend', enhancedPrompt?: string): Promise<CodePlan> {
+  console.log(`[umlToCodePlan] Starting LIGHTWEIGHT UML analysis for ${planType}...`);
+  // Removed verbose diagrams object logging
   
   // Log which diagrams are present
   Object.entries(diagrams).forEach(([key, value]) => {
@@ -154,178 +228,245 @@ async function analyzeUMLDiagramsWithAI(diagrams: {
     }
   });
   
-  const prompt = `You are an expert software architect and full-stack developer. Analyze the provided UML diagrams and create a comprehensive CodePlan for a complete, production-ready application with proper folder structure, dependencies, and integration.
+  // Build infrastructure section for the prompt
+  const infrastructureSection = infrastructureContext ? `\n\n**INFRASTRUCTURE CONTEXT:**\n${JSON.stringify(infrastructureContext, null, 2)}` : '';
+  
+  // Add semantic context section if enhanced prompt is provided
+  const semanticSection = enhancedPrompt ? `\n\n**SEMANTIC CONTEXT:**\n${enhancedPrompt}` : '';
+  
+  const planTypeSection = planType === 'frontend' ? 
+    `**FRONTEND-ONLY:** Generate ONLY frontend components, models, dependencies, and file structure.` :
+    `**BACKEND-ONLY:** Generate ONLY backend components, models, dependencies, and file structure.`;
+  
+  const prompt = `You are an expert software architect. Create a COMPLETE CodePlan for a ${planType} application based on the UML diagrams.${infrastructureSection}${semanticSection}
 
-**ANALYZE ALL 6 DIAGRAM TYPES FOR COMPLETE UNDERSTANDING:**
+${planTypeSection}
 
-1. **Frontend Component Diagrams** - Extract UI components, pages, layouts, and component hierarchy
-2. **Backend Component Diagrams** - Extract services, controllers, API endpoints, and service architecture  
-3. **Frontend Class Diagrams** - Extract frontend models, interfaces, types, and data structures
-4. **Backend Class Diagrams** - Extract backend models, entities, services, and business logic classes
-5. **Frontend Sequence Diagrams** - Extract frontend component interactions, API calls, and data flows
-6. **Backend Sequence Diagrams** - Extract backend service interactions, database operations, and API flows
+**CRITICAL REQUIREMENTS:**
+1. **STRICT UML ADHERENCE:** Extract EXACTLY what is shown in UML diagrams - NO assumptions, NO additions
+2. **STRUCTURE ONLY:** Generate ONLY file structure, dependencies, and specifications - NO actual code content
+3. **METHOD SIGNATURE CONSISTENCY:** All method signatures must match EXACTLY across all layers
+4. **PROPERTY CONSISTENCY:** All properties must match EXACTLY what's defined in class diagrams
+5. **FLAT FILE STRUCTURE:** Use simple, flat file paths without unnecessary nesting
+6. **LAMBDA-COMPATIBLE:** For backend, use flat structure suitable for Lambda deployment
 
-**GENERATE COMPLETE, INTEGRATED FOLDER STRUCTURE:**
+**STRICT UML ANALYSIS REQUIREMENTS:**
 
-Available diagrams:
-${Object.entries(diagrams)
-  .filter(([key, content]) => content && content.trim())
-  .map(([type, content]) => `${type}: ${content.substring(0, 800)}${content.length > 800 ? '...' : ''}`)
-  .join('\n\n')}
+**FROM CLASS DIAGRAMS - EXACT EXTRACTION:**
+- Extract EXACT method signatures as shown (parameters, return types, visibility)
+- Extract EXACT properties as shown (names, types, visibility)
+- Extract EXACT class relationships and dependencies
+- Extract EXACT class names and structure
+- DO NOT add properties or methods not shown in the diagram
+- DO NOT change method signatures or parameter types
+- DO NOT add or remove parameters
 
-Create a comprehensive JSON CodePlan with complete file structure and integration:
+**FROM SEQUENCE DIAGRAMS - EXACT FLOW:**
+- Extract EXACT method call sequences as shown
+- Extract EXACT parameter passing as shown
+- Extract EXACT return values as shown
+- Extract EXACT error handling as shown
+- DO NOT change the flow or add extra steps
+- DO NOT modify method names or signatures
+
+**FROM COMPONENT DIAGRAMS - EXACT STRUCTURE:**
+- Extract EXACT component names and relationships
+- Extract EXACT file structure as shown
+- Extract EXACT dependencies as shown
+- DO NOT add components not shown in the diagram
+- DO NOT change component names or relationships
+
+**FILE STRUCTURE RULES:**
+${planType === 'backend' ? `
+- Use proper structure: src/index.ts, src/controllers/, src/services/, src/models/, src/repositories/
+- Place source files in src/ subdirectory for proper TypeScript compilation
+- Use simple imports: import ServiceName from './services/ServiceName'
+- Include: src/index.ts, package.json, serverless.yml, tsconfig.json
+- CRITICAL: Each file type must be in its correct directory:
+  * Controllers: src/controllers/ControllerName.ts
+  * Services: src/services/ServiceName.ts
+  * Models: src/models/ModelName.ts
+  * Repositories: src/repositories/RepositoryName.ts
+  * Config files: package.json, tsconfig.json, serverless.yml (root level)` : `
+- Use simple structure: App.tsx, ComponentName.tsx, ModelName.ts
+- No complex folder hierarchies unless shown in UML
+- Use simple imports: import ComponentName from './ComponentName'`}
+
+**STRUCTURE-ONLY REQUIREMENTS:**
+
+**For Backend Models:**
+- Define EXACT TypeScript interface specifications matching class diagram properties
+- Use EXACT property names and types from class diagram
+- Use string types for dates (createdAt: string, updatedAt: string) for JSON compatibility
+- DO NOT add properties not shown in class diagram
+- Specify export structure and type definitions
+
+**For Backend Services:**
+- Define EXACT method specifications from class diagram as PUBLIC methods
+- Use EXACT method signatures (parameters, return types) from class diagram
+- Use EXACT method names from class diagram
+- Specify business logic requirements based on model structure
+- Define error handling requirements
+- Method signatures must match EXACTLY what controllers will call
+- Specify model interfaces for parameter and return types
+
+**For Backend Controllers:**
+- Define EXACT endpoint specifications from sequence diagram as PUBLIC methods
+- Use EXACT HTTP methods and paths from sequence diagram
+- Use EXACT method names from sequence diagram
+- Specify request/response handling requirements
+- Define input validation and sanitization requirements
+- Specify appropriate HTTP status codes
+- Method signatures must match EXACTLY what routes will call
+- Specify model interfaces for request/response types
+
+**For Backend Repositories:**
+- Define EXACT CRUD operation specifications from class diagram as PUBLIC methods
+- Use EXACT method signatures from class diagram
+- Use EXACT method names from class diagram
+- Specify database operation requirements
+- Define error handling and logging requirements
+
+**CRITICAL: NO CODE CONTENT**
+- DO NOT generate any actual code implementations
+- DO NOT include code examples or snippets
+- DO NOT provide method implementations
+- DO NOT include class implementations
+- ONLY provide structure, specifications, and requirements
+- The fileStructure should contain ONLY paths, dependencies, and descriptions
+- NO content field should be populated with actual code
+
+**RESPONSE FORMAT:**
+Return ONLY a JSON object with the following structure:
 
 {
-  "frontendComponents": [
-    {
-      "name": "ComponentGroupName",
-      "children": ["child1", "child2"],
-      "description": "Purpose and responsibility"
-    }
-  ],
   "backendComponents": [
     {
-      "name": "ServiceGroupName", 
-      "children": ["service1", "service2"],
-      "description": "Purpose and responsibility"
-    }
-  ],
-  "frontendModels": [
-    {
-      "name": "ModelName",
-      "properties": ["property1: type", "property2: type"],
-      "methods": ["method1(): returnType", "method2(): returnType"],
-      "description": "Purpose and usage"
+      "name": "ComponentName",
+      "children": ["dependency1", "dependency2"],
+      "description": "Component purpose"
     }
   ],
   "backendModels": [
     {
       "name": "ModelName",
       "properties": ["property1: type", "property2: type"],
-      "methods": ["method1(): returnType", "method2(): returnType"],
-      "description": "Purpose and usage"
-    }
-  ],
-  "frontendDependencies": [
-    {
-      "from": "ComponentA",
-      "to": "ComponentB",
-      "type": "imports|uses|depends_on",
-      "description": "Nature of dependency"
+      "methods": ["method1(param: type): returnType"],
+      "description": "Model purpose"
     }
   ],
   "backendDependencies": [
     {
-      "from": "ServiceA",
-      "to": "ServiceB",
-      "type": "imports|uses|depends_on",
-      "description": "Nature of dependency"
+      "from": "ComponentA",
+      "to": "ComponentB",
+      "type": "depends_on",
+      "description": "Dependency description"
     }
   ],
   "fileStructure": {
-    "frontend": [
-      {
-        "path": "src/components/UIComponents/CalculatorPage.tsx",
-        "content": "",
-        "dependencies": ["../utils/calculator", "../types/CalculatorTypes", "../services/api"],
-        "description": "React component for calculator interface with state management and API integration"
-      }
-    ],
+    "frontend": [],
     "backend": [
       {
-        "path": "src/services/CalculatorService.ts",
-        "content": "",
-        "dependencies": ["../models/Calculator", "../utils/validation", "../middleware/auth"],
-        "description": "Service to handle calculator operations with proper error handling and validation"
+        "path": "src/index.ts",
+        "dependencies": ["express", "serverless-http", "./controllers/ControllerName"],
+        "description": "Main Lambda entry point",
+        "type": "backend"
+      },
+      {
+        "path": "src/controllers/ControllerName.ts",
+        "dependencies": ["./services/ServiceName"],
+        "description": "Controller with exact method signatures",
+        "type": "backend"
+      },
+      {
+        "path": "src/services/ServiceName.ts",
+        "dependencies": ["./models/ModelName", "./repositories/RepositoryName"],
+        "description": "Service with exact method signatures",
+        "type": "backend"
+      },
+      {
+        "path": "src/repositories/RepositoryName.ts",
+        "dependencies": ["./models/ModelName"],
+        "description": "Repository with exact method signatures",
+        "type": "backend"
+      },
+      {
+        "path": "src/models/ModelName.ts",
+        "dependencies": [],
+        "description": "Model with exact properties",
+        "type": "backend"
+      },
+      {
+        "path": "package.json",
+        "dependencies": ["express", "serverless-http"],
+        "description": "Package configuration",
+        "type": "backend"
+      },
+      {
+        "path": "serverless.yml",
+        "dependencies": [],
+        "description": "Serverless configuration",
+        "type": "backend"
+      },
+      {
+        "path": "tsconfig.json",
+        "dependencies": [],
+        "description": "TypeScript configuration",
+        "type": "backend"
       }
     ]
   },
-  "integration": {
-    "apiEndpoints": [
-      {
-        "path": "/api/calculator/calculate",
-        "method": "POST",
-        "frontendComponent": "CalculatorPage",
-        "backendService": "CalculatorService",
-        "description": "Integration flow"
-      }
-    ],
-    "dataFlow": [
-      {
-        "from": "FrontendComponent",
-        "to": "BackendService",
-        "data": "Request/Response structure",
-        "description": "Data flow description"
-      }
-    ]
+  "infrastructure": {
+    "lambdaFunction": {
+      "name": "function-name",
+      "runtime": "nodejs18.x",
+      "handler": "dist/index.handler"
+    },
+    "apiGateway": {
+      "routes": [
+        {
+          "path": "/api/endpoint",
+          "method": "POST",
+          "description": "Endpoint purpose"
+        }
+      ]
+    }
   }
 }
 
-**EXTRACTION AND INTEGRATION RULES:**
-- Extract ALL subgraphs as component groups with clear responsibilities
-- Extract ALL nodes within subgraphs as children with specific purposes
-- Extract ALL classes with their properties, methods, and relationships
-- Extract ALL sequence flows to determine dependencies and integration points
-- Generate complete file paths with proper folder structure and organization
-- Include all necessary imports and dependencies based on sequence diagrams
-- Use meaningful names from the diagram labels and maintain consistency
-- Group related files into logical folders based on component diagrams
-- Ensure proper TypeScript/React patterns and best practices
-- Create integration points between frontend and backend based on sequence diagrams
-- Include error handling, validation, and security based on class diagrams
-
-**FOLDER STRUCTURE GUIDELINES:**
-Frontend: src/components/, src/pages/, src/hooks/, src/utils/, src/types/, src/services/, src/context/, src/styles/
-Backend: src/controllers/, src/services/, src/models/, src/routes/, src/middleware/, src/utils/, src/config/, src/types/
-
-**INTEGRATION REQUIREMENTS:**
-- Map frontend components to backend services based on sequence diagrams
-- Create proper API endpoints and data contracts
-- Ensure consistent naming and structure across frontend and backend
-- Include proper error handling and validation
-- Add authentication and authorization where needed
-- Include proper TypeScript interfaces for API contracts
-
-**CRITICAL REQUIREMENTS FOR FILE STRUCTURE:**
-- The "content" field should be EMPTY ("") - do NOT generate actual code
-- Focus on file structure, dependencies, and descriptions only
-- The "description" field should contain detailed information about what the file should do
-- The "dependencies" field should list all required imports and dependencies
-- The "path" field should follow proper folder structure conventions
-- Generate comprehensive file structure based on UML diagrams
-- Include all necessary files for a complete application
-- Ensure proper separation of concerns in file organization
-
-**CRITICAL: For every file in fileStructure.frontend, add "type": "frontend". For every file in fileStructure.backend, add "type": "backend". This field is mandatory and must be present on every file object.**
-
-Return only the JSON object, no explanations.`;
+**CRITICAL: Ensure NO content fields contain actual code - only structure and specifications.**
+**CRITICAL: Use proper src/ directory structure with organized subdirectories (controllers/, services/, repositories/, models/).**
+**CRITICAL: Each file must be in its correct directory according to its type and purpose.**`;
 
   try {
     const response = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 8000,
-      temperature: 0.3,
+      temperature: 0.1, // Lower temperature for more consistent, diagram-following output
     });
 
     const content = response.choices[0]?.message;
     if (content && content.content) {
-      const result = safeJSONParse(content.content, {
-        frontendComponents: [],
-        backendComponents: [],
-        frontendModels: [],
-        backendModels: [],
-        frontendDependencies: [],
-        backendDependencies: [],
-        fileStructure: {
-          frontend: [],
-          backend: []
-        },
-        integration: {
-          apiEndpoints: [],
-          dataFlow: []
-        }
-      });
+      // Parse the AI response
+      const cleanedResponse = cleanAIResponse(content.content);
+      const result = safeJSONParse(cleanedResponse, {});
+      
+      // CRITICAL: Remove any content fields to ensure structure-only approach
+      if (result.fileStructure) {
+        result.fileStructure = removeContentFields(result.fileStructure);
+      }
+      
+      // Ensure proper structure
+      if (!result.fileStructure) {
+        result.fileStructure = { frontend: [], backend: [] };
+      }
+      if (!result.fileStructure.frontend) {
+        result.fileStructure.frontend = [];
+      }
+      if (!result.fileStructure.backend) {
+        result.fileStructure.backend = [];
+      }
 
       // Post-process: Ensure every file in fileStructure has a type
       if (result.fileStructure) {
@@ -337,7 +478,107 @@ Return only the JSON object, no explanations.`;
         }
       }
 
-      console.log('[umlToCodePlan] Enhanced AI analysis completed successfully');
+      // CRITICAL: Ensure index.ts is always included in backend file structure
+      if (planType === 'backend') {
+        result.fileStructure = ensureIndexTsInBackend(result.fileStructure);
+        
+        // Ensure infrastructure configuration is included for backend
+        if (!result.infrastructure) {
+          result.infrastructure = {
+            lambdaFunction: {
+              name: "notes-app",
+              runtime: "nodejs18.x",
+              handler: "dist/index.handler",
+              environment: {
+                NODE_ENV: "production"
+              }
+            },
+            apiGateway: {
+              routes: [
+                {
+                  path: "/notes",
+                  method: "POST",
+                  description: "Create a new note"
+                },
+                {
+                  path: "/health",
+                  method: "GET",
+                  description: "Health check endpoint for Lambda monitoring"
+                }
+              ]
+            },
+            database: {
+              type: "DynamoDB",
+              tables: ["notes-data", "notes-users"]
+            }
+          };
+        }
+        
+        // Ensure package.json and serverless.yml are included
+        const hasPackageJson = result.fileStructure.backend.some((f: any) => f.path === 'package.json');
+        const hasServerlessYml = result.fileStructure.backend.some((f: any) => f.path === 'serverless.yml');
+        const hasTsConfig = result.fileStructure.backend.some((f: any) => f.path === 'tsconfig.json');
+        
+        if (!hasPackageJson) {
+          result.fileStructure.backend.push({
+            path: 'package.json',
+            dependencies: ['express', 'serverless-http', 'helmet', 'cors', '@aws-sdk/client-dynamodb'],
+            description: 'Package configuration with Lambda-compatible dependencies',
+            type: 'backend'
+          });
+        }
+        
+        if (!hasServerlessYml) {
+          result.fileStructure.backend.push({
+            path: 'serverless.yml',
+            dependencies: [],
+            description: 'Serverless framework configuration for AWS Lambda deployment',
+            type: 'backend'
+          });
+        }
+        
+        if (!hasTsConfig) {
+          result.fileStructure.backend.push({
+            path: 'tsconfig.json',
+            dependencies: [],
+            description: 'TypeScript configuration for proper compilation',
+            type: 'backend'
+          });
+        }
+        
+        // CRITICAL: Update all backend file dependencies to use proper src/ structure
+        result.fileStructure.backend = result.fileStructure.backend.map((file: any) => {
+          if (file.dependencies && Array.isArray(file.dependencies)) {
+            file.dependencies = file.dependencies.map((dep: string) => {
+              // Convert relative imports to use src/ structure
+              if (dep.startsWith('./') || dep.startsWith('../')) {
+                // Extract the filename from the path
+                const pathParts = dep.split('/');
+                const fileName = pathParts[pathParts.length - 1];
+                // Remove .ts extension if present
+                const cleanFileName = fileName.replace(/\.ts$/, '');
+                
+                // Determine the proper path based on file type
+                if (fileName.includes('Controller')) {
+                  return `./controllers/${cleanFileName}`;
+                } else if (fileName.includes('Service')) {
+                  return `./services/${cleanFileName}`;
+                } else if (fileName.includes('Repository')) {
+                  return `./repositories/${cleanFileName}`;
+                } else if (fileName.includes('Model') || fileName.includes('Interface')) {
+                  return `./models/${cleanFileName}`;
+                } else {
+                  return `./${cleanFileName}`;
+                }
+              }
+              return dep;
+            });
+          }
+          return file;
+        });
+      }
+
+      console.log(`[umlToCodePlan] STRICT AI analysis completed successfully for ${planType}`);
       
       // Check if the AI analysis returned an empty result
       const hasFrontendFiles = result.fileStructure?.frontend?.length > 0;
@@ -352,14 +593,14 @@ Return only the JSON object, no explanations.`;
       throw new Error('Unexpected response type from AI');
     }
   } catch (error: any) {
-    console.error('[umlToCodePlan] Error in enhanced AI analysis:', error);
+    console.error(`[umlToCodePlan] Error in STRICT AI analysis for ${planType}:`, error);
     // Throw error instead of falling back to dummy code
     throw new Error(`AI analysis failed: ${error.message}. Please ensure AI providers are properly configured and UML diagrams are valid.`);
   }
 }
 
 /**
- * Main function: parse all diagrams into a comprehensive CodePlan using AI
+ * Main function: parse all diagrams into a comprehensive CodePlan using AI with STRICT adherence
  */
 export async function umlToCodePlan({
   frontendComponentDiagram,
@@ -375,8 +616,8 @@ export async function umlToCodePlan({
   backendClassDiagram?: string;
   frontendSequenceDiagram?: string;
   backendSequenceDiagram?: string;
-}): Promise<CodePlan> {
-  console.log('[umlToCodePlan] Starting enhanced CodePlan generation...');
+}, infrastructureContext?: any, planType: 'frontend' | 'backend' = 'frontend', enhancedPrompt?: string): Promise<CodePlan> {
+  console.log(`[umlToCodePlan] Starting STRICT CodePlan generation for ${planType} with infrastructure context...`);
   console.log('[umlToCodePlan] Input diagrams:');
   console.log('[umlToCodePlan] - frontendComponentDiagram:', frontendComponentDiagram ? 'present' : 'missing');
   console.log('[umlToCodePlan] - backendComponentDiagram:', backendComponentDiagram ? 'present' : 'missing');
@@ -384,6 +625,9 @@ export async function umlToCodePlan({
   console.log('[umlToCodePlan] - backendClassDiagram:', backendClassDiagram ? 'present' : 'missing');
   console.log('[umlToCodePlan] - frontendSequenceDiagram:', frontendSequenceDiagram ? 'present' : 'missing');
   console.log('[umlToCodePlan] - backendSequenceDiagram:', backendSequenceDiagram ? 'present' : 'missing');
+  console.log('[umlToCodePlan] - infrastructureContext:', infrastructureContext ? 'present' : 'missing');
+  console.log('[umlToCodePlan] - planType:', planType);
+  console.log('[umlToCodePlan] - enhancedPrompt:', enhancedPrompt ? 'present' : 'missing');
   
   const diagrams = {
     frontendComponentDiagram,
@@ -401,8 +645,8 @@ export async function umlToCodePlan({
     throw new Error('No UML diagrams provided. Please provide at least one valid UML diagram (frontendComponent, backendComponent, frontendClass, backendClass, frontendSequence, or backendSequence) for code generation.');
   }
   
-  const result = await analyzeUMLDiagramsWithAI(diagrams);
-  console.log('[umlToCodePlan] Final enhanced CodePlan result:', JSON.stringify(result, null, 2));
+  const result = await analyzeUMLDiagramsWithAI(diagrams, infrastructureContext, planType, enhancedPrompt);
+  console.log(`[umlToCodePlan] Final STRICT CodePlan result for ${planType}: Generated ${result.fileStructure?.frontend?.length || 0} frontend files, ${result.fileStructure?.backend?.length || 0} backend files`);
   
   // Final safety check: if result is still empty, throw error
   const hasFrontendFiles = result.fileStructure?.frontend?.length > 0;
@@ -413,297 +657,6 @@ export async function umlToCodePlan({
   }
   
   return result;
-}
-
-/**
- * Generate a frontend-only CodePlan from frontend diagrams
- */
-export async function umlToFrontendCodePlan({
-  frontendComponentDiagram,
-  frontendClassDiagram,
-  frontendSequenceDiagram
-}: {
-  frontendComponentDiagram?: string;
-  frontendClassDiagram?: string;
-  frontendSequenceDiagram?: string;
-}): Promise<Partial<CodePlan>> {
-  const diagrams = {
-    frontendComponentDiagram,
-    frontendClassDiagram,
-    frontendSequenceDiagram
-  };
-  const prompt = `You are an expert frontend architect. Analyze the provided frontend UML diagrams and create a comprehensive CodePlan for a complete, production-ready React/TypeScript frontend application. Only include frontend components, models, dependencies, and file structure. Do NOT include any backend or shared code. Return only the JSON object, no explanations.`;
-  // Use the same AI call as before, but with a frontend-focused prompt
-  const response = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    messages: [
-      { role: 'user', content: prompt },
-      { role: 'user', content: JSON.stringify(diagrams) }
-    ],
-    max_tokens: 6000,
-    temperature: 0.3,
-  });
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error('No response from AI for frontend code plan');
-  return safeJSONParse(content, {});
-}
-
-/**
- * Generate a backend-only CodePlan from backend diagrams
- */
-export async function umlToBackendCodePlan({
-  backendComponentDiagram,
-  backendClassDiagram,
-  backendSequenceDiagram
-}: {
-  backendComponentDiagram?: string;
-  backendClassDiagram?: string;
-  backendSequenceDiagram?: string;
-}): Promise<Partial<CodePlan>> {
-  console.log('[umlToBackendCodePlan] Starting backend-only CodePlan generation...');
-  console.log('[umlToBackendCodePlan] Input diagrams:');
-  console.log('[umlToBackendCodePlan] - backendComponentDiagram:', backendComponentDiagram ? 'present' : 'missing');
-  console.log('[umlToBackendCodePlan] - backendClassDiagram:', backendClassDiagram ? 'present' : 'missing');
-  console.log('[umlToBackendCodePlan] - backendSequenceDiagram:', backendSequenceDiagram ? 'present' : 'missing');
-  
-  const diagrams = {
-    backendComponentDiagram,
-    backendClassDiagram,
-    backendSequenceDiagram
-  };
-  
-  // Check if any backend diagrams are present
-  const hasAnyBackendDiagrams = Object.values(diagrams).some(diagram => diagram && diagram.trim());
-  
-  if (!hasAnyBackendDiagrams) {
-    console.log('[umlToBackendCodePlan] No backend UML diagrams provided, generating basic Lambda backend CodePlan...');
-    return {
-      backendComponents: [{ name: 'LambdaAPI', children: ['Handler', 'Router', 'Controller'], description: 'Basic Lambda backend API structure' }],
-      backendModels: [],
-      backendDependencies: [],
-      fileStructure: {
-        frontend: [],
-        backend: [
-          {
-            path: 'src/index.ts',
-            content: 'import express from "express";\nimport serverless from "serverless-http";\nimport cors from "cors";\n\nconst app = express();\napp.use(cors());\napp.use(express.json());\n\n// Routes here\n\nexport const handler = serverless(app);\nexport default app;',
-            dependencies: ['express', 'serverless-http', 'cors'],
-            description: 'Basic Lambda entry point with Express app wrapped in serverless-http',
-            type: 'backend'
-          }
-        ]
-      },
-      integration: {
-        apiEndpoints: [],
-        dataFlow: []
-      }
-    };
-  }
-  
-  const prompt = `You are an expert backend architect specializing in AWS Lambda and serverless architecture. Analyze the provided backend UML diagrams and create a comprehensive CodePlan for a complete, production-ready Node.js/TypeScript backend application that will be deployed as AWS Lambda functions.
-
-**ANALYZE BACKEND DIAGRAMS FOR LAMBDA DEPLOYMENT:**
-1. **Backend Component Diagrams** - Extract services, controllers, API endpoints, and service architecture for Lambda hosting
-2. **Backend Class Diagrams** - Extract backend models, entities, services, and business logic classes optimized for serverless
-3. **Backend Sequence Diagrams** - Extract backend service interactions, database operations, and API flows for Lambda execution
-
-**AVAILABLE DIAGRAMS:**
-${Object.entries(diagrams)
-  .filter(([key, content]) => content && content.trim())
-  .map(([type, content]) => `${type}: ${content?.substring(0, 800)}${content && content.length > 800 ? '...' : ''}`)
-  .join('\n\n')}
-
-Create a comprehensive JSON CodePlan with complete Lambda-native backend structure:
-
-{
-  "backendComponents": [
-    {
-      "name": "ServiceGroupName", 
-      "children": ["service1", "service2"],
-      "description": "Purpose and responsibility for Lambda execution"
-    }
-  ],
-  "backendModels": [
-    {
-      "name": "ModelName",
-      "properties": ["property1: type", "property2: type"],
-      "methods": ["method1(): returnType", "method2(): returnType"],
-      "description": "Purpose and usage in Lambda context"
-    }
-  ],
-  "backendDependencies": [
-    {
-      "from": "ServiceA",
-      "to": "ServiceB",
-      "type": "imports|uses|depends_on",
-      "description": "Nature of dependency for Lambda execution"
-    }
-  ],
-  "fileStructure": {
-    "frontend": [],
-    "backend": [
-      {
-        "path": "src/index.ts",
-        "content": "",
-        "dependencies": ["express", "serverless-http", "cors", "helmet", "morgan"],
-        "description": "Lambda entry point with Express app wrapped in serverless-http, exports handler function for AWS Lambda deployment",
-        "type": "backend"
-      },
-      {
-        "path": "src/services/CalculatorService.ts",
-        "content": "",
-        "dependencies": ["../models/Calculator", "../utils/validation", "../middleware/auth"],
-        "description": "Service to handle calculator operations optimized for Lambda cold starts with proper error handling and validation",
-        "type": "backend"
-      }
-    ]
-  },
-  "integration": {
-    "apiEndpoints": [
-      {
-        "path": "/api/calculator/calculate",
-        "method": "POST",
-        "frontendComponent": "",
-        "backendService": "CalculatorService",
-        "description": "Lambda API endpoint integration flow"
-      }
-    ],
-    "dataFlow": [
-      {
-        "from": "BackendService",
-        "to": "Database",
-        "data": "Request/Response structure",
-        "description": "Data flow description for Lambda execution"
-      }
-    ]
-  }
-}
-
-**LAMBDA-SPECIFIC EXTRACTION AND INTEGRATION RULES:**
-- Extract ALL subgraphs as component groups optimized for Lambda execution
-- Extract ALL nodes within subgraphs as children with specific purposes for serverless deployment
-- Extract ALL classes with their properties, methods, and relationships optimized for Lambda cold starts
-- Extract ALL sequence flows to determine dependencies and integration points for Lambda execution
-- Generate complete file paths with proper folder structure for Lambda deployment
-- Include all necessary imports and dependencies based on sequence diagrams for serverless execution
-- Use meaningful names from the diagram labels and maintain consistency for Lambda deployment
-- Group related files into logical folders based on component diagrams for Lambda organization
-- Ensure proper TypeScript/Node.js patterns and best practices for Lambda execution
-- Include error handling, validation, and security based on class diagrams for Lambda context
-
-**LAMBDA ENTRY POINT REQUIREMENT:**
-- You MUST include "src/index.ts" as the main Lambda entry point in fileStructure.backend
-- This file must be the first file in the backend array
-- The description should specify it's the Lambda entry point with Express app wrapped in serverless-http
-- Include all necessary dependencies: express, serverless-http, cors, helmet, morgan, and any route/middleware imports
-- The description should mention: Lambda handler export, serverless-http wrapper, middleware setup, route registration, error handling for Lambda context
-- NO app.listen() - use serverless-http handler instead
-
-**LAMBDA-SPECIFIC REQUIREMENTS:**
-- The "content" field should be EMPTY ("") - do NOT generate actual code
-- Focus on file structure, dependencies, and descriptions optimized for Lambda deployment
-- The "description" field should contain detailed information about what the file should do in Lambda context
-- The "dependencies" field should list all required imports and dependencies for Lambda execution
-- The "path" field should follow proper folder structure conventions for Lambda deployment
-- All services should be optimized for Lambda cold starts and serverless execution
-- Include Lambda-specific patterns: handler functions, serverless-http, APIGatewayProxyEvent handling
-
-**LAMBDA FOLDER STRUCTURE GUIDELINES:**
-Backend: src/controllers/, src/services/, src/models/, src/routes/, src/middleware/, src/utils/, src/config/, src/types/, src/lambda/
-
-**CRITICAL: For every file in fileStructure.backend, add "type": "backend". This field is mandatory and must be present on every file object.**
-
-Return only the JSON object, no explanations.`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 6000,
-      temperature: 0.3,
-    });
-
-    const content = response.choices[0]?.message;
-    if (content && content.content) {
-      const result = safeJSONParse(content.content, {
-        backendComponents: [],
-        backendModels: [],
-        backendDependencies: [],
-        fileStructure: {
-          frontend: [],
-          backend: []
-        },
-        integration: {
-          apiEndpoints: [],
-          dataFlow: []
-        }
-      });
-
-      // Post-process: Ensure every file in fileStructure has a type
-      if (result.fileStructure && Array.isArray(result.fileStructure.backend)) {
-        result.fileStructure.backend = result.fileStructure.backend.map((f: any) => ({ ...f, type: 'backend' }));
-      }
-
-      console.log('[umlToBackendCodePlan] Backend AI analysis completed successfully');
-      
-      // Check if the AI analysis returned an empty result
-      const hasBackendFiles = result.fileStructure?.backend?.length > 0;
-      const hasBackendComponents = result.backendComponents?.length > 0;
-      
-      if (!hasBackendFiles && !hasBackendComponents) {
-        console.log('[umlToBackendCodePlan] AI analysis returned empty result, generating basic Lambda backend structure...');
-        return {
-          backendComponents: [{ name: 'LambdaAPI', children: ['Handler', 'Router', 'Controller'], description: 'Basic Lambda backend API structure' }],
-          backendModels: [],
-          backendDependencies: [],
-          fileStructure: {
-            frontend: [],
-            backend: [
-              {
-                path: 'src/index.ts',
-                content: '',
-                dependencies: ['express', 'serverless-http', 'cors', 'helmet', 'morgan'],
-                description: 'Lambda entry point with Express app wrapped in serverless-http, exports handler function for AWS Lambda deployment',
-                type: 'backend'
-              }
-            ]
-          },
-          integration: {
-            apiEndpoints: [],
-            dataFlow: []
-          }
-        };
-      }
-      
-      return result;
-    } else {
-      throw new Error('Unexpected response type from AI');
-    }
-  } catch (error: any) {
-    console.error('[umlToBackendCodePlan] Error in backend AI analysis:', error);
-    console.log('[umlToBackendCodePlan] Falling back to basic Lambda backend structure...');
-    return {
-      backendComponents: [{ name: 'LambdaAPI', children: ['Handler', 'Router', 'Controller'], description: 'Basic Lambda backend API structure' }],
-      backendModels: [],
-      backendDependencies: [],
-      fileStructure: {
-        frontend: [],
-        backend: [
-          {
-            path: 'src/index.ts',
-            content: '',
-            dependencies: ['express', 'serverless-http', 'cors', 'helmet', 'morgan'],
-            description: 'Lambda entry point with Express app wrapped in serverless-http, exports handler function for AWS Lambda deployment',
-            type: 'backend'
-          }
-        ]
-      },
-      integration: {
-        apiEndpoints: [],
-        dataFlow: []
-      }
-    };
-  }
 }
 
 // Legacy functions for backward compatibility (now deprecated)

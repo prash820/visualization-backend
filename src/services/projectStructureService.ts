@@ -559,7 +559,7 @@ services:
       
       // Create frontend structure
       for (const category of Object.keys(organizedCode.fileStructure.frontend)) {
-        const categoryPath = path.join(projectPath, 'frontend', category);
+        const categoryPath = path.join(projectPath, 'frontend', 'src', category);
         await fs.mkdir(categoryPath, { recursive: true });
         
         // Write files in this category
@@ -571,7 +571,7 @@ services:
       
       // Create backend structure
       for (const category of Object.keys(organizedCode.fileStructure.backend)) {
-        const categoryPath = path.join(projectPath, 'backend', category);
+        const categoryPath = path.join(projectPath, 'backend', 'src', category);
         await fs.mkdir(categoryPath, { recursive: true });
         
         // Write files in this category

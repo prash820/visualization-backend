@@ -1,0 +1,29 @@
+{
+  "projectId": "simple-note-app",
+  "createdAt": "2025-08-07T01:30:10.554Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/simple-note-app/frontend/src/components/NotesApp.tsx",
+    "generated-projects/simple-note-app/frontend/src/components/NotesList.tsx",
+    "generated-projects/simple-note-app/frontend/src/components/NoteForm.tsx",
+    "generated-projects/simple-note-app/frontend/package.json",
+    "generated-projects/simple-note-app/frontend/public/index.html",
+    "generated-projects/simple-note-app/frontend/src/App.tsx",
+    "generated-projects/simple-note-app/frontend/src/index.tsx",
+    "generated-projects/simple-note-app/backend/src/controllers/NotesController.ts",
+    "generated-projects/simple-note-app/backend/src/models/Note.ts",
+    "generated-projects/simple-note-app/backend/src/services/NotesService.ts",
+    "generated-projects/simple-note-app/backend/src/routes/notesRoute.ts",
+    "generated-projects/simple-note-app/backend/package.json",
+    "generated-projects/simple-note-app/backend/src/index.ts",
+    "generated-projects/simple-note-app/backend/tsconfig.json",
+    "generated-projects/simple-note-app/shared/types.ts"
+  ],
+  "errors": [],
+  "warnings": []
+}

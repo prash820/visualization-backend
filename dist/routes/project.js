@@ -17,53 +17,62 @@ const express_1 = __importDefault(require("express"));
 const projectController_1 = require("../controllers/projectController");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const asyncHandler_1 = __importDefault(require("../utils/asyncHandler"));
-const projectFileStore_1 = require("../utils/projectFileStore");
+const databaseService_1 = require("../services/databaseService");
 const router = express_1.default.Router();
-// Development mode middleware that skips authentication for GET requests
+// Development mode middleware that skips authentication for development
 const optionalAuth = (req, res, next) => {
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const isGetRequest = req.method === 'GET';
-    if (isDevelopment && isGetRequest) {
-        // Skip authentication for GET requests in development
-        console.log("Development mode: Skipping authentication for GET request");
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    if (isDevelopment) {
+        // Skip authentication for all requests in development
+        console.log("Development mode: Skipping authentication");
         next();
     }
     else {
-        // Use normal authentication for other requests
+        // Use normal authentication for production
         (0, authMiddleware_1.authenticateToken)(req, res, next);
     }
 };
-router.get("/", optionalAuth, (0, asyncHandler_1.default)(projectController_1.getProjects));
-router.post("/", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(projectController_1.createProject));
-router.get("/:id", optionalAuth, (0, asyncHandler_1.default)(projectController_1.getProject));
-router.put("/:id", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(projectController_1.updateProject));
-router.delete("/:id", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(projectController_1.removeProject));
-router.patch("/:id/state", authMiddleware_1.authenticateToken, (0, asyncHandler_1.default)(projectController_1.saveProjectState));
+// Get all projects for a user
+router.get("/user/:userId", optionalAuth, (0, asyncHandler_1.default)(projectController_1.getUserProjects));
+// Create a new project
+router.post("/", optionalAuth, (0, asyncHandler_1.default)(projectController_1.createProject));
+// Get a specific project
+router.get("/:projectId", optionalAuth, (0, asyncHandler_1.default)(projectController_1.getProject));
+// Update a project
+router.put("/:projectId", optionalAuth, (0, asyncHandler_1.default)(projectController_1.updateProject));
+// Delete a project
+router.delete("/:projectId", optionalAuth, (0, asyncHandler_1.default)(projectController_1.deleteProject));
+// Archive a project
+router.patch("/:projectId/archive", optionalAuth, (0, asyncHandler_1.default)(projectController_1.archiveProject));
 // Update project deployment status (called by Terraform runner - no auth required)
-router.post('/:id/deployment-status', (0, asyncHandler_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
+router.post('/:projectId/deployment-status', (0, asyncHandler_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { projectId } = req.params;
     const { deploymentStatus, deploymentOutputs, lastDeployed } = req.body;
-    console.log(`[Project] Updating deployment status for project ${id}: ${deploymentStatus}`);
+    console.log(`[Project] Updating deployment status for project ${projectId}: ${deploymentStatus}`);
     try {
-        const project = yield (0, projectFileStore_1.getProjectById)(id);
+        const project = databaseService_1.databaseService.getProject(projectId);
         if (!project) {
             res.status(404).json({ error: "Project not found" });
             return;
         }
-        // Update deployment status
-        project.deploymentStatus = deploymentStatus;
+        // Update deployment status in metadata
+        const metadata = project.metadata ? JSON.parse(project.metadata) : {};
+        metadata.deploymentStatus = deploymentStatus;
         if (deploymentOutputs) {
-            project.deploymentOutputs = deploymentOutputs;
+            metadata.deploymentOutputs = deploymentOutputs;
         }
         if (lastDeployed) {
-            project.lastDeployed = new Date(lastDeployed);
+            metadata.lastDeployed = lastDeployed;
         }
-        yield (0, projectFileStore_1.saveProject)(project);
-        console.log(`[Project] Successfully updated project ${id} deployment status to ${deploymentStatus}`);
+        project.metadata = JSON.stringify(metadata);
+        project.updatedAt = new Date().toISOString();
+        project.lastAccessed = new Date().toISOString();
+        databaseService_1.databaseService.saveProject(project);
+        console.log(`[Project] Successfully updated project ${projectId} deployment status to ${deploymentStatus}`);
         res.json({ success: true, message: "Deployment status updated" });
     }
     catch (error) {
-        console.error(`[Project] Error updating deployment status for project ${id}:`, error);
+        console.error(`[Project] Error updating deployment status for project ${projectId}:`, error);
         res.status(500).json({ error: error.message || "Failed to update deployment status" });
     }
 })));

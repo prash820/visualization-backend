@@ -1,0 +1,37 @@
+{
+  "projectId": "note-app-test",
+  "createdAt": "2025-08-08T03:50:09.022Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/note-app-test/frontend/src/components/UserComponent.tsx",
+    "generated-projects/note-app-test/frontend/src/pages/Dashboard.tsx",
+    "generated-projects/note-app-test/frontend/src/pages/Login.tsx",
+    "generated-projects/note-app-test/frontend/src/pages/Projects.tsx",
+    "generated-projects/note-app-test/frontend/src/hooks/useAuth.ts",
+    "generated-projects/note-app-test/frontend/src/hooks/useApi.ts",
+    "generated-projects/note-app-test/frontend/src/services/UserService.ts",
+    "generated-projects/note-app-test/frontend/package.json",
+    "generated-projects/note-app-test/frontend/public/index.html",
+    "generated-projects/note-app-test/frontend/src/App.tsx",
+    "generated-projects/note-app-test/frontend/src/index.tsx",
+    "generated-projects/note-app-test/frontend/src/index.css",
+    "generated-projects/note-app-test/frontend/tsconfig.json",
+    "generated-projects/note-app-test/backend/src/controllers/UserController.ts",
+    "generated-projects/note-app-test/backend/src/models/User.ts",
+    "generated-projects/note-app-test/backend/src/services/UserService.ts",
+    "generated-projects/note-app-test/backend/package.json",
+    "generated-projects/note-app-test/backend/src/index.ts",
+    "generated-projects/note-app-test/backend/tsconfig.json",
+    "generated-projects/note-app-test/shared/package.json",
+    "generated-projects/note-app-test/shared/types.ts",
+    "generated-projects/note-app-test/shared/index.ts",
+    "generated-projects/note-app-test/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

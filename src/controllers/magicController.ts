@@ -5,6 +5,7 @@ import { getProjectById, saveProject } from '../utils/projectFileStore';
 import { anthropic, ANTHROPIC_MODEL } from '../config/aiProvider';
 import dotenv from "dotenv";
 import { generateUmlFromPrompt } from '../utils/umlGenerator';
+import PromptEngine from '../config/promptEngine';
 
 dotenv.config();
 
@@ -177,58 +178,10 @@ async function analyzeAppIdea(jobId: string, prompt: string, targetCustomers: st
     conceptJobs[jobId].progress = 20;
     conceptJobs[jobId].lastAccessed = new Date();
 
-    const analysisPrompt = `You are an expert product analyst and software architect. Analyze the following app idea comprehensively and provide a detailed summary.
+    const promptEngine = PromptEngine.getInstance();
+    const analysisPrompt = promptEngine.getAnalysisPrompt(prompt, targetCustomers);
 
-App Idea: ${prompt}
-Target Customers/Users (ICP): ${targetCustomers}
-
-Provide a comprehensive analysis in the following JSON format:
-{
-  "appSummary": {
-    "name": "Suggested app name",
-    "description": "Clear, detailed description of what the app does",
-    "coreValue": "Main value proposition for users",
-    "keyFeatures": ["feature1", "feature2", "feature3"],
-    "userJourney": "How users will interact with the app step-by-step"
-  },
-  "targetAudience": {
-    "primaryUsers": "Who will use this app primarily",
-    "userPersonas": ["persona1", "persona2"],
-    "painPoints": ["pain1", "pain2"],
-    "useCases": ["usecase1", "usecase2"]
-  },
-  "technicalOverview": {
-    "appType": "web app|mobile app|desktop app|api service",
-    "architecture": "monolithic|microservices|serverless",
-    "estimatedComplexity": "simple|medium|complex",
-    "keyTechnologies": ["tech1", "tech2"],
-    "dataRequirements": "What data the app will handle",
-    "integrations": ["integration1", "integration2"]
-  },
-  "businessModel": {
-    "revenueModel": "freemium|subscription|one-time|advertising",
-    "marketSize": "estimated market opportunity",
-    "competitiveAdvantage": "what makes this app unique",
-    "mvpFeatures": ["core feature for MVP"]
-  },
-  "implementationPlan": {
-    "estimatedTimeline": "development time estimate",
-    "developmentPhases": ["phase1", "phase2"],
-    "riskFactors": ["risk1", "risk2"],
-    "successMetrics": ["metric1", "metric2"]
-  },
-  "recommendation": {
-    "viability": "high|medium|low",
-    "reasoning": "why this app idea is/isn't viable",
-    "suggestedImprovements": ["improvement1", "improvement2"],
-    "nextSteps": "what to do next"
-  }
-}
-
-Be thorough, realistic, and provide actionable insights. Focus on creating a clear picture of what will be built.
-Return ONLY the JSON response, no explanations.`;
-
-    const analysisResponse = await makeAIRequest(analysisPrompt);
+    const analysisResponse = await makeAIRequest(analysisPrompt, promptEngine.getSystemPrompt());
     const analysisResult = JSON.parse(cleanJsonResponse(analysisResponse));
     
     conceptJobs[jobId] = {
@@ -377,34 +330,10 @@ async function generateUMLDiagrams(jobId: string) {
 
     const { analysisResult, userPrompt, targetCustomers } = job;
     
-    const umlPrompt = `Based on the comprehensive app analysis, generate detailed UML diagrams.
+    const promptEngine = PromptEngine.getInstance();
+    const umlPrompt = promptEngine.getUMLPrompt(analysisResult, userPrompt);
 
-App Summary: ${JSON.stringify(analysisResult.appSummary, null, 2)}
-Technical Overview: ${JSON.stringify(analysisResult.technicalOverview, null, 2)}
-Original Prompt: ${userPrompt}
-Target Customers: ${targetCustomers}
-
-Generate comprehensive UML diagrams in PlantUML format:
-
-{
-  "componentDiagram": "PlantUML component diagram showing system architecture and component relationships",
-  "classDiagram": "PlantUML class diagram with detailed classes, attributes, methods, and relationships", 
-  "sequenceDiagram": "PlantUML sequence diagram showing key user interactions and system flows",
-  "architectureDiagram": "PlantUML deployment diagram showing infrastructure components and deployment architecture"
-}
-
-Requirements:
-1. Component diagram should show all major system components and their dependencies
-2. Class diagram should include detailed business logic classes with methods and attributes
-3. Sequence diagram should cover main user flows and system interactions
-4. Architecture diagram should show deployment components (databases, servers, APIs, etc.)
-5. Use proper PlantUML syntax with @startuml/@enduml blocks
-6. Include meaningful component and class names based on the app functionality
-7. Show clear relationships and data flow
-
-Return ONLY the JSON response with PlantUML code.`;
-
-    const umlResponse = await makeAIRequest(umlPrompt);
+    const umlResponse = await makeAIRequest(umlPrompt, promptEngine.getSystemPrompt());
     const umlDiagrams = JSON.parse(cleanJsonResponse(umlResponse));
     
     job.progress = 50;
@@ -477,258 +406,12 @@ async function generateApplicationCode(jobId: string) {
     
     console.log(`[Magic Flow] Using ${componentAnalysis.components.length} components for parallel generation`);
     
-    // Generate comprehensive application code using the parallel approach
-    const codePrompt = `Based on the app analysis, UML diagrams, and comprehensive component requirements, generate a complete application code structure with comprehensive UI components.
-
-**CRITICAL**: This must be a production-ready application with comprehensive UI component coverage.
-
-App Analysis: ${JSON.stringify(analysisResult, null, 2)}
-Component Analysis: ${JSON.stringify(componentAnalysis, null, 2)}
-App Type: ${appTypeAnalysis.appType}
-Required Components: ${JSON.stringify(appTypeAnalysis.requiredComponents, null, 2)}
-UML Diagrams: ${JSON.stringify(umlDiagrams, null, 2)}
-Infrastructure Code: ${infraCode}
-Original Prompt: ${userPrompt}
-
-**CRITICAL: USE PARALLEL-COMPATIBLE COMPONENT STRUCTURE**
-Generate code for each component in the componentAnalysis.components array.
-Each component should be independently generatable for parallel processing.
-
-**ENHANCED CODE GENERATION REQUIREMENTS:**
-1. **CRITICALLY IMPORTANT**: Generate ALL components from the componentAnalysis.components array
-2. Generate ALL components from the required components list
-3. Include comprehensive UI component coverage (20-30 frontend components)
-4. Break down complex components into focused, single-purpose components
-5. Include proper error handling, loading states, and edge case components
-6. Add authentication and user management components
-7. Include search, filter, and sorting components where applicable
-8. Add responsive design components (mobile nav, modals, etc.)
-9. Include notification and feedback components
-10. Add accessibility components where needed
-11. Create reusable components and their usage patterns
-
-**PARALLEL PROCESSING COMPATIBILITY:**
-- Each component should be self-contained with minimal dependencies
-- Use standardized interfaces for component communication
-- Include proper TypeScript typing for all components
-- Ensure components can be generated independently
-
-Generate a complete application with comprehensive frontend and backend code structure in the following JSON format:
-{
-  "frontend": {
-    "components": {
-      "Login.tsx": "authentication login component code",
-      "Register.tsx": "user registration component code",
-      "TaskList.tsx": "comprehensive task list component",
-      "TaskItem.tsx": "individual task item component",
-      "TaskForm.tsx": "task creation/editing form component",
-      "TaskDetails.tsx": "task details view component",
-      "TaskFilters.tsx": "task filtering component",
-      "TaskSearch.tsx": "task search component",
-      "Dashboard.tsx": "dashboard overview component",
-      "Header.tsx": "main navigation header component",
-      "Sidebar.tsx": "sidebar navigation component",
-      "Modal.tsx": "reusable modal component",
-      "LoadingSpinner.tsx": "loading state component",
-      "ErrorBoundary.tsx": "error handling component",
-      "Notification.tsx": "notification system component",
-      "UserProfile.tsx": "user profile component",
-      "Settings.tsx": "user settings component",
-      "MobileNav.tsx": "mobile navigation component",
-      "Breadcrumbs.tsx": "breadcrumb navigation component",
-      "Dropdown.tsx": "dropdown menu component",
-      "DatePicker.tsx": "date picker component",
-      "Tooltip.tsx": "tooltip component",
-      "ConfirmDialog.tsx": "confirmation dialog component"
-    },
-    "pages": {
-      "HomePage.tsx": "main home page",
-      "LoginPage.tsx": "login page",
-      "DashboardPage.tsx": "dashboard page",
-      "TasksPage.tsx": "tasks management page",
-      "ProfilePage.tsx": "user profile page",
-      "SettingsPage.tsx": "settings page",
-      "NotFoundPage.tsx": "404 error page"
-    },
-    "hooks": {
-      "useAuth.ts": "authentication hook",
-      "useTasks.ts": "task management hook",
-      "useApi.ts": "API communication hook",
-      "useNotification.ts": "notification hook",
-      "useLocalStorage.ts": "local storage hook"
-    },
-    "services": {
-      "apiService.ts": "API service with comprehensive endpoints",
-      "authService.ts": "authentication service",
-      "taskService.ts": "task management service",
-      "notificationService.ts": "notification service",
-      "storageService.ts": "local storage service"
-    },
-    "utils": {
-      "constants.ts": "application constants",
-      "helpers.ts": "utility functions",
-      "validators.ts": "form validation functions",
-      "formatters.ts": "data formatting functions",
-      "dateUtils.ts": "date utility functions"
-    }
-  },
-  "backend": {
-    "controllers": {
-      "authController.ts": "authentication controller with login/register/profile",
-      "taskController.ts": "comprehensive task management controller",
-      "userController.ts": "user management controller",
-      "projectController.ts": "project management controller",
-      "searchController.ts": "search functionality controller"
-    },
-    "models": {
-      "User.ts": "user model with validation",
-      "Task.ts": "task model with comprehensive properties",
-      "Project.ts": "project model",
-      "Session.ts": "session model",
-      "ActivityLog.ts": "activity logging model"
-    },
-    "services": {
-      "authService.ts": "authentication service",
-      "taskService.ts": "task business logic service",
-      "userService.ts": "user management service",
-      "emailService.ts": "email notification service",
-      "searchService.ts": "search functionality service"
-    },
-    "routes": {
-      "authRoutes.ts": "authentication routes",
-      "taskRoutes.ts": "task management routes",
-      "userRoutes.ts": "user management routes",
-      "projectRoutes.ts": "project management routes",
-      "searchRoutes.ts": "search routes"
-    },
-    "middleware": {
-      "authMiddleware.ts": "authentication middleware",
-      "validationMiddleware.ts": "request validation middleware",
-      "errorMiddleware.ts": "error handling middleware",
-      "loggingMiddleware.ts": "request logging middleware"
-    },
-    "utils": {
-      "database.ts": "database connection utilities",
-      "encryption.ts": "password encryption utilities",
-      "logger.ts": "logging utilities",
-      "validators.ts": "data validation utilities",
-      "emailTemplates.ts": "email template utilities"
-    }
-  },
-  "documentation": "comprehensive documentation for the application"
-}
-
-**CRITICAL REQUIREMENTS:**
-1. Generate complete, functional TypeScript/JavaScript code for each file
-2. Use modern React with hooks and functional components
-3. Include proper error handling and validation throughout
-4. Follow best practices for the identified architecture
-5. Include comprehensive API endpoints and database models
-6. Add proper authentication and authorization
-7. Include responsive design and mobile-friendly components
-8. Add proper loading states and error boundaries
-9. Include accessibility features (ARIA labels, keyboard navigation)
-10. Add proper TypeScript interfaces and types
-11. Include comprehensive form validation
-12. Add proper state management patterns
-13. Include search, filter, and sorting functionality
-14. Add notification and feedback systems
-15. Include proper routing and navigation
-
-**BUILD-READY TYPESCRIPT REACT CODE REQUIREMENTS:**
-
-1. **MANDATORY COMPONENT STRUCTURE:**
-All React components must follow this exact pattern:
-- Import React and necessary hooks (import React, { useState, useEffect } from 'react')
-- Define TypeScript interface for props
-- Use React.FC with proper typing
-- Export default component
-- Use .tsx extension for React components
-
-2. **API SERVICE PATTERN:**
-All API services must use:
-- Simple environment variable pattern: const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
-- Consistent error handling with try/catch blocks
-- TypeScript interfaces for all API responses
-- NO window object references (breaks during build)
-- NO complex environment variable chains
-
-3. **HOOK PATTERN:**
-Custom hooks must:
-- Import React hooks properly
-- Use TypeScript typing for all state
-- Return object with state and methods
-- Follow standard React hook conventions
-- Use proper useEffect dependency arrays
-
-4. **UTILITY PATTERN:**
-Utility functions must:
-- Use TypeScript function signatures
-- Export functions individually
-- Include proper error handling
-- Use simple environment variable patterns
-
-**CRITICAL VALIDATION CHECKLIST:**
-✅ All components use proper TypeScript interfaces
-✅ All components import React properly: import React from 'react'
-✅ All exports use 'export default ComponentName'
-✅ API calls use simple pattern: process.env.REACT_APP_API_URL || 'http://localhost:5000'
-✅ No window references in component code
-✅ All file extensions are .tsx for components, .ts for utilities
-✅ No complex router configurations
-✅ All useState and useEffect hooks are properly typed
-
-**ERROR PREVENTION FOR BUILD SUCCESS:**
-- NO missing imports (React, useState, useEffect, etc.)
-- NO undefined variables or functions
-- NO invalid JSX syntax
-- NO complex environment variable patterns like window.ENV
-- NO .js/.jsx file extensions for TypeScript project
-- NO router components that require additional dependencies
-- NO Next.js patterns (use React patterns only)
-- NO unescaped quotes in JSX strings
-- NO missing semicolons in TypeScript
-- NO circular imports between components
-
-**FRONTEND REQUIREMENTS:**
-- Environment-aware API configuration
-- Comprehensive error handling and retry logic
-- Loading states for all async operations
-- Responsive design for mobile and desktop
-- Accessibility features throughout
-- Proper form validation and feedback
-- Search and filtering capabilities
-- Notification system
-- User authentication flows
-- Dashboard with statistics and overview
-- Task management with full CRUD operations
-- User profile and settings management
-
-**BACKEND REQUIREMENTS:**
-- RESTful API design with proper HTTP methods
-- Authentication with JWT tokens
-- Input validation and sanitization
-- Comprehensive error handling
-- Database integration with proper models
-- Search functionality with filtering
-- Email notifications
-- Activity logging
-- Rate limiting and security measures
-- Proper CORS configuration
-- Health check endpoints
-
-**DEPLOYMENT COMPATIBILITY:**
-- Environment variables for all configurations
-- AWS Lambda compatibility for backend
-- S3 static hosting compatibility for frontend
-- Proper API Gateway integration
-- DynamoDB integration for data storage
-- Cognito integration for authentication
-
-Return ONLY the JSON response with the complete application code structure. No explanations, no markdown formatting, just the JSON object with comprehensive code for each file.`;
+    // Generate comprehensive application code using the enhanced prompt engine
+    const promptEngine = PromptEngine.getInstance();
+    const codePrompt = promptEngine.getApplicationPrompt(analysisResult, umlDiagrams, " ", userPrompt);
 
     // Try to generate application code with retry logic
-    const appCode = await generateApplicationCodeWithRetry(codePrompt, userPrompt, 3);
+    const appCode = await generateApplicationCodeWithRetry(codePrompt, userPrompt || 'App generation', 3);
     
     const parsedAppCode = JSON.parse(cleanJsonResponse(appCode));
     job.appCode = parsedAppCode;
@@ -780,7 +463,7 @@ Return ONLY the JSON response with the complete application code structure. No e
 }
 
 // Helper function to retry generating application code with different prompts/strategies
-async function generateApplicationCodeWithRetry(prompt: string, userPrompt: string, maxRetries: number = 3): Promise<string> {
+async function generateApplicationCodeWithRetry(prompt: string, userPrompt?: string, maxRetries: number = 3): Promise<string> {
   let lastError: Error | null = null;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -798,7 +481,7 @@ async function generateApplicationCodeWithRetry(prompt: string, userPrompt: stri
         
         console.warn(`[Magic Flow] AI returned conversational response, retrying with different prompt strategy...`);
         // If conversational, try to rephrase the prompt or use a different strategy
-        const rephrasePrompt = `Please generate the application code in JSON format, focusing on the app idea: "${userPrompt}". If you cannot generate JSON, please return a JSON object with an "error" key and a message explaining why.`;
+        const rephrasePrompt = `Please generate the application code in JSON format, focusing on the app idea: "${userPrompt || 'App generation'}". If you cannot generate JSON, please return a JSON object with an "error" key and a message explaining why.`;
         return await generateApplicationCodeWithRetry(rephrasePrompt, userPrompt, maxRetries - attempt); // Retry with a different prompt
       }
       
@@ -808,7 +491,7 @@ async function generateApplicationCodeWithRetry(prompt: string, userPrompt: stri
       // Validate that the parsed result has the expected structure
       if (!parsedResponse.frontend || !parsedResponse.backend) {
         console.warn(`[Magic Flow] Parsed code missing frontend or backend, retrying with different prompt strategy...`);
-        const fallbackPrompt = `Please generate the application code in JSON format, focusing on the app idea: "${userPrompt}". If you cannot generate JSON, please return a JSON object with an "error" key and a message explaining why.`;
+        const fallbackPrompt = `Please generate the application code in JSON format, focusing on the app idea: "${userPrompt || 'App generation'}". If you cannot generate JSON, please return a JSON object with an "error" key and a message explaining why.`;
         return await generateApplicationCodeWithRetry(fallbackPrompt, userPrompt, maxRetries - attempt); // Retry with a different prompt
       }
       

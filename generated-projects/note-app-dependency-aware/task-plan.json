@@ -1,0 +1,27 @@
+{
+  "projectId": "note-app-dependency-aware",
+  "createdAt": "2025-08-07T05:59:51.344Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/note-app-dependency-aware/frontend/package.json",
+    "generated-projects/note-app-dependency-aware/frontend/public/index.html",
+    "generated-projects/note-app-dependency-aware/frontend/src/App.tsx",
+    "generated-projects/note-app-dependency-aware/frontend/src/index.tsx",
+    "generated-projects/note-app-dependency-aware/frontend/src/index.css",
+    "generated-projects/note-app-dependency-aware/frontend/tsconfig.json",
+    "generated-projects/note-app-dependency-aware/backend/package.json",
+    "generated-projects/note-app-dependency-aware/backend/src/index.ts",
+    "generated-projects/note-app-dependency-aware/backend/tsconfig.json",
+    "generated-projects/note-app-dependency-aware/shared/package.json",
+    "generated-projects/note-app-dependency-aware/shared/types.ts",
+    "generated-projects/note-app-dependency-aware/shared/index.ts",
+    "generated-projects/note-app-dependency-aware/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

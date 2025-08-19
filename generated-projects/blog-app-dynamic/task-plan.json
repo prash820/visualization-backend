@@ -1,0 +1,43 @@
+{
+  "projectId": "blog-app-dynamic",
+  "createdAt": "2025-08-08T04:01:24.658Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/blog-app-dynamic/frontend/src/components/UserComponent.tsx",
+    "generated-projects/blog-app-dynamic/frontend/src/components/PostComponent.tsx",
+    "generated-projects/blog-app-dynamic/frontend/src/components/CommentComponent.tsx",
+    "generated-projects/blog-app-dynamic/frontend/src/hooks/useAuth.ts",
+    "generated-projects/blog-app-dynamic/frontend/src/services/UserService.ts",
+    "generated-projects/blog-app-dynamic/frontend/src/services/PostService.ts",
+    "generated-projects/blog-app-dynamic/frontend/src/services/CommentService.ts",
+    "generated-projects/blog-app-dynamic/frontend/package.json",
+    "generated-projects/blog-app-dynamic/frontend/public/index.html",
+    "generated-projects/blog-app-dynamic/frontend/src/App.tsx",
+    "generated-projects/blog-app-dynamic/frontend/src/index.tsx",
+    "generated-projects/blog-app-dynamic/frontend/src/index.css",
+    "generated-projects/blog-app-dynamic/frontend/tsconfig.json",
+    "generated-projects/blog-app-dynamic/backend/src/controllers/UserController.ts",
+    "generated-projects/blog-app-dynamic/backend/src/controllers/PostController.ts",
+    "generated-projects/blog-app-dynamic/backend/src/controllers/CommentController.ts",
+    "generated-projects/blog-app-dynamic/backend/src/models/User.ts",
+    "generated-projects/blog-app-dynamic/backend/src/models/Post.ts",
+    "generated-projects/blog-app-dynamic/backend/src/models/Comment.ts",
+    "generated-projects/blog-app-dynamic/backend/src/services/UserService.ts",
+    "generated-projects/blog-app-dynamic/backend/src/services/PostService.ts",
+    "generated-projects/blog-app-dynamic/backend/src/services/CommentService.ts",
+    "generated-projects/blog-app-dynamic/backend/package.json",
+    "generated-projects/blog-app-dynamic/backend/src/index.ts",
+    "generated-projects/blog-app-dynamic/backend/tsconfig.json",
+    "generated-projects/blog-app-dynamic/shared/package.json",
+    "generated-projects/blog-app-dynamic/shared/types.ts",
+    "generated-projects/blog-app-dynamic/shared/index.ts",
+    "generated-projects/blog-app-dynamic/package.json"
+  ],
+  "errors": [],
+  "warnings": []
+}

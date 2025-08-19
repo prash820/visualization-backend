@@ -1,4 +1,7 @@
-interface MemoryOptimizedJob {
+// Memory Manager Utility
+// Monitors and manages memory usage to prevent out-of-memory errors
+
+export interface MemoryOptimizedJob {
   status: string;
   progress: number;
   result?: any;
@@ -8,13 +11,18 @@ interface MemoryOptimizedJob {
   lastAccessed?: Date;
 }
 
-class MemoryManager {
+export class MemoryManager {
   private static instance: MemoryManager;
+  private memoryThreshold: number = 0.8; // 80% of available memory
+  private lastGcTime: number = 0;
+  private gcInterval: number = 30000; // 30 seconds
   private cleanupIntervals: Set<NodeJS.Timeout> = new Set();
-  
-  private constructor() {}
-  
-  static getInstance(): MemoryManager {
+
+  private constructor() {
+    this.startMemoryMonitoring();
+  }
+
+  public static getInstance(): MemoryManager {
     if (!MemoryManager.instance) {
       MemoryManager.instance = new MemoryManager();
     }
@@ -22,9 +30,81 @@ class MemoryManager {
   }
 
   /**
+   * Get current memory usage statistics
+   */
+  public getMemoryStats(): {
+    used: number;
+    total: number;
+    percentage: number;
+    isHigh: boolean;
+    rss: number;
+    heapUsed: number;
+    heapTotal: number;
+    external: number;
+  } {
+    const memUsage = process.memoryUsage();
+    const used = memUsage.heapUsed;
+    const total = memUsage.heapTotal;
+    const percentage = used / total;
+    const isHigh = percentage > this.memoryThreshold;
+
+    return {
+      used: Math.round(used / 1024 / 1024), // MB
+      total: Math.round(total / 1024 / 1024), // MB
+      percentage: Math.round(percentage * 100),
+      isHigh,
+      rss: Math.round(memUsage.rss / 1024 / 1024), // MB
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024), // MB
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024), // MB
+      external: Math.round(memUsage.external / 1024 / 1024), // MB
+    };
+  }
+
+  /**
+   * Check if memory usage is high and trigger garbage collection if needed
+   */
+  public checkMemoryUsage(): boolean {
+    const stats = this.getMemoryStats();
+    const now = Date.now();
+
+    if (stats.isHigh && (now - this.lastGcTime) > this.gcInterval) {
+      console.log(`[MemoryManager] High memory usage detected: ${stats.percentage}% (${stats.used}MB/${stats.total}MB)`);
+      
+      if (global.gc) {
+        global.gc();
+        this.lastGcTime = now;
+        console.log('[MemoryManager] Garbage collection triggered');
+        
+        // Check memory after GC
+        const afterStats = this.getMemoryStats();
+        console.log(`[MemoryManager] After GC: ${afterStats.percentage}% (${afterStats.used}MB/${afterStats.total}MB)`);
+      } else {
+        console.warn('[MemoryManager] Garbage collection not available');
+      }
+      
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Force garbage collection
+   */
+  public forceGarbageCollection(): void {
+    if (global.gc) {
+      global.gc();
+      this.lastGcTime = Date.now();
+      console.log('[MemoryManager] Forced garbage collection');
+    } else {
+      console.warn('[MemoryManager] Garbage collection not available');
+    }
+  }
+
+  /**
    * Set up automatic cleanup for a job store
    */
-  setupJobStoreCleanup<T extends MemoryOptimizedJob>(
+  public setupJobStoreCleanup<T extends MemoryOptimizedJob>(
     jobStore: Record<string, T>,
     storeName: string,
     maxAge: number = 30 * 60 * 1000, // 30 minutes default
@@ -92,38 +172,14 @@ class MemoryManager {
   /**
    * Update job access time for memory management
    */
-  touchJob<T extends MemoryOptimizedJob>(job: T): void {
+  public touchJob<T extends MemoryOptimizedJob>(job: T): void {
     job.lastAccessed = new Date();
-  }
-
-  /**
-   * Force garbage collection if available
-   */
-  forceGarbageCollection(): void {
-    if (global.gc) {
-      global.gc();
-      console.log("[Memory] Forced garbage collection");
-    }
-  }
-
-  /**
-   * Get memory usage statistics
-   */
-  getMemoryStats(): { used: number; rss: number; heapUsed: number; heapTotal: number; external: number } {
-    const memUsage = process.memoryUsage();
-    return {
-      used: Math.round(memUsage.heapUsed / 1024 / 1024), // MB
-      rss: Math.round(memUsage.rss / 1024 / 1024), // MB
-      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024), // MB
-      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024), // MB
-      external: Math.round(memUsage.external / 1024 / 1024), // MB
-    };
   }
 
   /**
    * Log current memory usage
    */
-  logMemoryUsage(context: string = ""): void {
+  public logMemoryUsage(context: string = ""): void {
     const stats = this.getMemoryStats();
     console.log(`[Memory${context ? ' ' + context : ''}] Used: ${stats.used}MB, RSS: ${stats.rss}MB, Heap: ${stats.heapUsed}/${stats.heapTotal}MB`);
   }
@@ -131,7 +187,7 @@ class MemoryManager {
   /**
    * Check if memory usage is high
    */
-  isMemoryHigh(threshold: number = 500): boolean {
+  public isMemoryHigh(threshold: number = 500): boolean {
     const stats = this.getMemoryStats();
     return stats.rss > threshold;
   }
@@ -139,7 +195,7 @@ class MemoryManager {
   /**
    * Emergency memory cleanup
    */
-  emergencyCleanup(): void {
+  public emergencyCleanup(): void {
     console.log("[Memory] Running emergency cleanup...");
     this.forceGarbageCollection();
     
@@ -150,7 +206,7 @@ class MemoryManager {
   /**
    * Set up memory monitoring
    */
-  setupMemoryMonitoring(): void {
+  public setupMemoryMonitoring(): void {
     // Log memory usage every 2 minutes
     const monitoringInterval = setInterval(() => {
       this.logMemoryUsage("Monitor");
@@ -166,9 +222,41 @@ class MemoryManager {
   }
 
   /**
+   * Start memory monitoring
+   */
+  private startMemoryMonitoring(): void {
+    // Monitor memory every 10 seconds
+    setInterval(() => {
+      this.checkMemoryUsage();
+    }, 10000);
+
+    console.log('[MemoryManager] Memory monitoring started');
+  }
+
+  /**
+   * Set memory threshold (0.0 to 1.0)
+   */
+  public setMemoryThreshold(threshold: number): void {
+    if (threshold >= 0 && threshold <= 1) {
+      this.memoryThreshold = threshold;
+      console.log(`[MemoryManager] Memory threshold set to ${threshold * 100}%`);
+    } else {
+      console.warn('[MemoryManager] Invalid memory threshold. Must be between 0 and 1');
+    }
+  }
+
+  /**
+   * Get memory usage as formatted string
+   */
+  public getMemoryUsageString(): string {
+    const stats = this.getMemoryStats();
+    return `${stats.used}MB/${stats.total}MB (${stats.percentage}%)`;
+  }
+
+  /**
    * Cleanup all intervals (for shutdown)
    */
-  shutdown(): void {
+  public shutdown(): void {
     console.log("[Memory] Shutting down memory manager");
     this.cleanupIntervals.forEach(interval => clearInterval(interval));
     this.cleanupIntervals.clear();
@@ -176,7 +264,4 @@ class MemoryManager {
 }
 
 // Export singleton instance
-export const memoryManager = MemoryManager.getInstance();
-
-// Type for jobs that can be managed by MemoryManager
-export type { MemoryOptimizedJob }; 
+export const memoryManager = MemoryManager.getInstance(); 

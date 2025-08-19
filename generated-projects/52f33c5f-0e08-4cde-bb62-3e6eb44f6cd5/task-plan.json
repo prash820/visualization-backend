@@ -1,0 +1,551 @@
+{
+  "summary": {
+    "backendTasks": 7,
+    "frontendTasks": 2,
+    "commonTasks": 3,
+    "testTasks": 3,
+    "buildTasks": 3,
+    "deploymentTasks": 3,
+    "totalTasks": 25,
+    "generationTimestamp": "2025-07-31T03:18:42.831Z"
+  },
+  "backendTasks": [
+    {
+      "id": "backend_1",
+      "type": "model",
+      "entityName": "NotesApp",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate ORM model for NotesApp entity",
+      "filePath": "backend/src/models/NotesApp.ts",
+      "estimatedComplexity": "low",
+      "className": "NotesApp",
+      "methodSignatures": [],
+      "folderPath": "backend/src/models",
+      "imports": []
+    },
+    {
+      "id": "backend_2",
+      "type": "model",
+      "entityName": "NotesList",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate ORM model for NotesList entity",
+      "filePath": "backend/src/models/NotesList.ts",
+      "estimatedComplexity": "low",
+      "className": "NotesList",
+      "methodSignatures": [],
+      "folderPath": "backend/src/models",
+      "imports": []
+    },
+    {
+      "id": "backend_3",
+      "type": "model",
+      "entityName": "NoteForm",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate ORM model for NoteForm entity",
+      "filePath": "backend/src/models/NoteForm.ts",
+      "estimatedComplexity": "low",
+      "className": "NoteForm",
+      "methodSignatures": [],
+      "folderPath": "backend/src/models",
+      "imports": []
+    },
+    {
+      "id": "backend_4",
+      "type": "model",
+      "entityName": "NoteItem",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate ORM model for NoteItem entity",
+      "filePath": "backend/src/models/NoteItem.ts",
+      "estimatedComplexity": "low",
+      "className": "NoteItem",
+      "methodSignatures": [],
+      "folderPath": "backend/src/models",
+      "imports": []
+    },
+    {
+      "id": "backend_5",
+      "type": "controller",
+      "componentName": "NotesController",
+      "dependencies": [
+        "backend_service_NotesController"
+      ],
+      "priority": 3,
+      "description": "Generate controller for NotesController",
+      "filePath": "backend/src/controllers/NotesController.ts",
+      "estimatedComplexity": "low",
+      "className": "NotesController",
+      "methodSignatures": [],
+      "folderPath": "backend/src/controllers",
+      "imports": []
+    },
+    {
+      "id": "backend_6",
+      "type": "route",
+      "componentName": "NotesController",
+      "dependencies": [
+        "backend_controller_NotesController"
+      ],
+      "priority": 4,
+      "description": "Generate routes for NotesController",
+      "filePath": "backend/src/routes/route.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "backend_7",
+      "type": "serverless",
+      "dependencies": [],
+      "priority": 5,
+      "description": "Generate serverless.yml configuration",
+      "filePath": "backend/src/serverlesss/serverless.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    }
+  ],
+  "frontendTasks": [
+    {
+      "id": "frontend_1",
+      "type": "page",
+      "componentName": "NotesApp",
+      "dependencies": [],
+      "priority": 2,
+      "description": "Generate React page for NotesApp",
+      "filePath": "backend/src/pages/page.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "frontend_2",
+      "type": "router",
+      "dependencies": [],
+      "priority": 3,
+      "description": "Generate React router configuration",
+      "filePath": "backend/src/routers/router.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    }
+  ],
+  "commonTasks": [
+    {
+      "id": "common_1",
+      "type": "type",
+      "name": "SharedTypes",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate shared TypeScript types",
+      "filePath": "backend/src/types/type.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "common_2",
+      "type": "constant",
+      "name": "Constants",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate shared constants",
+      "filePath": "backend/src/constants/constant.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "common_3",
+      "type": "util",
+      "name": "Utils",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate shared utilities",
+      "filePath": "backend/src/utils/util.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    }
+  ],
+  "testTasks": [
+    {
+      "id": "test_1",
+      "type": "unit",
+      "targetComponent": "NotesController",
+      "dependencies": [
+        "backend_NotesController"
+      ],
+      "priority": 1,
+      "description": "Generate unit tests for NotesController",
+      "filePath": "backend/src/units/unit.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "test_2",
+      "type": "integration",
+      "targetComponent": "API",
+      "dependencies": [],
+      "priority": 2,
+      "description": "Generate integration tests for API endpoints",
+      "filePath": "backend/src/integrations/integration.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "test_3",
+      "type": "e2e",
+      "targetComponent": "Application",
+      "dependencies": [],
+      "priority": 3,
+      "description": "Generate end-to-end tests for the application",
+      "filePath": "backend/src/e2es/e2e.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    }
+  ],
+  "buildTasks": [
+    {
+      "id": "build_1",
+      "type": "config",
+      "name": "BackendPackage",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate package.json for backend",
+      "filePath": "backend/src/configs/config.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "build_2",
+      "type": "config",
+      "name": "FrontendPackage",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Generate package.json for frontend",
+      "filePath": "backend/src/configs/config.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "build_3",
+      "type": "script",
+      "name": "BuildScripts",
+      "dependencies": [],
+      "priority": 2,
+      "description": "Generate build and deployment scripts",
+      "filePath": "backend/src/scripts/script.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    }
+  ],
+  "deploymentTasks": [
+    {
+      "id": "deploy_1",
+      "type": "package",
+      "target": "Backend",
+      "dependencies": [],
+      "priority": 1,
+      "description": "Package backend for deployment",
+      "filePath": "backend/src/packages/package.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "deploy_2",
+      "type": "deploy",
+      "target": "Lambda",
+      "dependencies": [
+        "deploy_package_backend"
+      ],
+      "priority": 2,
+      "description": "Deploy backend to AWS Lambda",
+      "filePath": "backend/src/deploys/deploy.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    },
+    {
+      "id": "deploy_3",
+      "type": "deploy",
+      "target": "S3",
+      "dependencies": [],
+      "priority": 2,
+      "description": "Deploy frontend to AWS S3",
+      "filePath": "backend/src/deploys/deploy.ts",
+      "estimatedComplexity": "low",
+      "className": "UnknownClass",
+      "methodSignatures": [],
+      "folderPath": "unknown",
+      "imports": []
+    }
+  ],
+  "generationOrder": [
+    {
+      "taskId": "backend_1",
+      "type": "model",
+      "description": "Generate ORM model for NotesApp entity",
+      "filePath": "backend/src/models/NotesApp.ts",
+      "className": "NotesApp",
+      "folderPath": "backend/src/models"
+    },
+    {
+      "taskId": "backend_2",
+      "type": "model",
+      "description": "Generate ORM model for NotesList entity",
+      "filePath": "backend/src/models/NotesList.ts",
+      "className": "NotesList",
+      "folderPath": "backend/src/models"
+    },
+    {
+      "taskId": "backend_3",
+      "type": "model",
+      "description": "Generate ORM model for NoteForm entity",
+      "filePath": "backend/src/models/NoteForm.ts",
+      "className": "NoteForm",
+      "folderPath": "backend/src/models"
+    },
+    {
+      "taskId": "backend_4",
+      "type": "model",
+      "description": "Generate ORM model for NoteItem entity",
+      "filePath": "backend/src/models/NoteItem.ts",
+      "className": "NoteItem",
+      "folderPath": "backend/src/models"
+    },
+    {
+      "taskId": "backend_service_NotesController",
+      "type": "unknown",
+      "description": "No description",
+      "filePath": "unknown",
+      "className": "unknown",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "backend_5",
+      "type": "controller",
+      "description": "Generate controller for NotesController",
+      "filePath": "backend/src/controllers/NotesController.ts",
+      "className": "NotesController",
+      "folderPath": "backend/src/controllers"
+    },
+    {
+      "taskId": "backend_controller_NotesController",
+      "type": "unknown",
+      "description": "No description",
+      "filePath": "unknown",
+      "className": "unknown",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "backend_6",
+      "type": "route",
+      "description": "Generate routes for NotesController",
+      "filePath": "backend/src/routes/route.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "backend_7",
+      "type": "serverless",
+      "description": "Generate serverless.yml configuration",
+      "filePath": "backend/src/serverlesss/serverless.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "frontend_1",
+      "type": "page",
+      "description": "Generate React page for NotesApp",
+      "filePath": "backend/src/pages/page.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "frontend_2",
+      "type": "router",
+      "description": "Generate React router configuration",
+      "filePath": "backend/src/routers/router.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "common_1",
+      "type": "type",
+      "description": "Generate shared TypeScript types",
+      "filePath": "backend/src/types/type.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "common_2",
+      "type": "constant",
+      "description": "Generate shared constants",
+      "filePath": "backend/src/constants/constant.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "common_3",
+      "type": "util",
+      "description": "Generate shared utilities",
+      "filePath": "backend/src/utils/util.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "backend_NotesController",
+      "type": "unknown",
+      "description": "No description",
+      "filePath": "unknown",
+      "className": "unknown",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "test_1",
+      "type": "unit",
+      "description": "Generate unit tests for NotesController",
+      "filePath": "backend/src/units/unit.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "test_2",
+      "type": "integration",
+      "description": "Generate integration tests for API endpoints",
+      "filePath": "backend/src/integrations/integration.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "test_3",
+      "type": "e2e",
+      "description": "Generate end-to-end tests for the application",
+      "filePath": "backend/src/e2es/e2e.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "build_1",
+      "type": "config",
+      "description": "Generate package.json for backend",
+      "filePath": "backend/src/configs/config.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "build_2",
+      "type": "config",
+      "description": "Generate package.json for frontend",
+      "filePath": "backend/src/configs/config.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "build_3",
+      "type": "script",
+      "description": "Generate build and deployment scripts",
+      "filePath": "backend/src/scripts/script.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "deploy_1",
+      "type": "package",
+      "description": "Package backend for deployment",
+      "filePath": "backend/src/packages/package.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "deploy_package_backend",
+      "type": "unknown",
+      "description": "No description",
+      "filePath": "unknown",
+      "className": "unknown",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "deploy_2",
+      "type": "deploy",
+      "description": "Deploy backend to AWS Lambda",
+      "filePath": "backend/src/deploys/deploy.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    },
+    {
+      "taskId": "deploy_3",
+      "type": "deploy",
+      "description": "Deploy frontend to AWS S3",
+      "filePath": "backend/src/deploys/deploy.ts",
+      "className": "UnknownClass",
+      "folderPath": "unknown"
+    }
+  ],
+  "folderStructure": {
+    "backend": {
+      "src": {
+        "models": [
+          "NotesApp.ts",
+          "NotesList.ts",
+          "NoteForm.ts",
+          "NoteItem.ts"
+        ],
+        "services": [],
+        "controllers": [],
+        "routes": [],
+        "middleware": [
+          "auth.ts",
+          "validation.ts",
+          "errorHandler.ts"
+        ],
+        "utils": [
+          "database.ts",
+          "logger.ts",
+          "config.ts"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "projectId": "test-missing-components",
+  "createdAt": "2025-08-07T02:30:43.817Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/test-missing-components/frontend/src/components/CalculatorApp.tsx",
+    "generated-projects/test-missing-components/frontend/package.json",
+    "generated-projects/test-missing-components/frontend/public/index.html",
+    "generated-projects/test-missing-components/frontend/src/App.tsx",
+    "generated-projects/test-missing-components/frontend/src/index.tsx",
+    "generated-projects/test-missing-components/frontend/src/index.css",
+    "generated-projects/test-missing-components/frontend/tsconfig.json",
+    "generated-projects/test-missing-components/shared/types.ts"
+  ],
+  "errors": [],
+  "warnings": [
+    "Could not check for missing components: Command failed: npx tsc --noEmit --project generated-projects/test-missing-components/frontend/tsconfig.json\n"
+  ]
+}

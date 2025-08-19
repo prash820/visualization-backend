@@ -16,5 +16,11 @@
     "email": "demo@test.com",
     "passwordHash": "$2a$10$6dFeYd2e/mgBPq0rceci/eitXUNG2ntdfDnGW8Gs10CfrvbIYyOiG",
     "createdAt": "2025-07-09T01:22:54.283Z"
+  },
+  {
+    "_id": "454350ae-c449-4a95-8511-1a183926a2d7",
+    "email": "test2@example.com",
+    "passwordHash": "$2a$10$V5SRBXf060yaVxJjGOlC9eKh7TmnWdP4kxtVciCp4IP/2H1M57uW2",
+    "createdAt": "2025-08-11T07:59:19.198Z"
   }
 ]

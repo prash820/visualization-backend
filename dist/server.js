@@ -21,23 +21,45 @@ const errorHandler_1 = require("./middleware/errorHandler");
 const openAI_1 = __importDefault(require("./routes/openAI"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const project_1 = __importDefault(require("./routes/project"));
-const iac_1 = __importDefault(require("./routes/iac"));
+const iacRoutes_1 = __importDefault(require("./routes/iacRoutes"));
 const deployRoutes_1 = __importDefault(require("./routes/deployRoutes"));
 const sandboxRoutes_1 = __importDefault(require("./routes/sandboxRoutes"));
 const uml_1 = __importDefault(require("./routes/uml"));
-const appCode_1 = __importDefault(require("./routes/appCode"));
 const documentation_1 = __importDefault(require("./routes/documentation"));
 const magicRoutes_1 = __importDefault(require("./routes/magicRoutes"));
+const codeGeneration_1 = __importDefault(require("./routes/codeGeneration"));
+const appCode_1 = __importDefault(require("./routes/appCode"));
+const automation_1 = __importDefault(require("./routes/automation"));
+const architectureRecommendationRoutes_1 = __importDefault(require("./routes/architectureRecommendationRoutes"));
+const deploymentRoutes_1 = __importDefault(require("./routes/deploymentRoutes"));
+const deploymentWizardRoutes_1 = __importDefault(require("./routes/deploymentWizardRoutes"));
+const pricingRoutes_1 = __importDefault(require("./routes/pricingRoutes"));
+const regionRoutes_1 = __importDefault(require("./routes/regionRoutes"));
+const sqliteRoutes_1 = __importDefault(require("./routes/sqliteRoutes"));
 const child_process_1 = require("child_process");
 const path_1 = __importDefault(require("path"));
 const memoryManager_1 = require("./utils/memoryManager");
+const databaseService_1 = require("./services/databaseService");
 dotenv_1.default.config();
+console.log('[Server] JWT_SECRET from env:', process.env.JWT_SECRET);
+console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5001;
 // Memory optimization: Set Node.js memory limits
 if (process.env.NODE_ENV === 'production') {
     // Optimize garbage collection for production
     process.env.NODE_OPTIONS = '--max-old-space-size=512 --optimize-for-size';
+}
+else {
+    // Development memory settings
+    process.env.NODE_OPTIONS = '--max-old-space-size=1024 --expose-gc';
+}
+// Enable garbage collection for memory management
+if (global.gc) {
+    console.log('[Server] Garbage collection enabled');
+}
+else {
+    console.log('[Server] Garbage collection not available - run with --expose-gc flag');
 }
 // Increase timeout for all routes
 app.use((req, res, next) => {
@@ -132,13 +154,21 @@ app.use(simpleRateLimiter);
 app.use("/api/generate", openAI_1.default);
 app.use("/api/auth", auth_1.default);
 app.use("/api/projects", project_1.default);
-app.use("/api/iac", iac_1.default); // ✅ New Route for IaC
+app.use("/api/iac", iacRoutes_1.default); // ✅ New Route for IaC
 app.use("/api/deploy", deployRoutes_1.default);
 app.use("/api/sandbox", sandboxRoutes_1.default);
 app.use("/api/uml", uml_1.default);
 app.use("/api/documentation", documentation_1.default);
-app.use("/api/code", appCode_1.default);
 app.use("/api/magic", magicRoutes_1.default); // 🚀 NEW: Magic one-step app creation
+app.use("/api/code-generation", codeGeneration_1.default); // 🧠 NEW: Code Generation Engine
+app.use("/api/app-code", appCode_1.default); // 📁 NEW: App Code Conversion & Deployment
+app.use("/api/automation", automation_1.default); // 🤖 NEW: Complete Automation Pipeline
+app.use("/api/architecture", architectureRecommendationRoutes_1.default); // 🏗️ NEW: Smart Cloud Architect
+app.use("/api/deployment", deploymentRoutes_1.default); // 🚀 NEW: Code Deployment Engine
+app.use("/api/deployment-wizard", deploymentWizardRoutes_1.default); // 🚀 NEW: Deployment Wizard
+app.use("/api/pricing", pricingRoutes_1.default); // 💰 NEW: AWS Pricing Service
+app.use("/api/region", regionRoutes_1.default); // 🌍 NEW: Region Detection & Selection
+app.use("/api/sqlite", sqliteRoutes_1.default); // 🗄️ NEW: SQLite Database Access
 // 🔹 Configuration endpoint for frontend
 app.get("/api/config", (req, res) => {
     const isProduction = process.env.NODE_ENV === 'production';
@@ -316,6 +346,14 @@ const gracefulShutdown = (signal) => __awaiter(void 0, void 0, void 0, function*
     console.log(`[Server] Received ${signal}, shutting down gracefully...`);
     // Shutdown memory manager
     memoryManager_1.memoryManager.shutdown();
+    // Close database connection
+    try {
+        databaseService_1.databaseService.close();
+        console.log("[Database] Database connection closed");
+    }
+    catch (error) {
+        console.error("[Database] Error closing database:", error);
+    }
     // Kill Terraform service if it's running
     if (terraformProcess) {
         console.log("[Terraform Service] Terminating Terraform service...");
@@ -343,8 +381,18 @@ const gracefulShutdown = (signal) => __awaiter(void 0, void 0, void 0, function*
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
-const startServer = () => {
+const startServer = () => __awaiter(void 0, void 0, void 0, function* () {
     console.log("🚀 Starting Chart AI Visualization Backend...");
+    // Initialize database
+    console.log("🗄️ Initializing database...");
+    try {
+        yield databaseService_1.databaseService.migrateFromFileStorage();
+        const stats = databaseService_1.databaseService.getStats();
+        console.log(`📊 Database stats: ${stats.totalUsers} users, ${stats.totalJobs} jobs`);
+    }
+    catch (error) {
+        console.error("❌ Database initialization failed:", error);
+    }
     // Initialize memory management
     console.log("🧠 Initializing memory management...");
     memoryManager_1.memoryManager.setupMemoryMonitoring();
@@ -360,5 +408,5 @@ const startServer = () => {
         // Start Terraform service as a subprocess
         startTerraformService();
     });
-};
+});
 startServer();

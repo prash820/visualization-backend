@@ -8,67 +8,144 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getProject = exports.saveProjectState = exports.removeProject = exports.updateProject = exports.getProjects = exports.createProject = void 0;
-const express_1 = __importDefault(require("express"));
-const projectFileStore_1 = require("../utils/projectFileStore");
-const dotenv_1 = __importDefault(require("dotenv"));
+exports.archiveProject = exports.deleteProject = exports.updateProject = exports.getProject = exports.getUserProjects = exports.createProject = void 0;
+const databaseService_1 = require("../services/databaseService");
 const uuid_1 = require("uuid");
-dotenv_1.default.config();
-const router = express_1.default.Router();
-exports.default = router;
-// Create a project
+// Create a new project
 const createProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const newProject = Object.assign(Object.assign({}, req.body), { _id: (0, uuid_1.v4)(), createdAt: new Date().toISOString() });
-    yield (0, projectFileStore_1.saveProject)(newProject);
-    res.status(201).json(newProject);
+    const { name, description, userId } = req.body;
+    if (!name || !userId) {
+        res.status(400).json({ error: "Name and userId are required" });
+        return;
+    }
+    const now = new Date().toISOString();
+    const project = {
+        id: (0, uuid_1.v4)(),
+        name,
+        description,
+        userId,
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+        lastAccessed: now
+    };
+    try {
+        databaseService_1.databaseService.saveProject(project);
+        res.json({ success: true, project });
+    }
+    catch (error) {
+        console.error('Error creating project:', error);
+        res.status(500).json({ error: "Failed to create project" });
+    }
 });
 exports.createProject = createProject;
 // Get all projects for a user
-const getProjects = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const projects = yield (0, projectFileStore_1.getAllProjects)();
-    res.json(projects);
+const getUserProjects = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { userId } = req.params;
+    if (!userId) {
+        res.status(400).json({ error: "userId is required" });
+        return;
+    }
+    try {
+        const projects = databaseService_1.databaseService.getProjectsByUserId(userId);
+        res.json({ projects });
+    }
+    catch (error) {
+        console.error('Error getting user projects:', error);
+        res.status(500).json({ error: "Failed to get projects" });
+    }
 });
-exports.getProjects = getProjects;
+exports.getUserProjects = getUserProjects;
+// Get a specific project
+const getProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { projectId } = req.params;
+    if (!projectId) {
+        res.status(400).json({ error: "projectId is required" });
+        return;
+    }
+    try {
+        const project = databaseService_1.databaseService.getProject(projectId);
+        if (!project) {
+            res.status(404).json({ error: "Project not found" });
+            return;
+        }
+        res.json({ project });
+    }
+    catch (error) {
+        console.error('Error getting project:', error);
+        res.status(500).json({ error: "Failed to get project" });
+    }
+});
+exports.getProject = getProject;
 // Update a project
 const updateProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const project = yield (0, projectFileStore_1.getProjectById)(req.params.id);
-    if (!project)
-        return res.status(404).json({ error: "Project not found" });
-    console.log("Updating project", req.body);
-    const updated = Object.assign(Object.assign({}, project), req.body);
-    yield (0, projectFileStore_1.saveProject)(updated);
-    res.json(updated);
+    const { projectId } = req.params;
+    const { name, description, status } = req.body;
+    if (!projectId) {
+        res.status(400).json({ error: "projectId is required" });
+        return;
+    }
+    try {
+        const project = databaseService_1.databaseService.getProject(projectId);
+        if (!project) {
+            res.status(404).json({ error: "Project not found" });
+            return;
+        }
+        // Update fields
+        if (name)
+            project.name = name;
+        if (description !== undefined)
+            project.description = description;
+        if (status)
+            project.status = status;
+        project.updatedAt = new Date().toISOString();
+        project.lastAccessed = new Date().toISOString();
+        databaseService_1.databaseService.saveProject(project);
+        res.json({ success: true, project });
+    }
+    catch (error) {
+        console.error('Error updating project:', error);
+        res.status(500).json({ error: "Failed to update project" });
+    }
 });
 exports.updateProject = updateProject;
 // Delete a project
-const removeProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield (0, projectFileStore_1.deleteProject)(req.params.id);
-    res.json({ message: "Project deleted" });
-});
-exports.removeProject = removeProject;
-const saveProjectState = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const { prompt, lastCode } = req.body;
-    const project = yield (0, projectFileStore_1.getProjectById)(id);
-    if (!project) {
-        res.status(404).json({ error: "Project not found" });
+const deleteProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { projectId } = req.params;
+    if (!projectId) {
+        res.status(400).json({ error: "projectId is required" });
         return;
     }
-    if (prompt !== undefined)
-        project.prompt = prompt;
-    project.lastCode = lastCode;
-    yield (0, projectFileStore_1.saveProject)(project);
-    res.status(200).json({ project });
+    try {
+        const project = databaseService_1.databaseService.getProject(projectId);
+        if (!project) {
+            res.status(404).json({ error: "Project not found" });
+            return;
+        }
+        databaseService_1.databaseService.deleteProject(projectId);
+        res.json({ success: true, message: "Project deleted successfully" });
+    }
+    catch (error) {
+        console.error('Error deleting project:', error);
+        res.status(500).json({ error: "Failed to delete project" });
+    }
 });
-exports.saveProjectState = saveProjectState;
-const getProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const project = yield (0, projectFileStore_1.getProjectById)(req.params.id);
-    if (!project)
-        return res.status(404).json({ error: "Project not found" });
-    res.json(project);
+exports.deleteProject = deleteProject;
+// Archive a project
+const archiveProject = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { projectId } = req.params;
+    if (!projectId) {
+        res.status(400).json({ error: "projectId is required" });
+        return;
+    }
+    try {
+        databaseService_1.databaseService.updateProjectStatus(projectId, 'archived');
+        res.json({ success: true, message: "Project archived successfully" });
+    }
+    catch (error) {
+        console.error('Error archiving project:', error);
+        res.status(500).json({ error: "Failed to archive project" });
+    }
 });
-exports.getProject = getProject;
+exports.archiveProject = archiveProject;

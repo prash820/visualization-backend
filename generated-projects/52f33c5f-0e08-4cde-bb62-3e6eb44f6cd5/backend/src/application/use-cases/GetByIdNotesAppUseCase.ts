@@ -1,0 +1,39 @@
+import { INotesAppRepository } from '../../domain/repositories/INotesAppRepository';
+import { NotesApp } from '../../domain/entities/NotesApp';
+import { INotesAppProps } from '../../domain/entities/NotesApp';
+import { ValidationError } from '../../shared/errors/ValidationError';
+import { NotFoundError } from '../../shared/errors/NotFoundError';
+import { Logger } from '../../shared/logging/Logger';
+
+export interface IGetByIdNotesAppUseCase {
+  execute(id: string): Promise<NotesApp>;
+}
+
+export class GetByIdNotesAppUseCase implements IGetByIdNotesAppUseCase {
+  constructor(
+    private notesappRepository: INotesAppRepository,
+    private logger: Logger
+  ) {}
+
+  async execute(id: string): Promise<NotesApp> {
+    try {
+      this.logger.info(`Executing GetByIdNotesAppUseCase`, { id });
+
+      const result = await this.notesappRepository.findById(id);
+if (!result) {
+  throw new NotFoundError(`NotesApp with id ${id} not found`);
+}
+
+      this.logger.info(`GetByIdNotesAppUseCase executed successfully`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in GetByIdNotesAppUseCase`, { error, id });
+      throw error;
+    }
+  }
+
+  const result = await this.notesappRepository.findById(id);
+if (!result) {
+  throw new NotFoundError(`NotesApp with id ${id} not found`);
+}
+}

@@ -1,0 +1,71 @@
+service: notes-service
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: us-east-1
+  stage: dev
+  environment:
+    S3_BUCKET_NAME: notes-web-furon2
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:GetObject
+        - s3:DeleteObject
+      Resource: arn:aws:s3:::notes-web-furon2/*
+    - Effect: Allow
+      Action:
+        - lambda:InvokeFunction
+      Resource: arn:aws:lambda:us-east-1:413486338132:function:notes-search-furon2
+
+functions:
+  notesSearch:
+    handler: handler.notesSearch
+    memorySize: 128
+    timeout: 10
+    events:
+      - http:
+          path: notes/search
+          method: get
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+
+resources:
+  Resources:
+    ApiGatewayRestApi:
+      Type: AWS::ApiGateway::RestApi
+      Properties:
+        Name: NotesApi
+    ApiGatewayResource:
+      Type: AWS::ApiGateway::Resource
+      Properties:
+        ParentId:
+          Fn::GetAtt:
+            - ApiGatewayRestApi
+            - RootResourceId
+        PathPart: notes
+        RestApiId:
+          Ref: ApiGatewayRestApi
+    ApiGatewayMethod:
+      Type: AWS::ApiGateway::Method
+      Properties:
+        AuthorizationType: NONE
+        HttpMethod: GET
+        ResourceId:
+          Ref: ApiGatewayResource
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        Integration:
+          IntegrationHttpMethod: POST
+          Type: AWS_PROXY
+          Uri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:413486338132:function:notes-search-furon2/invocations
+        MethodResponses:
+          - StatusCode: 200

@@ -1,0 +1,35 @@
+{
+  "projectId": "calculator-app-simple",
+  "createdAt": "2025-08-07T01:41:09.795Z",
+  "status": "converted",
+  "structure": {
+    "frontend": true,
+    "backend": true,
+    "shared": true
+  },
+  "files": [
+    "generated-projects/calculator-app-simple/frontend/src/components/CalculatorApp.tsx",
+    "generated-projects/calculator-app-simple/frontend/src/pages/Dashboard.tsx",
+    "generated-projects/calculator-app-simple/frontend/src/hooks/useApi.ts",
+    "generated-projects/calculator-app-simple/frontend/src/services/api.ts",
+    "generated-projects/calculator-app-simple/frontend/src/utils/types.ts",
+    "generated-projects/calculator-app-simple/frontend/package.json",
+    "generated-projects/calculator-app-simple/frontend/public/index.html",
+    "generated-projects/calculator-app-simple/frontend/src/components/Login.tsx",
+    "generated-projects/calculator-app-simple/frontend/src/App.tsx",
+    "generated-projects/calculator-app-simple/frontend/src/index.tsx",
+    "generated-projects/calculator-app-simple/frontend/src/index.css",
+    "generated-projects/calculator-app-simple/backend/src/controllers/CalculatorController.ts",
+    "generated-projects/calculator-app-simple/backend/src/models/Calculation.ts",
+    "generated-projects/calculator-app-simple/backend/src/services/CalculatorService.ts",
+    "generated-projects/calculator-app-simple/backend/src/routes/CalculatorRoutes.ts",
+    "generated-projects/calculator-app-simple/backend/src/middleware/errorHandler.ts",
+    "generated-projects/calculator-app-simple/backend/src/utils/config.ts",
+    "generated-projects/calculator-app-simple/backend/package.json",
+    "generated-projects/calculator-app-simple/backend/src/index.ts",
+    "generated-projects/calculator-app-simple/backend/tsconfig.json",
+    "generated-projects/calculator-app-simple/shared/types.ts"
+  ],
+  "errors": [],
+  "warnings": []
+}

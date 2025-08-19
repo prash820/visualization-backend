@@ -1,63 +1,152 @@
-import express from "express";
-import  { Request, Response,  } from "express";
-import { getAllProjects, getProjectById, saveProject, deleteProject, Project } from "../utils/projectFileStore";
-import dotenv from "dotenv";
+import { Request, Response } from "express";
+import { databaseService, Project } from "../services/databaseService";
 import { v4 as uuidv4 } from "uuid";
-dotenv.config();
-const router = express.Router();
-export default router;
-// Create a project
-export const createProject = async (req: Request, res: Response) => {
-  const newProject: Project = {
-    ...req.body,
-    _id: uuidv4(),
-    createdAt: new Date().toISOString(),
-  };
-  await saveProject(newProject);
-  res.status(201).json(newProject);
-};
 
-// Get all projects for a user
-export const getProjects = async (req: Request, res: Response) => {
-  const projects = await getAllProjects();
-  res.json(projects);
-};
-
-// Update a project
-export const updateProject = async (req: Request, res: Response) => {
-  const project = await getProjectById(req.params.id);
-  if (!project) return res.status(404).json({ error: "Project not found" });
-  console.log("Updating project", req.body);
-  const updated: Project = { ...project, ...req.body };
-  await saveProject(updated);
-  res.json(updated);
-};
-
-// Delete a project
-export const removeProject = async (req: Request, res: Response) => {
-  await deleteProject(req.params.id);
-  res.json({ message: "Project deleted" });
-};
-
-export const saveProjectState = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { prompt, lastCode } = req.body;
-
-  const project = await getProjectById(id);
-  if (!project) {
-    res.status(404).json({ error: "Project not found" });
+// Create a new project
+export const createProject = async (req: Request, res: Response): Promise<void> => {
+  const { name, description, userId } = req.body;
+  
+  if (!name || !userId) {
+    res.status(400).json({ error: "Name and userId are required" });
     return;
   }
 
-  if (prompt !== undefined) project.prompt = prompt;
-  project.lastCode = lastCode;
-  await saveProject(project);
+  const now = new Date().toISOString();
+  const project: Project = {
+    id: uuidv4(),
+    name,
+    description,
+    userId,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+    lastAccessed: now
+  };
 
-  res.status(200).json({ project });
+  try {
+    databaseService.saveProject(project);
+    res.json({ success: true, project });
+  } catch (error) {
+    console.error('Error creating project:', error);
+    res.status(500).json({ error: "Failed to create project" });
+  }
 };
 
-export const getProject = async (req: Request, res: Response) => {
-  const project = await getProjectById(req.params.id);
-  if (!project) return res.status(404).json({ error: "Project not found" });
-  res.json(project);
+// Get all projects for a user
+export const getUserProjects = async (req: Request, res: Response): Promise<void> => {
+  const { userId } = req.params;
+  
+  if (!userId) {
+    res.status(400).json({ error: "userId is required" });
+    return;
+  }
+
+  try {
+    const projects = databaseService.getProjectsByUserId(userId);
+    res.json({ projects });
+  } catch (error) {
+    console.error('Error getting user projects:', error);
+    res.status(500).json({ error: "Failed to get projects" });
+  }
+};
+
+// Get a specific project
+export const getProject = async (req: Request, res: Response): Promise<void> => {
+  const { projectId } = req.params;
+  
+  if (!projectId) {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+
+  try {
+    const project = databaseService.getProject(projectId);
+    
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+
+    res.json({ project });
+  } catch (error) {
+    console.error('Error getting project:', error);
+    res.status(500).json({ error: "Failed to get project" });
+  }
+};
+
+// Update a project
+export const updateProject = async (req: Request, res: Response): Promise<void> => {
+  const { projectId } = req.params;
+  const { name, description, status } = req.body;
+  
+  if (!projectId) {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+
+  try {
+    const project = databaseService.getProject(projectId);
+    
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+
+    // Update fields
+    if (name) project.name = name;
+    if (description !== undefined) project.description = description;
+    if (status) project.status = status;
+    
+    project.updatedAt = new Date().toISOString();
+    project.lastAccessed = new Date().toISOString();
+
+    databaseService.saveProject(project);
+    res.json({ success: true, project });
+  } catch (error) {
+    console.error('Error updating project:', error);
+    res.status(500).json({ error: "Failed to update project" });
+  }
+};
+
+// Delete a project
+export const deleteProject = async (req: Request, res: Response): Promise<void> => {
+  const { projectId } = req.params;
+  
+  if (!projectId) {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+
+  try {
+    const project = databaseService.getProject(projectId);
+    
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+
+    databaseService.deleteProject(projectId);
+    res.json({ success: true, message: "Project deleted successfully" });
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).json({ error: "Failed to delete project" });
+  }
+};
+
+// Archive a project
+export const archiveProject = async (req: Request, res: Response): Promise<void> => {
+  const { projectId } = req.params;
+  
+  if (!projectId) {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+
+  try {
+    databaseService.updateProjectStatus(projectId, 'archived');
+    res.json({ success: true, message: "Project archived successfully" });
+  } catch (error) {
+    console.error('Error archiving project:', error);
+    res.status(500).json({ error: "Failed to archive project" });
+  }
 };

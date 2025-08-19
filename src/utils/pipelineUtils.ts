@@ -54,17 +54,22 @@ export async function runFrontendIntegrationTest(): Promise<void> {
   });
 }
 
-export async function wireUpApiIntegration(frontendPlan: any, backendPlan: any): Promise<void> {
-  console.log('[Pipeline] Wiring up API integration between frontend and backend...');
+export async function wireUpApiIntegration(frontendPlan: any, backendPlan: any, infrastructureContext?: any): Promise<void> {
+  console.log('[Pipeline] Wiring up API integration with infrastructure context');
   
-  // This function would handle connecting the frontend to the backend APIs
-  // For now, we'll just log that this step is completed
+  // Implementation for wiring up API integration
+  // This would typically involve:
+  //1 Updating frontend API service files with real endpoints
+  // 2. Configuring CORS and authentication
+  // 3. Setting up environment variables
+  // 4. Testing API connectivity
+  
+  if (infrastructureContext) {
+    console.log('[Pipeline] Using infrastructure context for API wiring:', infrastructureContext);
+  }
+  
+  // Placeholder implementation
   console.log('[Pipeline] API integration wiring completed');
-  
-  // TODO: Implement actual API wiring logic
-  // - Update frontend API calls to use backend endpoints
-  // - Configure CORS and other integration settings
-  // - Set up environment variables for API URLs
 }
 
 export async function runEndToEndTests(): Promise<void> {

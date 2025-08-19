@@ -6,13 +6,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // src/routes/auth.ts
 const express_1 = __importDefault(require("express"));
 const authController_1 = require("../controllers/authController");
+const auth_1 = require("../middleware/auth");
 const asyncHandler_1 = __importDefault(require("../utils/asyncHandler"));
 const router = express_1.default.Router();
-// Login endpoint
-router.post("/login", (0, asyncHandler_1.default)(authController_1.login));
-// Register endpoint
-router.post("/register", authController_1.register);
-// Token validation endpoint
-router.get("/validate-token", authController_1.validateToken);
-router.post("/validate", authController_1.validateToken);
+// Public routes with rate limiting
+router.post("/register", auth_1.authRateLimit, (0, asyncHandler_1.default)(authController_1.register));
+router.post("/login", (req, res, next) => {
+    console.log('[AUTH ROUTE] Login request received:', req.body);
+    next();
+}, auth_1.authRateLimit, (0, asyncHandler_1.default)(authController_1.login));
+// Protected routes
+router.get("/validate", auth_1.authenticateToken, (0, asyncHandler_1.default)(authController_1.validateToken));
+router.get("/profile", auth_1.authenticateToken, (0, asyncHandler_1.default)(authController_1.getProfile));
+router.post("/logout", auth_1.authenticateToken, (0, asyncHandler_1.default)(authController_1.logout));
 exports.default = router;

@@ -7,20 +7,29 @@ import { errorHandler } from "./middleware/errorHandler";
 import openAIRoutes from "./routes/openAI";
 import authRoutes from "./routes/auth";
 import projectRoutes from "./routes/project";
-import iacRoutes from "./routes/iac";
+import iacRoutes from "./routes/iacRoutes";
 import deployRoutes from "./routes/deployRoutes";
 import sandboxRoutes from "./routes/sandboxRoutes";
 import umlRoutes from "./routes/uml";
-import codeRoutes from "./routes/appCode";
 import documentationRoutes from "./routes/documentation";
 import magicRoutes from "./routes/magicRoutes";
+import codeGenerationRoutes from "./routes/codeGeneration";
+import appCodeRoutes from "./routes/appCode";
+import automationRoutes from "./routes/automation";
+import architectureRecommendationRoutes from "./routes/architectureRecommendationRoutes";
+import deploymentRoutes from "./routes/deploymentRoutes";
+import deploymentWizardRoutes from './routes/deploymentWizardRoutes';
+import pricingRoutes from './routes/pricingRoutes';
+import regionRoutes from './routes/regionRoutes';
+import sqliteRoutes from './routes/sqliteRoutes';
 import { spawn } from "child_process";
 import path from "path";
 import { memoryManager } from "./utils/memoryManager";
-import { generateUmlFromPrompt } from './utils/umlGenerator';
-import { getProjectById } from './utils/projectFileStore';
+import { databaseService } from "./services/databaseService";
 
 dotenv.config();
+console.log('[Server] JWT_SECRET from env:', process.env.JWT_SECRET);
+console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -28,6 +37,16 @@ const PORT = process.env.PORT || 5001;
 if (process.env.NODE_ENV === 'production') {
   // Optimize garbage collection for production
   process.env.NODE_OPTIONS = '--max-old-space-size=512 --optimize-for-size';
+} else {
+  // Development memory settings
+  process.env.NODE_OPTIONS = '--max-old-space-size=1024 --expose-gc';
+}
+
+// Enable garbage collection for memory management
+if (global.gc) {
+  console.log('[Server] Garbage collection enabled');
+} else {
+  console.log('[Server] Garbage collection not available - run with --expose-gc flag');
 }
 
 // Increase timeout for all routes
@@ -139,8 +158,16 @@ app.use("/api/deploy", deployRoutes);
 app.use("/api/sandbox", sandboxRoutes);
 app.use("/api/uml", umlRoutes);
 app.use("/api/documentation", documentationRoutes);
-app.use("/api/code", codeRoutes);
 app.use("/api/magic", magicRoutes); // 🚀 NEW: Magic one-step app creation
+app.use("/api/code-generation", codeGenerationRoutes); // 🧠 NEW: Code Generation Engine
+app.use("/api/app-code", appCodeRoutes); // 📁 NEW: App Code Conversion & Deployment
+app.use("/api/automation", automationRoutes); // 🤖 NEW: Complete Automation Pipeline
+app.use("/api/architecture", architectureRecommendationRoutes); // 🏗️ NEW: Smart Cloud Architect
+app.use("/api/deployment", deploymentRoutes); // 🚀 NEW: Code Deployment Engine
+app.use("/api/deployment-wizard", deploymentWizardRoutes); // 🚀 NEW: Deployment Wizard
+app.use("/api/pricing", pricingRoutes); // 💰 NEW: AWS Pricing Service
+app.use("/api/region", regionRoutes); // 🌍 NEW: Region Detection & Selection
+app.use("/api/sqlite", sqliteRoutes); // 🗄️ NEW: SQLite Database Access
 
 // 🔹 Configuration endpoint for frontend
 app.get("/api/config", (req: Request, res: Response) => {
@@ -352,6 +379,15 @@ const gracefulShutdown = async (signal: string) => {
   // Shutdown memory manager
   memoryManager.shutdown();
   
+  // Close database connection
+  try {
+    databaseService.close();
+    console.log("[Database] Database connection closed");
+  } catch (error) {
+    console.error("[Database] Error closing database:", error);
+  }
+
+  
   // Kill Terraform service if it's running
   if (terraformProcess) {
     console.log("[Terraform Service] Terminating Terraform service...");
@@ -382,8 +418,18 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
 
-const startServer = () => {
+const startServer = async () => {
   console.log("🚀 Starting Chart AI Visualization Backend...");
+  
+  // Initialize database
+  console.log("🗄️ Initializing database...");
+  try {
+    await databaseService.migrateFromFileStorage();
+    const stats = databaseService.getStats();
+    console.log(`📊 Database stats: ${stats.totalUsers} users, ${stats.totalJobs} jobs`);
+  } catch (error) {
+    console.error("❌ Database initialization failed:", error);
+  }
   
   // Initialize memory management
   console.log("🧠 Initializing memory management...");

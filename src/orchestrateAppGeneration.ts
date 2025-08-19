@@ -1,43 +1,89 @@
-import { loadUmlDiagrams, analyzeBackendUml, analyzeFrontendUml } from './utils/umlUtils';
-import { generateBackendFile } from './agents/backendComponentAgent';
-import { generateFrontendFile } from './agents/frontendComponentAgent';
-import { runBuildFixPipeline, runBackendIntegrationTest, runFrontendIntegrationTest, wireUpApiIntegration, runEndToEndTests } from './utils/pipelineUtils';
-import { saveFileToDisk } from './utils/fileUtils';
-import { flattenFileStructure } from './utils/flattenFileStructure';
+/**
+ * Infrastructure Context Interface
+ * Defines the infrastructure context for application generation
+ */
 
-export async function orchestrateAppGeneration(projectId: string) {
-  // 1. Read UML diagrams
-  const umlDiagrams = await loadUmlDiagrams(projectId);
+export interface InfrastructureContext {
+  provider: 'aws' | 'azure' | 'gcp' | 'local';
+  region: string;
+  services: {
+    database?: {
+      type: 'dynamodb' | 'rds' | 'mongodb' | 'postgresql';
+      name: string;
+      tables: string[];
+    };
+    storage?: {
+      type: 's3' | 'blob' | 'cloud-storage';
+      name: string;
+      buckets: string[];
+    };
+    compute?: {
+      type: 'lambda' | 'ec2' | 'container' | 'function';
+      name: string;
+      functions: string[];
+    };
+    api?: {
+      type: 'api-gateway' | 'load-balancer' | 'app-service';
+      name: string;
+      endpoints: string[];
+    };
+    auth?: {
+      type: 'cognito' | 'auth0' | 'firebase-auth';
+      name: string;
+    };
+    monitoring?: {
+      type: 'cloudwatch' | 'application-insights' | 'stackdriver';
+      name: string;
+    };
+  };
+  deployment: {
+    type: 'serverless' | 'container' | 'vm' | 'static';
+    environment: 'development' | 'staging' | 'production';
+    autoScaling: boolean;
+    loadBalancing: boolean;
+  };
+  networking: {
+    vpc?: {
+      id: string;
+      subnets: string[];
+    };
+    domain?: string;
+    ssl: boolean;
+    cdn: boolean;
+  };
+  security: {
+    encryption: boolean;
+    iam: boolean;
+    vpc: boolean;
+    waf: boolean;
+  };
+  cost: {
+    estimatedMonthlyCost: number;
+    currency: string;
+    optimization: boolean;
+  };
+  // Additional properties for deployment URLs
+  lambdaFunctionUrl?: string;
+  loadBalancerUrl?: string;
+  s3BucketName?: string;
+  cloudfrontUrl?: string;
+}
 
-  // 2. Analyze backend UML diagrams
-  const backendPlan = await analyzeBackendUml(umlDiagrams.backend);
+export interface AppGenerationContext {
+  userPrompt: string;
+  targetCustomers?: string;
+  projectId: string;
+  infrastructureContext: InfrastructureContext;
+  umlDiagrams?: any;
+  generatedCode?: any;
+  deploymentUrl?: string;
+}
 
-  // 3. Backend code generation (per file)
-  const backendFiles = flattenFileStructure(backendPlan.fileStructure);
-  for (const file of backendFiles) {
-    const code = await generateBackendFile(file, backendPlan);
-    await saveFileToDisk(file.path, code);
-  }
-
-  // 4. Backend fix & integration test
-  await runBuildFixPipeline('backend');
-  await runBackendIntegrationTest();
-
-  // 5. Analyze frontend UML diagrams (with backend context)
-  const frontendPlan = await analyzeFrontendUml(umlDiagrams.frontend, backendPlan.apiSchema);
-
-  // 6. Frontend code generation (per file)
-  const frontendFiles = flattenFileStructure(frontendPlan.fileStructure);
-  for (const file of frontendFiles) {
-    const code = await generateFrontendFile(file, frontendPlan, backendPlan.apiSchema);
-    await saveFileToDisk(file.path, code);
-  }
-
-  // 7. Frontend fix & integration test
-  await runBuildFixPipeline('frontend');
-  await runFrontendIntegrationTest();
-
-  // 8. Integration: wire up API calls, run end-to-end tests
-  await wireUpApiIntegration(frontendPlan, backendPlan);
-  await runEndToEndTests();
+export interface GenerationResult {
+  success: boolean;
+  projectPath: string;
+  deploymentUrl?: string;
+  errors: string[];
+  warnings: string[];
+  generatedFiles: Array<{ path: string; content: string }>;
 } 

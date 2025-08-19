@@ -11,5 +11,5 @@ console.log("In IAC");
 // Generate Infrastructure as Code (IaC)
 router.post("/", (0, asyncHandler_1.default)(iacController_1.generateIaC));
 // Poll IaC job status
-router.get("/status/:jobId", (0, asyncHandler_1.default)(iacController_1.getIaCJobStatus));
+router.get("/status/:jobId", (0, asyncHandler_1.default)(iacController_1.getInfrastructureJobStatus));
 exports.default = router;
